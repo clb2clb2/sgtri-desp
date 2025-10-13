@@ -258,12 +258,16 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Alojamiento: permitir sólo dígitos y comas en tiempo real; convertir puntos a comas
+    // Alojamiento: durante la edición permitir dígitos y UNA coma decimal; convertir puntos a comas
+    // Al perder foco seguirá aplicándose el formateo con miles y decimales.
     if (el.classList && el.classList.contains('format-alojamiento')) {
       applyWithCaretPreserved(el, (val, selStart) => {
         const v = (val || '');
+        // convertir puntos a comas (usuario puede escribir punto como separador accidental)
         let s = v.replace(/\./g, ',');
+        // eliminar espacios y caracteres no numéricos/coma
         s = s.replace(/[^0-9,]/g, '');
+        // permitir sólo una coma
         const parts = s.split(',');
         if (parts.length > 2) s = parts[0] + ',' + parts.slice(1).join('');
         return s;
@@ -750,7 +754,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (isNaN(num)) { el.value = ''; return; }
       // Round to nearest integer as requested
       const rounded = Math.round(num);
-      el.value = Number(rounded).toLocaleString('de-DE');
+      // Mostrar con separador de miles y añadir unidad ' km'
+      el.value = Number(rounded).toLocaleString('de-DE') + ' km';
     }
 
     if (el && el.classList && el.classList.contains('format-alojamiento')) {
@@ -765,6 +770,38 @@ document.addEventListener("DOMContentLoaded", () => {
       el.value = parts[0] + ',' + parts[1] + ' €';
     }
   }, true);
+
+  // Al entrar en un campo km, quitar la unidad y desformatear para permitir edición
+  document.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (el && el.classList && el.classList.contains('format-km')) {
+      // Si el valor termina en ' km', lo quitamos y desformateamos
+      const v = (el.value || '').toString().trim();
+      if (v.endsWith(' km')) {
+        const core = v.slice(0, -3).replace(/\./g, ''); // quitar puntos de miles
+        el.value = core;
+        // colocar caret al final
+        try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) {}
+      }
+    }
+
+    // Al entrar en Alojamiento, quitar símbolo € y separadores de miles para edición
+    if (el && el.classList && el.classList.contains('format-alojamiento')) {
+      const v = (el.value || '').toString().trim();
+      // Quitar sufijo ' €' si existe y cualquier espacio
+      let core = v.replace(/\s*€\s*$/, '');
+      // Eliminar puntos de miles
+      core = core.replace(/\./g, '');
+      // Si el usuario o el formato usa punto decimal, convertirlo a coma
+      core = core.replace(/,/g, ',');
+      // Dejar sólo dígitos y una coma decimal (si existe)
+      core = core.replace(/[^0-9,]/g, '');
+      const parts = core.split(',');
+      if (parts.length > 2) core = parts[0] + ',' + parts.slice(1).join('');
+      if (core !== el.value) el.value = core;
+      try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) {}
+    }
+  });
 
   // Función para crear un nuevo desplazamiento
   function crearNuevoDesplazamiento() {
@@ -838,11 +875,11 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="form-row two-cols-50-50">
         <div class="form-group">
           <label for="km-${desplazamientoCounter}">Km:</label>
-          <input type="text" id="km-${desplazamientoCounter}" name="km-${desplazamientoCounter}" class="format-km" placeholder="0" />
+          <input type="text" id="km-${desplazamientoCounter}" name="km-${desplazamientoCounter}" class="format-km" placeholder="0 km" />
         </div>
         <div class="form-group">
           <label for="alojamiento-${desplazamientoCounter}">Alojamiento (€):</label>
-          <input type="text" id="alojamiento-${desplazamientoCounter}" name="alojamiento-${desplazamientoCounter}" class="format-alojamiento" placeholder="0,00" />
+          <input type="text" id="alojamiento-${desplazamientoCounter}" name="alojamiento-${desplazamientoCounter}" class="format-alojamiento" placeholder="0,00 €" />
         </div>
       </div>
 
