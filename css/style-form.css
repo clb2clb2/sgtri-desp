@@ -185,7 +185,7 @@ input[type="number"] {
   width: 100%;
   box-sizing: border-box;
 }
-.form-row.three-cols-33 { grid-template-columns: repeat(3, 33%); }
+.form-row.three-cols-33 { grid-template-columns: repeat(3, 1fr); }
 
 /* Quitar flechas de inputs number */
 input[type="number"]::-webkit-outer-spin-button,
@@ -215,23 +215,18 @@ input[type="number"]:focus {
   box-shadow: 0 0 4px rgba(106, 139, 69, 0.4);
 }
 
-.fronteras-fields {
-  background-color: #fff3cd;
-  padding: 1rem;
+
+/* Filas condicionales (fronteras, ticket-cena, etc.)
+   Estilo común para líneas que aparecen/ocultan solicitando datos adicionales */
+.conditional-row {
+  background-color: #ddf3f5;
+  padding: 0.5rem 1rem;
   border-radius: 6px;
-  margin: 1rem 0;
-  border-left: 4px solid #ffc107;
+  margin: 0.5rem 0;
+  border-left: 4px solid #53868b;
 }
 
-.ticket-cena-field {
-  background-color: #d1ecf1;
-  padding: 1rem;
-  border-radius: 6px;
-  margin: 1rem 0;
-  border-left: 4px solid #17a2b8;
-}
-
-.ticket-cena-field label {
+.conditional-row label {
   display: flex;
   align-items: center;
   font-weight: 600;
@@ -239,7 +234,7 @@ input[type="number"]:focus {
   cursor: pointer;
 }
 
-.ticket-cena-field input[type="checkbox"] {
+.conditional-row input[type="checkbox"] {
   margin-right: 0.5rem;
   width: 18px;
   height: 18px;

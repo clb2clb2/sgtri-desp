@@ -852,7 +852,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
 
-      <div class="fronteras-fields" id="fronteras-fields-${desplazamientoCounter}" style="display: none;">
+  <div class="fronteras-fields conditional-row" id="fronteras-fields-${desplazamientoCounter}" style="display: none;">
         <div class="form-row">
           <div class="form-group">
             <label for="cruce-ida-${desplazamientoCounter}">Cruce de fronteras Ida</label>
@@ -883,7 +883,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
 
-      <div class="ticket-cena-field" id="ticket-cena-field-${desplazamientoCounter}" style="display: ${mostrarTicketCena ? 'block' : 'none'};">
+  <div class="ticket-cena-field conditional-row" id="ticket-cena-field-${desplazamientoCounter}" style="display: ${mostrarTicketCena ? 'block' : 'none'};">
         <div class="form-group">
           <label>
             <input type="checkbox" id="ticket-cena-${desplazamientoCounter}" name="ticket-cena-${desplazamientoCounter}" />
