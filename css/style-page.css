@@ -1,0 +1,96 @@
+body {
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background-color: #e0e0e0; /* fondo ligeramente más oscuro */
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+
+/* Encabezado */
+.Encabezado {
+    background-color: #53868b;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 40px;
+    margin-bottom: 1rem;
+}
+
+.Encabezado .logo {
+    height: 80px;
+    width: auto;
+    margin: 10px;
+}
+
+.Encabezado h1 {
+    font-family: "Roboto", Arial, sans-serif;
+    font-weight: 700;
+    flex: 1;
+    font-size: 2rem;
+    text-align: center;
+    margin: 0;
+}
+
+/* Contenedor único para secciones */
+.form-sections-wrapper {
+    background-color: white;
+    margin: 0 auto 2rem auto;
+    width: min(90%, 800px);
+    border-radius: 0; /* esquinas cuadradas */
+}
+
+/* Títulos de sección */
+.section-title {
+    background-color: #53868b;
+    color: white;
+    padding: 0.75rem 1rem;
+    font-size: 1.2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-family: "Roboto", Arial, sans-serif;
+    font-weight: 700;
+    margin: 0 0 5px 0;
+}
+
+/* Icono de desplegar/plegar */
+.toggle-section {
+    user-select: none;
+    font-size: 1.2rem;
+}
+
+/* Contenido de cada sección */
+.section-content-wrapper {
+    /* No usamos un max-height fijo aquí: el JS establece inline max-height
+       dinámicamente (en px) para permitir transiciones suaves con contenido
+       dinámico. Mantener overflow hidden para que el colapso oculte el contenido. */
+    overflow: hidden;
+    transition: max-height 0.28s ease-out;
+}
+
+.section-content-wrapper.collapsed {
+    max-height: 0;
+}
+
+.section-content {
+    padding: 0.5rem 1rem 2rem 1rem;
+    background-color: white;
+}
+
+/* Formularios */
+/* .form-group spacing centralized in css/style-form.css */
+
+label {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+input[type="text"],
+select {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
