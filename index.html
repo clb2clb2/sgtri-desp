@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/style-form.css" />
 
   <script src="js/main.js" defer></script>
+  <script src="js/dietasCalc.js" defer></script>
   <script src="js/formLogic.js" defer></script>
 </head>
 
@@ -53,14 +54,16 @@
                 <select id="categoria" name="categoria" required></select>
               </div>
             </div>
-            <div class="form-row two-cols-25-75">
+            <div class="form-row three-cols-25-50-25">
               <div class="form-group">
                 <label for="tipo-pago">Pago en</label>
                 <select id="tipo-pago" name="tipo-pago" required></select>
               </div>
-              <div class="form-group">
-                <label for="iban">IBAN</label>
-                <input type="text" id="iban" name="iban" maxlength="30" />
+              <div id="pago-iban-container" class="form-group">
+                <!-- El contenido (IBAN / tarjeta) se renderiza dinámicamente aquí -->
+              </div>
+              <div id="pago-swift-container" class="form-group">
+                <!-- El contenido SWIFT se renderiza dinámicamente aquí para Cuenta Extranjera -->
               </div>
             </div>
           </form>
@@ -160,6 +163,16 @@
                   </div>
                 </div>
 
+                <!-- Ticket Cena (oculto por defecto, se mostrará según tipo de proyecto) -->
+                <div class="ticket-cena-field conditional-row" id="ticket-cena-field-1" style="display: none;">
+                  <div class="form-group">
+                    <label>
+                      <input type="checkbox" id="ticket-cena-1" name="ticket-cena-1" />
+                      Aporta justificante de pago por la cena del último día.
+                    </label>
+                  </div>
+                </div>
+
                 <div class="form-row three-cols-33">
                   <div class="form-group">
                     <label for="origen-1">Origen</label>
@@ -172,7 +185,6 @@
                   <div class="form-group">
                     <label for="pais-destino-1">País de Destino</label>
                     <select id="pais-destino-1" name="pais-destino-1" required>
-                      <option value="España">España</option>
                     </select>
                   </div>
                 </div>
@@ -200,7 +212,7 @@
 
                 <div class="form-row two-cols-50-50">
                   <div class="form-group">
-                    <label for="km-1">Km:</label>
+                    <label for="km-1">Kilometraje en vehículo particular:</label>
                     <input type="text" id="km-1" name="km-1" class="format-km" placeholder="0 km" />
                   </div>
                   <div class="form-group">
@@ -209,15 +221,7 @@
                   </div>
                 </div>
 
-                <!-- Campo Ticket Cena (oculto por defecto, se muestra según tipo de proyecto) -->
-                <div class="ticket-cena-field conditional-row" id="ticket-cena-field-1" style="display: none;">
-                  <div class="form-group">
-                    <label>
-                      <input type="checkbox" id="ticket-cena-1" name="ticket-cena-1" />
-                      Ticket Cena
-                    </label>
-                  </div>
-                </div>
+                <!-- (duplicado eliminado) -->
 
                 <button type="button" class="btn-eliminar-desplazamiento" style="display: none;" aria-label="Eliminar desplazamiento 1">
                   <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6zm2 3h14l-1.2 11.3A2 2 0 0 1 15.8 22H8.2a2 2 0 0 1-1.99-1.7L5 9zm5-7h4l1 1H9l1-1z"/></svg>
@@ -230,6 +234,9 @@
             <button type="button" id="btn-add-desplazamiento" class="btn-add-desplazamiento">
               Añadir otro desplazamiento
             </button>
+
+              <!-- Ficha para vehículo particular (se muestra dinámicamente si hay km > 0) -->
+              <div id="vehiculo-particular-container"></div>
           </form>
         </div>
       </div>

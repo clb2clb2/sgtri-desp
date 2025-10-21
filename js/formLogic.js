@@ -119,16 +119,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el.id === 'iban' || el.classList.contains('iban')) {
       applyWithCaretPreserved(el, (val, selStart) => {
         const v = val || '';
+        // Determine max raw length from attribute or maxlength (fallback to 34)
+        const attrMax = parseInt(el.getAttribute && el.getAttribute('data-raw-max')) || parseInt(el.getAttribute && el.getAttribute('maxlength')) || 34;
         // Si justo antes del caret hay un espacio (usuario acaba de teclear espacio), respetamos el espacio y no reagrupamos
         if (selStart > 0 && v[selStart - 1] === ' ') {
           // Permitimos espacios escritos por el usuario; limpiamos otros caracteres inválidos y forzamos mayúsculas
           const cleaned = v.replace(/[^A-Za-z0-9 ]/g, '').toUpperCase();
-          // Limitar al número máximo de caracteres alfanuméricos (24)
+          // Limitar al número máximo de caracteres alfanuméricos
           const onlyAlnum = cleaned.replace(/[^A-Za-z0-9]/g, '');
-          const limitedAlnum = onlyAlnum.slice(0, 24);
+          const limitedAlnum = onlyAlnum.slice(0, attrMax);
           // Reconstruir manteniendo los espacios lo más posible: simple fallback — quitar exceso al final
-          // Si hay más letras que el límite, acortamos desde el final
-          if (onlyAlnum.length <= 24) return cleaned.toUpperCase();
+          if (onlyAlnum.length <= attrMax) return cleaned.toUpperCase();
           // cortar exceso: reconstruir a partir de cleaned dejando sólo primeros limitedAlnum y respetando espacios antes
           let result = '';
           let taken = 0;
@@ -143,10 +144,26 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // De lo contrario, agrupamos automáticamente: sólo alfanuméricos, mayúsculas y grupos de 4
-        const raw = v.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 24);
+        const raw = v.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, attrMax);
         const parts = raw.match(/.{1,4}/g) || [];
         return parts.join(' ').toUpperCase();
       });
+      return;
+    }
+
+    // SWIFT/BIC: sólo alfanumérico, mayúsculas, hasta 11 caracteres
+    if (el.id === 'swift' || el.classList.contains('swift')) {
+      applyWithCaretPreserved(el, (val) => {
+        const v = String(val || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        return v.slice(0, 11);
+      });
+      return;
+    }
+
+    // Número de tarjeta (Tarjeta UEx): sólo dígitos, agrupar en bloques de 4, hasta 19 dígitos
+    if (el.id === 'numero-tarjeta' || el.classList.contains('card-number')) {
+      // Use processGroupedInput for caret-preserving grouping
+      processGroupedInput(el, { groupSize: 4, sep: ' ', maxRawLen: 19, validPattern: '\\d' });
       return;
     }
 
@@ -518,6 +535,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return response.json();
     })
     .then(data => {
+      // Exponer los datos cargados para que otros módulos (dietasCalc, etc.) puedan consultarlos
+      try { window.__sgtriDatos = data; } catch (e) {}
       // -------------------------
       // 1️⃣ Rellenar "En calidad de"
       // -------------------------
@@ -563,10 +582,11 @@ document.addEventListener("DOMContentLoaded", () => {
         actualizarTextoDecreto(tipoProyecto.value);
       });
 
-      // -------------------------
-      // 6️⃣ Paises: guardar y poblar select inicial de desplazamientos
-      // -------------------------
-      paisesData = data.paises || [];
+  // -------------------------
+  // 6️⃣ Paises: guardar y poblar select inicial de desplazamientos
+  //     Ahora usamos el array `dietasPorPais.paises` desde datos.json
+  // -------------------------
+  paisesData = (data.dietasPorPais && data.dietasPorPais.paises) ? data.dietasPorPais.paises : [];
       const primerSelectPais = document.getElementById('pais-destino-1');
       if (primerSelectPais && paisesData.length > 0) {
         poblarSelectPaises(primerSelectPais);
@@ -576,9 +596,14 @@ document.addEventListener("DOMContentLoaded", () => {
           manejarCambioPais(1);
         });
       }
-
       // Actualizar visibilidad inicial del ticket cena
       actualizarTicketCena();
+      // Render inicial de campos de pago según la opción seleccionada
+      renderPagoFields(tipoPagoSelect.value);
+      // Escuchar cambios en el select de pago para render dinámico
+      tipoPagoSelect.addEventListener('change', (e) => {
+        renderPagoFields(e.target.value);
+      });
       // Asegurar numeración/visibilidad inicial de proyectos y desplazamientos
       actualizarNumerosProyectos();
       actualizarNumerosDesplazamientos();
@@ -621,11 +646,23 @@ document.addEventListener("DOMContentLoaded", () => {
   // Función para actualizar visibilidad del campo Ticket Cena según tipo de proyecto
   function actualizarTicketCena() {
     const tipoProyectoValor = tipoProyecto.value;
-    const mostrarTicketCena = ["G24", "PEI", "NAL"].includes(tipoProyectoValor);
-    
-    // Actualizar todos los desplazamientos existentes
-    document.querySelectorAll('.ticket-cena-field').forEach(field => {
-      field.style.display = mostrarTicketCena ? 'block' : 'none';
+    const esRD462 = ["G24", "PEI", "NAL"].includes(tipoProyectoValor);
+    // Para cada desplazamiento: mostrar sólo si es RD462 y la hora de regreso es > 22:00 (a partir de 22:01)
+    document.querySelectorAll('.desplazamiento-grupo').forEach(desp => {
+      const id = desp.dataset.desplazamientoId;
+      const field = desp.querySelector(`#ticket-cena-field-${id}`);
+      if (!field) return;
+      if (!esRD462) { field.style.display = 'none'; return; }
+      const horaRegresoEl = desp.querySelector(`#hora-regreso-${id}`);
+      const valor = (horaRegresoEl && horaRegresoEl.value) ? horaRegresoEl.value.trim() : '';
+      let mostrar = false;
+      const m = valor.match(/^(\d{1,2}):(\d{2})$/);
+      if (m) {
+        const hh = parseInt(m[1], 10);
+        const mm = parseInt(m[2], 10);
+        if (hh > 22 || (hh === 22 && mm >= 1)) mostrar = true;
+      }
+      field.style.display = mostrar ? 'block' : 'none';
     });
   }
 
@@ -651,13 +688,116 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Función para poblar select de países
   function poblarSelectPaises(selectElement) {
+    // Limpiar opciones existentes para evitar duplicados
+    if (!selectElement) return;
+    selectElement.innerHTML = '';
     paisesData.forEach(pais => {
       const option = document.createElement("option");
       option.value = pais;
       option.textContent = pais;
       selectElement.appendChild(option);
     });
+    // Seleccionar España por defecto si existe
+    try {
+      const tieneEspaña = paisesData.indexOf('España') !== -1;
+      if (tieneEspaña) selectElement.value = 'España';
+      else if (selectElement.options.length > 0) selectElement.selectedIndex = 0;
+    } catch (e) {}
   }
+
+  // -------------------------
+  // FICHA VEHÍCULO PARTICULAR
+  // -------------------------
+  const vehiculoContainer = document.getElementById('vehiculo-particular-container');
+  let vehiculoVisible = false;
+
+  function crearFichaVehiculo() {
+    if (!vehiculoContainer) return;
+    vehiculoContainer.innerHTML = `
+      <div class="vehiculo-ficha">
+        <div class="form-row">
+          <div class="form-group">
+            <div class="veh-row">
+              <h3 class="veh-label">Vehículo particular:</h3>
+              <label class="veh-radio-label">
+                <input type="radio" name="vehiculo-tipo" value="coche" checked class="veh-radio"/>
+                <span>Automóvil</span>
+              </label>
+              <label class="veh-radio-label">
+                <input type="radio" name="vehiculo-tipo" value="motocicleta" class="veh-radio"/>
+                <span>Motocicleta</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="form-row three-cols-33" id="veh-datos-row" name="vehiculo-datos-row">
+              <div class="form-group">
+                <label for="veh-marca">Marca:</label>
+                <input type="text" id="veh-marca" name="veh-marca" class="veh-text" />
+              </div>
+              <div class="form-group">
+                <label for="veh-modelo">Modelo:</label>
+                <input type="text" id="veh-modelo" name="veh-modelo" class="veh-text" />
+              </div>
+              <div class="form-group">
+                <label for="veh-matricula">Matrícula:</label>
+                <input type="text" id="veh-matricula" name="veh-matricula" class="veh-text" />
+              </div>
+        </div>
+      </div>
+    `;
+
+    // Sanear inputs de vehículo
+    const vehTextHandler = (e) => {
+      const el = e.target;
+      if (!el) return;
+      // permitir sólo letras/números/espacios/.-
+      const cleaned = String(el.value || '').replace(/[^0-9A-Za-z\u00C0-\u017F .\-]/g, '');
+      // matrícula en mayúsculas
+      if (el.id === 'veh-matricula') el.value = cleaned.toUpperCase(); else el.value = cleaned;
+    };
+
+    vehiculoContainer.querySelectorAll('.veh-text').forEach(inp => {
+      inp.addEventListener('input', vehTextHandler);
+    });
+
+    // Listener para cambio de tipo de vehículo para recalcular todos los desplazamientos
+    vehiculoContainer.querySelectorAll('input[name="vehiculo-tipo"]').forEach(r => {
+      r.addEventListener('change', () => {
+        // Recalcular todos los desplazamientos
+        document.querySelectorAll('.desplazamiento-grupo').forEach(el => {
+          const id = el.dataset.desplazamientoId;
+          if (id) recalculateDesplazamientoById(id);
+        });
+      });
+    });
+  }
+
+  function mostrarFichaVehiculo() {
+    if (!vehiculoContainer) return;
+    if (!vehiculoVisible) {
+      crearFichaVehiculo();
+      vehiculoVisible = true;
+    }
+    vehiculoContainer.style.display = '';
+  }
+
+  function ocultarFichaVehiculo() {
+    if (!vehiculoContainer) return;
+    vehiculoContainer.style.display = 'none';
+    vehiculoVisible = false;
+  }
+
+  // Comprobar si algún desplazamiento tiene km > 0 y mostrar/ocultar ficha
+  function evaluarKmParaMostrarFicha() {
+    const anyKm = Array.from(document.querySelectorAll('.desplazamiento-grupo .format-km')).some(inp => {
+      const v = (inp.value || '').toString().replace(/[^0-9,\.]/g, '').replace(/\./g, '').replace(/,/g, '.');
+      const n = parseFloat(v) || 0;
+      return n > 0;
+    });
+    if (anyKm) mostrarFichaVehiculo(); else ocultarFichaVehiculo();
+  }
+
 
   // Formateo simple para campos de fecha: dd/mm/aa
   function formatFechaValue(value) {
@@ -835,6 +975,16 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
 
+  <!-- Ticket Cena (oculto por defecto, se mostrará según tipo de proyecto y hora de regreso) -->
+  <div class="ticket-cena-field conditional-row" id="ticket-cena-field-${desplazamientoCounter}" style="display: none;">
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="ticket-cena-${desplazamientoCounter}" name="ticket-cena-${desplazamientoCounter}" />
+            Aporta justificante de pago por la cena del último día
+          </label>
+        </div>
+      </div>
+
       <div class="form-row three-cols-33">
         <div class="form-group">
           <label for="origen-${desplazamientoCounter}">Origen</label>
@@ -847,7 +997,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="form-group">
           <label for="pais-destino-${desplazamientoCounter}">País de Destino</label>
           <select id="pais-destino-${desplazamientoCounter}" name="pais-destino-${desplazamientoCounter}" required>
-            <option value="España">España</option>
           </select>
         </div>
       </div>
@@ -883,14 +1032,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
 
-  <div class="ticket-cena-field conditional-row" id="ticket-cena-field-${desplazamientoCounter}" style="display: ${mostrarTicketCena ? 'block' : 'none'};">
-        <div class="form-group">
-          <label>
-            <input type="checkbox" id="ticket-cena-${desplazamientoCounter}" name="ticket-cena-${desplazamientoCounter}" />
-            Ticket Cena
-          </label>
-        </div>
-      </div>
+      
 
   <button type="button" class="btn-eliminar-desplazamiento" aria-label="Eliminar desplazamiento ${desplazamientoCounter}"><svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6zm2 3h14l-1.2 11.3A2 2 0 0 1 15.8 22H8.2a2 2 0 0 1-1.99-1.7L5 9zm5-7h4l1 1H9l1-1z"/></svg>Eliminar</button>
     `;
@@ -918,6 +1060,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Asegurar que la numeración y visibilidad de títulos/botones se actualiza inmediatamente
     actualizarNumerosDesplazamientos();
+
+  // Adjuntar listeners de cálculo al nuevo desplazamiento
+  if (desplazamientoCounter) attachCalcListenersToDesplazamiento(desplazamientoCounter);
 
     return nuevoDesplazamiento;
   }
@@ -956,6 +1101,98 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+
+  // -------------------------
+  // Render dinámico de campos de pago según #tipo-pago
+  // -------------------------
+  function renderPagoFields(tipo) {
+    const mid = document.getElementById('pago-iban-container');
+    const right = document.getElementById('pago-swift-container');
+    const tipoPagoEl = document.getElementById('tipo-pago');
+    // parent row that wraps the select + mid + right
+    const parentRow = (tipoPagoEl && tipoPagoEl.closest) ? tipoPagoEl.closest('.form-row') : null;
+    if (!mid || !right) return;
+    // Clear both containers
+    mid.innerHTML = '';
+    right.innerHTML = '';
+
+    // Helper to set layout mode
+    function setLayoutThreeCols() {
+      if (parentRow) parentRow.className = 'form-row three-cols-25-50-25';
+      right.style.display = '';
+      // avoid visual overflow
+      right.style.overflow = 'hidden';
+    }
+    function setLayoutTwoCols() {
+      if (parentRow) parentRow.className = 'form-row two-cols-25-75';
+      // hide right column so grid with two columns applies cleanly
+      right.style.display = 'none';
+      right.style.overflow = '';
+    }
+
+    if (tipo === 'CE' || tipo === 'Cuenta Española' || tipo === 'CuentaEsp') {
+      // Cuenta Española: layout de dos columnas 25-75, un solo IBAN en el medio (raw max 20)
+      setLayoutTwoCols();
+      mid.innerHTML = `
+        <label for="iban">IBAN:</label>
+        <input type="text" id="iban" name="iban" class="iban" />
+      `;
+      // set display maxlength accounting for grouping (groups of 4 -> separators every 4 chars)
+      (function(){
+        const rawMax = 24;
+        const sepCount = Math.floor((rawMax - 1) / 4);
+        const displayMax = rawMax + sepCount;
+        const inp = mid.querySelector('input');
+        if (inp) { inp.setAttribute('maxlength', String(displayMax)); inp.setAttribute('data-raw-max', String(rawMax)); }
+      })();
+      return;
+    }
+
+    if (tipo === 'CI' || tipo === 'Cuenta Extranjera' || tipo === 'CuentaExtranjera') {
+      // Cuenta Extranjera: layout de tres columnas 25-50-25; IBAN-ext en el medio (raw max 34), SWIFT a la derecha
+      setLayoutThreeCols();
+      mid.innerHTML = `
+        <label for="iban-ext">IBAN:</label>
+        <input type="text" id="iban-ext" name="iban-ext" class="iban" />
+      `;
+      // compute display maxlength for raw 34
+      (function(){
+        const rawMax = 34;
+        const sepCount = Math.floor((rawMax - 1) / 4);
+        const displayMax = rawMax + sepCount;
+        const inp = mid.querySelector('input');
+        if (inp) { inp.setAttribute('maxlength', String(displayMax)); inp.setAttribute('data-raw-max', String(rawMax)); }
+      })();
+      right.innerHTML = `
+        <label for="swift">SWIFT/BIC:</label>
+        <input type="text" id="swift" name="swift" class="swift" maxlength="11" />
+      `;
+      // rely on CSS to handle input overflow; do not force container clipping here
+      return;
+    }
+
+    if (tipo === 'TJ' || tipo === 'Tarjeta UEx' || tipo === 'TarjetaUEx') {
+      // Tarjeta: usar layout de dos columnas 25-75 (select + tarjeta en medio)
+      setLayoutTwoCols();
+      mid.innerHTML = `
+        <label for="numero-tarjeta">Número de tarjeta:</label>
+        <input type="text" id="numero-tarjeta" name="numero-tarjeta" class="card-number" maxlength="23" />
+      `;
+      // Attach immediate grouping for any prefilled value
+      setTimeout(() => {
+        const cardEl = document.getElementById('numero-tarjeta');
+        if (cardEl) processGroupedInput(cardEl, { groupSize: 4, sep: ' ', maxRawLen: 19, validPattern: '\\d' });
+      }, 10);
+      return;
+    }
+
+    // Fallback: IBAN simple en el medio
+    mid.innerHTML = `
+      <label for="iban">IBAN:</label>
+      <input type="text" id="iban" name="iban" class="iban" maxlength="34" data-raw-max="34" />
+    `;
+  }
+
   // Evento para eliminar desplazamiento (confirmación modal)
   desplazamientosContainer.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-eliminar-desplazamiento")) {
@@ -968,17 +1205,148 @@ document.addEventListener("DOMContentLoaded", () => {
       // Actualizar numeración
       actualizarNumerosDesplazamientos();
 
-      // Si solo queda un desplazamiento, ocultar su botón de eliminar
+      // Re-evaluar visibilidad de ficha de vehículo y recalcular desplazamientos restantes
       const desplazamientos = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo');
+      // ocultar botón eliminar si sólo queda uno
       if (desplazamientos.length === 1) {
         const botonEliminar = desplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
-        botonEliminar.style.display = 'none';
+        if (botonEliminar) botonEliminar.style.display = 'none';
       }
+      // Recalcular todos los desplazamientos y evaluar ficha vehiculo
+      setTimeout(() => {
+        document.querySelectorAll('.desplazamiento-grupo').forEach(el => {
+          const id = el.dataset.desplazamientoId;
+          if (id) recalculateDesplazamientoById(id);
+        });
+        evaluarKmParaMostrarFicha();
+      }, 60);
     }
   });
 
-  // Listener para cambio de tipo de proyecto (actualizar ticket cena)
-  tipoProyecto.addEventListener('change', actualizarTicketCena);
+    // -------------------------
+    // Integración con dietasCalc: recopilación de datos y render de resultados
+    // -------------------------
+    function collectDesplazamientoData(despEl) {
+      const id = despEl && despEl.dataset && despEl.dataset.desplazamientoId;
+      const safeVal = (sel) => (sel ? sel.value : '');
+      return {
+        fechaIda: safeVal(despEl.querySelector(`#fecha-ida-${id}`)),
+        horaIda: safeVal(despEl.querySelector(`#hora-ida-${id}`)),
+        fechaRegreso: safeVal(despEl.querySelector(`#fecha-regreso-${id}`)),
+        horaRegreso: safeVal(despEl.querySelector(`#hora-regreso-${id}`)),
+        pais: safeVal(despEl.querySelector(`#pais-destino-${id}`)),
+        km: safeVal(despEl.querySelector(`#km-${id}`)),
+        alojamiento: safeVal(despEl.querySelector(`#alojamiento-${id}`))
+      };
+    }
+
+    function renderCalcResult(despEl, result) {
+      if (!despEl || !result) return;
+      let out = despEl.querySelector('.calc-result');
+      // Format numbers with '.' as thousands separator and ',' as decimal (de-DE)
+      const fmt = (n, opts) => (Number(n) || 0).toLocaleString('de-DE', Object.assign({ minimumFractionDigits: 2, maximumFractionDigits: 2 }, opts || {}));
+      const fmtInt = (n) => (Number(n) || 0).toLocaleString('de-DE');
+
+      // detect tipo de vehículo para formateo de tarifa en el texto
+      let tipoVehiculo = 'coche';
+      try { const rv = document.querySelector('input[name="vehiculo-tipo"]:checked'); if (rv && rv.value) tipoVehiculo = rv.value; } catch(e){}
+
+      const manutLabel = `Manutención: ${fmtInt(result.manutenciones)} × 50,55 €`;
+      const manutAmount = fmt(result.manutencionesAmount);
+
+      const alojamientoLabel = `Alojamiento [máx: ${fmtInt(result.noches)} noches × 98,88 €]`;
+      const alojamientoAmount = fmt(Number(result.alojamiento || 0));
+
+      const tarifa = (result && result.precioKm) ? Number(result.precioKm) : 0.26;
+      const tarifaTxt = (tipoVehiculo === 'motocicleta') ? tarifa.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : tarifa.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const kmLabel = `Km. en vehículo propio: ${fmtInt(result.km)} × ${tarifaTxt} €`;
+      const kmAmount = fmt(result.kmAmount);
+
+      // Total: sumar manutencionesAmount + alojamiento (real) + kmAmount
+      const totalVal = (Number(result.manutencionesAmount || 0) + Number(result.kmAmount || 0) + Number(result.alojamiento || 0));
+      const totalStr = fmt(totalVal);
+
+      const html = `
+        <div class="calc-result" aria-live="polite">
+          <div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount">${manutAmount} €</span></div>
+          <div class="calc-line"><span class="label">${alojamientoLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount">${alojamientoAmount} €</span></div>
+          <div class="calc-line"><span class="label">${kmLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount">${kmAmount} €</span></div>
+          <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="total-amount">${totalStr} €</strong></span></div>
+        </div>`;
+      if (out) out.outerHTML = html; else despEl.insertAdjacentHTML('beforeend', html);
+    }
+
+    function recalculateDesplazamientoById(id) {
+      const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+      if (!desp || !window.dietasCalc || !window.dietasCalc.calculateDesplazamiento) return;
+    const data = collectDesplazamientoData(desp);
+    // Show calculations if both dates/times provided OR if user provided km/alojamiento
+    const hasDatesTimes = data.fechaIda && data.horaIda && data.fechaRegreso && data.horaRegreso;
+    const hasKmOrAlojamiento = (Number(data.km) > 0) || (data.alojamiento && String(data.alojamiento).trim() !== '');
+    if (!hasDatesTimes && !hasKmOrAlojamiento) {
+      const existing = desp.querySelector('.calc-result');
+      if (existing) existing.remove();
+      return;
+    }
+    // Determinar tipo de vehículo y tarifa km (si la ficha está visible)
+    let tipoVehiculo = 'coche';
+    let kmTarifa = (window.__sgtriDatos && window.__sgtriDatos.kmTarifas && window.__sgtriDatos.kmTarifas.coche) ? window.__sgtriDatos.kmTarifas.coche : 0.26;
+    try {
+      const rv = document.querySelector('input[name="vehiculo-tipo"]:checked');
+      if (rv && rv.value) tipoVehiculo = rv.value;
+      if (window.__sgtriDatos && window.__sgtriDatos.kmTarifas && window.__sgtriDatos.kmTarifas[tipoVehiculo]) {
+        kmTarifa = window.__sgtriDatos.kmTarifas[tipoVehiculo];
+      }
+    } catch (e) {}
+
+    data.tipoVehiculo = tipoVehiculo;
+    data.kmTarifa = kmTarifa;
+
+    const res = window.dietasCalc.calculateDesplazamiento(data);
+    renderCalcResult(desp, res);
+    }
+
+    function attachCalcListenersToDesplazamiento(id) {
+      const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+      if (!desp) return;
+      const selector = [`#fecha-ida-${id}`, `#hora-ida-${id}`, `#fecha-regreso-${id}`, `#hora-regreso-${id}`, `#pais-destino-${id}`, `#km-${id}`, `#alojamiento-${id}`].join(',');
+      const nodes = desp.querySelectorAll(selector);
+      nodes.forEach(n => {
+        n.addEventListener('input', () => { recalculateDesplazamientoById(id); actualizarTicketCena(); });
+        n.addEventListener('change', () => { recalculateDesplazamientoById(id); actualizarTicketCena(); });
+      });
+      // Specifically watch km input to decide vehicle card visibility
+      const kmInput = desp.querySelector(`#km-${id}`);
+      if (kmInput) {
+        kmInput.addEventListener('input', () => {
+          evaluarKmParaMostrarFicha();
+          recalculateDesplazamientoById(id);
+          actualizarTicketCena();
+        });
+        kmInput.addEventListener('change', () => {
+          evaluarKmParaMostrarFicha();
+          recalculateDesplazamientoById(id);
+          actualizarTicketCena();
+        });
+      }
+      // calcular inicialmente
+      setTimeout(() => { evaluarKmParaMostrarFicha(); recalculateDesplazamientoById(id); }, 100);
+    }
+
+    // Attach to existing desplazamientos on load
+    document.querySelectorAll('.desplazamiento-grupo').forEach(el => {
+      const id = el.dataset.desplazamientoId;
+      if (id) attachCalcListenersToDesplazamiento(id);
+    });
+
+    // Listener para cambio de tipo de proyecto (actualizar ticket cena)
+    tipoProyecto.addEventListener('change', () => {
+      actualizarTicketCena();
+      document.querySelectorAll('.desplazamiento-grupo').forEach(el => {
+        const id = el.dataset.desplazamientoId;
+        if (id) recalculateDesplazamientoById(id);
+      });
+    });
 
   // (Paises ya se cargan en la petición principal arriba)
 });
