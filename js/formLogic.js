@@ -624,7 +624,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (valor) {
       infoDecreto.innerHTML = `
         Los cálculos se efectuarán en base al 
-        <strong>Decreto 42/2005 (Junta de Extremadura)</strong>.  
+        <strong>Decreto 42/2025 (Junta de Extremadura)</strong>.  
         <a href="https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o"
            target="_blank" rel="noopener noreferrer">
            Ver Decreto
@@ -822,65 +822,211 @@ document.addEventListener("DOMContentLoaded", () => {
     return d <= daysInMonth[m-1];
   }
 
+  // Devuelve Date|null para dd/mm/aa string; requiere dd/mm/aa completo
+  function parseDateStrict(ddmmaa) {
+    if (!ddmmaa) return null;
+    const parts = String(ddmmaa).split('/').map(p => p.trim());
+    if (parts.length !== 3) return null;
+    if (parts[0].length !== 2 || parts[1].length !== 2 || parts[2].length !== 2) return null;
+    const d = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const y = 2000 + parseInt(parts[2], 10);
+    if (!isValidDate(d, m, y)) return null;
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+  }
+
+  // Devuelve objeto {hh,mm} o null para hora en formato hh:mm (requiere dos dígitos o 1+):
+  function parseTimeStrict(hhmm) {
+    if (!hhmm) return null;
+    const raw = String(hhmm).trim();
+    const m = raw.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const hh = parseInt(m[1], 10);
+    const mm = parseInt(m[2], 10);
+    if (isNaN(hh) || isNaN(mm)) return null;
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+    return { hh, mm };
+  }
+
+  // Comprueba que fecha/hora de regreso es posterior a salida para un desplazamiento
+  // y actualiza la UI: aplica/remueve clase de campo-error y oculta el calc-result si hay error.
+  function validateDateTimePairAndUpdateUI(id) {
+    try {
+      const fechaIdEl = document.getElementById(`fecha-ida-${id}`);
+      const horaIdEl = document.getElementById(`hora-ida-${id}`);
+      const fechaRegEl = document.getElementById(`fecha-regreso-${id}`);
+      const horaRegEl = document.getElementById(`hora-regreso-${id}`);
+      const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+      if (!fechaIdEl || !horaIdEl || !fechaRegEl || !horaRegEl) return true;
+
+      // parse strict
+      const fId = parseDateStrict(fechaIdEl.value);
+      const fReg = parseDateStrict(fechaRegEl.value);
+      const tId = parseTimeStrict(horaIdEl.value);
+      const tReg = parseTimeStrict(horaRegEl.value);
+
+      // If any of the fields are partially filled or invalid, hide calc-result and mark invalid
+      const calc = desp ? desp.querySelector('.calc-result') : null;
+      const anyInvalidFormat = (!fId && fechaIdEl.value) || (!fReg && fechaRegEl.value) || (!tId && horaIdEl.value) || (!tReg && horaRegEl.value);
+      if (anyInvalidFormat) {
+        // If user left an invalid format which we've cleared on blur, hide calc-result
+        // but DO NOT mark the fields in red (red is reserved for ordering errors).
+        if (desp) { desp.dataset.dtInvalid = '1'; }
+        if (calc) calc.style.display = 'none';
+        const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+        if (just) just.style.display = 'none';
+        return false;
+      }
+
+      // If any are empty (not provided) and there is a dtInvalid flag, keep calc hidden until corrected
+      if (!fId || !fReg || !tId || !tReg) {
+        if (desp && desp.dataset && desp.dataset.dtInvalid === '1') {
+          if (calc) calc.style.display = 'none';
+          const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+          if (just) just.style.display = 'none';
+          return false;
+        }
+        // remove error state
+        [fechaIdEl, horaIdEl, fechaRegEl, horaRegEl].forEach(n => n && n.classList && n.classList.remove('field-error'));
+        if (calc) calc.style.display = ''; // leave visibility decision to recalc
+        // ensure justificar visible only if calc visible
+        const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+        if (just) just.style.display = '';
+        return true;
+      }
+
+      // build full Date objects including times
+      const dtId = new Date(fId.getFullYear(), fId.getMonth(), fId.getDate(), tId.hh, tId.mm, 0, 0);
+      const dtReg = new Date(fReg.getFullYear(), fReg.getMonth(), fReg.getDate(), tReg.hh, tReg.mm, 0, 0);
+
+      if (dtReg <= dtId) {
+        // invalid order: mark fields in red and hide calc-result
+        [fechaIdEl, horaIdEl, fechaRegEl, horaRegEl].forEach(n => n && n.classList && n.classList.add('field-error'));
+        if (calc) calc.style.display = 'none';
+        const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+        if (just) just.style.display = 'none';
+        // Insert inline message near the top row of this desplazamiento
+        try {
+          const existingMsg = desp ? desp.querySelector(`#dt-order-error-${id}`) : null;
+          if (!existingMsg && desp) {
+            const topRow = desp.querySelector('.form-row.four-cols-25');
+            const msg = document.createElement('div');
+            msg.id = `dt-order-error-${id}`;
+            msg.className = 'dt-order-error';
+            msg.textContent = 'El regreso debe ser posterior a la salida.';
+            if (topRow && topRow.parentNode) topRow.parentNode.insertBefore(msg, topRow.nextSibling);
+            else if (calc && calc.parentNode) calc.parentNode.insertBefore(msg, calc);
+          }
+        } catch (e) {}
+        return false;
+      }
+
+  // Ok: remove error classes, clear dtInvalid flag and show calc-result
+  if (desp && desp.dataset && desp.dataset.dtInvalid) delete desp.dataset.dtInvalid;
+  [fechaIdEl, horaIdEl, fechaRegEl, horaRegEl].forEach(n => n && n.classList && n.classList.remove('field-error'));
+  if (calc) calc.style.display = '';
+  const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+  if (just) just.style.display = '';
+  // Remove any inline order message if present
+  try { const existingMsg = desp ? desp.querySelector(`#dt-order-error-${id}`) : null; if (existingMsg && existingMsg.parentNode) existingMsg.parentNode.removeChild(existingMsg); } catch(e) {}
+  // trigger recalculation to ensure calc-result is in sync
+  recalculateDesplazamientoById(id);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Delegación para formatear inputs de fecha al perder foco
   document.addEventListener('blur', (e) => {
     const el = e.target;
     if (el && el.classList && el.classList.contains('input-fecha')) {
-      // On blur: si user typed ddmm (4 digits) completar con año actual (últimos 2 dígitos)
+      // On blur: we only keep the value if it can be interpreted as a full valid dd/mm/aa date.
       const v = (el.value || '').trim();
       const digits = (v.replace(/[^0-9]/g, '') || '');
+      let final = '';
       if (digits.length === 4) {
+        // If user typed ddmm, complete with current year (last two digits)
         const yy = (new Date()).getFullYear().toString().slice(-2);
         const candidate = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + yy;
-        // validar fecha
         const parts = candidate.split('/');
         const d = parseInt(parts[0],10);
         const m = parseInt(parts[1],10);
         const y = 2000 + parseInt(parts[2],10);
-        if (isValidDate(d,m,y)) el.value = parts[0].padStart(2,'0') + '/' + parts[1].padStart(2,'0') + '/' + parts[2]; else el.value = '';
+        if (isValidDate(d,m,y)) final = parts[0].padStart(2,'0') + '/' + parts[1].padStart(2,'0') + '/' + parts[2];
       } else {
-        // intentar formatear y validar fecha completa
+        // Try to normalize full date and require full dd/mm/aa
         const formatted = formatFechaValue(v);
-        // formatted puede ser "dd/mm/aa" o parcial
         const parts = (formatted || '').split('/').map(p => p || '');
         if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 2) {
           const d = parseInt(parts[0],10);
           const m = parseInt(parts[1],10);
           const y = 2000 + parseInt(parts[2],10);
-          if (isValidDate(d,m,y)) {
-            el.value = parts[0].padStart(2,'0') + '/' + parts[1].padStart(2,'0') + '/' + parts[2];
-          } else {
-            el.value = '';
-          }
-        } else {
-          // no hay fecha completa: dejar lo que haya (o vaciar si está claramente inválido)
-          el.value = formatted;
+          if (isValidDate(d,m,y)) final = parts[0].padStart(2,'0') + '/' + parts[1].padStart(2,'0') + '/' + parts[2];
         }
+      }
+      // If final is empty -> invalid date, clear field to show placeholder
+      el.value = final;
+      // After blur, validate the date/time pair ordering and visibility of calc-result
+      // Find desplazamiento id from element id (expects pattern fecha-ida-N or fecha-regreso-N)
+      const match = (el.id || '').match(/(fecha|hora)-(ida|regreso)-(\d+)/);
+      if (match) {
+        const id = match[3];
+        const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+        if (final === '') {
+          // mark this desplazamiento as having an invalid date/time input (cleared on blur)
+          if (desp) { desp.dataset.dtInvalid = '1'; const calc = desp.querySelector('.calc-result'); if (calc) calc.style.display = 'none'; const just = desp.querySelector('.justificar-pernocta-field'); if (just) just.style.display = 'none'; }
+        }
+        validateDateTimePairAndUpdateUI(id);
       }
     }
 
     // Hora: validar hh/mm cuando se pierda foco
     if (el && el.classList && el.classList.contains('input-hora')) {
-      const v = el.value || '';
+      const v = (el.value || '').trim();
+      // If the user left the field completely empty, keep it empty so the placeholder shows (hh:mm)
+      if (v === '') {
+        el.value = '';
+        const matchEmpty = (el.id || '').match(/(fecha|hora)-(ida|regreso)-(\d+)/);
+        if (matchEmpty) {
+          const id = matchEmpty[3];
+          const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+          if (desp) { desp.dataset.dtInvalid = '1'; const calc = desp.querySelector('.calc-result'); if (calc) calc.style.display = 'none'; const just = desp.querySelector('.justificar-pernocta-field'); if (just) just.style.display = 'none'; }
+          validateDateTimePairAndUpdateUI(id);
+        }
+        return;
+      }
+
       const parts = v.split(':').map(p => p.replace(/[^0-9]/g, ''));
       let hh = parts[0] || '';
       let mm = parts[1] || '';
       if (hh.length === 1) hh = '0' + hh;
       if (mm.length === 1) mm = '0' + mm;
       // validar rangos
-      const hnum = parseInt(hh || '0', 10);
-      const mnum = parseInt(mm || '0', 10);
+      const hnum = parseInt(hh, 10);
+      const mnum = parseInt(mm, 10);
+      let valid = true;
       if (!isNaN(hnum) && hnum >= 0 && hnum <= 23) {
         // ok
       } else {
-        hh = '';
+        valid = false;
       }
       if (!isNaN(mnum) && mnum >= 0 && mnum <= 59) {
         // ok
       } else {
-        mm = '';
+        valid = false;
       }
-      if (hh || mm) el.value = (hh || '00') + ':' + (mm || '00'); else el.value = '';
+      if (valid) el.value = (hh || '00') + ':' + (mm || '00'); else el.value = '';
+      // After blur, validate the date/time pair ordering and visibility of calc-result
+      const match = (el.id || '').match(/(fecha|hora)-(ida|regreso)-(\d+)/);
+      if (match) {
+        const id = match[3];
+        const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+        if (!valid) {
+          if (desp) { desp.dataset.dtInvalid = '1'; const calc = desp.querySelector('.calc-result'); if (calc) calc.style.display = 'none'; const just = desp.querySelector('.justificar-pernocta-field'); if (just) just.style.display = 'none'; }
+        }
+        validateDateTimePairAndUpdateUI(id);
+      }
     }
 
     // Formateo Km y Alojamiento al perder foco
@@ -1254,8 +1400,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const manutLabel = `Manutención: ${fmtInt(result.manutenciones)} × 50,55 €`;
       const manutAmount = fmt(result.manutencionesAmount);
 
-      const alojamientoLabel = `Alojamiento [máx: ${fmtInt(result.noches)} noches × 98,88 €]`;
-      const alojamientoAmount = fmt(Number(result.alojamiento || 0));
+  // Show appropriate alojamiento max depending on ambiguity:
+  // - If ambiguous: by default show the 'not counted' value (checkbox unchecked),
+  //   the checkbox will allow switching to the counted value.
+  // - If not ambiguous: show the actual computed noches and amount.
+  let alojamientoLabel = '';
+  if (result.nochesAmbiguous) {
+    alojamientoLabel = `Alojamiento: <em>[ máx: ${fmtInt(result.nochesIfNotCounted || 0)} noches × 98,88 € = ${fmt(result.nochesAmountIfNotCounted || 0)} € ]</em>`;
+  } else {
+    alojamientoLabel = `Alojamiento: <em>[ máx: ${fmtInt(result.noches || 0)} noches × 98,88 € = ${fmt(result.nochesAmount || 0)} € ]</em>`;
+  }
+  const alojamientoAmount = fmt(Number(result.alojamiento || 0));
 
       const tarifa = (result && result.precioKm) ? Number(result.precioKm) : 0.26;
       const tarifaTxt = (tipoVehiculo === 'motocicleta') ? tarifa.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : tarifa.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1266,19 +1421,200 @@ document.addEventListener("DOMContentLoaded", () => {
       const totalVal = (Number(result.manutencionesAmount || 0) + Number(result.kmAmount || 0) + Number(result.alojamiento || 0));
       const totalStr = fmt(totalVal);
 
+  // Check if alojamiento exceeds max allowed. For ambiguous cases the default
+  // allowed amount is the 'not counted' nights amount (checkbox unchecked).
+  const defaultAllowedAloj = result.nochesAmbiguous ? Number(result.nochesAmountIfNotCounted || 0) : Number(result.nochesAmount || 0);
+  const alojamientoExceedsMax = Number(result.alojamiento || 0) > defaultAllowedAloj;
+      // Determine normative label based on selected project
+      let normativaLabel = 'Decreto 42/2025';
+      try {
+        const tp = document.getElementById('tipo-proyecto');
+        const tpv = tp ? tp.value : (typeof tipoProyecto !== 'undefined' ? tipoProyecto.value : '');
+        if (["G24", "PEI", "NAL"].includes(tpv)) normativaLabel = 'RD 462/2002';
+      } catch (e) {}
+      // Build a stylized tooltip icon that appears to the LEFT of the amount
+      const warnHtml = alojamientoExceedsMax ? `
+        <span class="warn-wrapper" tabindex="0" aria-live="polite">
+          <span class="warn-icon" aria-hidden="true">⚠️</span>
+          <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento es superior al máximo permitido, conforme al ${normativaLabel}.</span>
+        </span>
+      ` : '';
+      const alojamientoAmountHtml = `${warnHtml}<span class="amount${alojamientoExceedsMax ? ' error-amount' : ''}">${alojamientoAmount} €</span>`;
+
+      const id = despEl.dataset && despEl.dataset.desplazamientoId ? despEl.dataset.desplazamientoId : Math.random().toString(36).slice(2,8);
+      // Do not inject the justificar checkbox inside the calc-result.
+      // We'll render it as a sibling div under the ticket-cena-field for the same desplazamiento
+      // so it visually matches the ticket-cena fields.
       const html = `
-        <div class="calc-result" aria-live="polite">
-          <div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount">${manutAmount} €</span></div>
-          <div class="calc-line"><span class="label">${alojamientoLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount">${alojamientoAmount} €</span></div>
-          <div class="calc-line"><span class="label">${kmLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount">${kmAmount} €</span></div>
-          <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="total-amount">${totalStr} €</strong></span></div>
+        <div class="calc-result" aria-live="polite" data-desp-id="${id}">
+          <div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmount} €</span></div>
+          <div class="calc-line aloj-line${alojamientoExceedsMax ? ' error-line' : ''}"><span class="label">${alojamientoLabel}</span><span class="leader" aria-hidden="true"></span>${alojamientoAmountHtml.replace('class="amount', 'class="amount aloj')}</div>
+          
+          <div class="calc-line"><span class="label">${kmLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmount} €</span></div>
+          <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalStr} €</strong></span></div>
         </div>`;
       if (out) out.outerHTML = html; else despEl.insertAdjacentHTML('beforeend', html);
+
+      // --- Tooltip portal handling: move tooltip to body to avoid clipping by overflow on ancestors
+      ensureGlobalWarnTooltip();
+      // attach handlers to warn-wrapper inside this desplazamiento
+      const wrappers = (despEl.querySelectorAll ? Array.from(despEl.querySelectorAll('.warn-wrapper')) : []);
+      wrappers.forEach(w => attachWarnHandlers(w));
+
+      // If ambiguous pernocta, render the justificar checkbox as a sibling under the ticket-cena-field
+      // and wire it to update amounts and total dynamically
+      // First remove any existing justificar div for this desplazamiento to avoid duplicates
+      const existingJust = despEl.querySelector('.justificar-pernocta-field');
+      if (existingJust) existingJust.parentNode.removeChild(existingJust);
+      if (result.nochesAmbiguous) {
+        try {
+          const calcDiv = despEl.querySelector('.calc-result[data-desp-id="' + id + '"]');
+          // Create checkbox block AFTER the ticket-cena-field to match requested placement
+          const ticketField = despEl.querySelector(`#ticket-cena-field-${id}`);
+          const justHtml = `<div class="ticket-cena-field conditional-row justificar-pernocta-field" id="justificar-container-${id}"><div class="form-group"><label><input type="checkbox" id="justificar-pernocta-${id}" /> Justifica haber pernoctado la noche del ${result.nochesAmbiguousFrom} al ${result.nochesAmbiguousTo}.</label></div></div>`;
+          if (ticketField && ticketField.insertAdjacentHTML) {
+            ticketField.insertAdjacentHTML('afterend', justHtml);
+          } else if (despEl) {
+            // fallback: append after calcDiv
+            calcDiv.insertAdjacentHTML('afterend', justHtml);
+          }
+          const checkbox = despEl.querySelector(`#justificar-pernocta-${id}`);
+          const alojAmountSpan = calcDiv.querySelector('.amount.aloj');
+          const alojLine = calcDiv.querySelector('.aloj-line');
+          const manutNum = Number(result.manutencionesAmount || 0);
+          const kmNum = Number(result.kmAmount || 0);
+          const alojNum = Number(result.alojamiento || 0);
+          const allowedYes = Number(result.nochesAmountIfCounted || 0);
+          const allowedNo = Number(result.nochesAmountIfNotCounted || 0);
+          const totalStrong = calcDiv.querySelector('.total-val');
+          const alojLabelSpan = calcDiv.querySelector('.aloj-line .label');
+
+          function updateForCheckbox() {
+            const checked = !!(checkbox && checkbox.checked);
+            const allowed = checked ? allowedYes : allowedNo;
+            // actualizar etiqueta máxima de alojamiento (noches y cantidad)
+            try {
+              if (alojLabelSpan) {
+                alojLabelSpan.innerHTML = `Alojamiento: <em>[ máx: ${fmtInt(checked ? result.nochesIfCounted : result.nochesIfNotCounted)} noches × 98,88 € = ${fmt(checked ? result.nochesAmountIfCounted : result.nochesAmountIfNotCounted)} € ]</em>`;
+              }
+            } catch (e) {}
+            // Manage warn icon/tooltip dynamically: create or remove warn-wrapper
+            try {
+              const existingWarn = calcDiv.querySelector('.warn-wrapper');
+              if (alojNum > allowed) {
+                // Add visual error classes
+                alojAmountSpan.classList.add('error-amount');
+                alojLine.classList.add('error-line');
+                // If there's no warn icon, create it and attach handlers
+                if (!existingWarn && alojAmountSpan && alojAmountSpan.parentNode) {
+                  const warnEl = document.createElement('span');
+                  warnEl.className = 'warn-wrapper';
+                  warnEl.tabIndex = 0;
+                  warnEl.setAttribute('aria-live','polite');
+                  warnEl.innerHTML = `<span class="warn-icon" aria-hidden="true">⚠️</span><span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento es superior al máximo permitido, conforme al ${normativaLabel}.</span>`;
+                  alojAmountSpan.parentNode.insertBefore(warnEl, alojAmountSpan);
+                  // Attach tooltip handlers so it behaves like the original ones
+                  try { attachWarnHandlers(warnEl); } catch(e) {}
+                }
+              } else {
+                // Remove visual error classes and any warn icon
+                alojAmountSpan.classList.remove('error-amount');
+                alojLine.classList.remove('error-line');
+                if (existingWarn && existingWarn.parentNode) existingWarn.parentNode.removeChild(existingWarn);
+              }
+            } catch (e) {
+              // fallback: toggle classes
+              if (alojNum > allowed) { alojAmountSpan.classList.add('error-amount'); alojLine.classList.add('error-line'); }
+              else { alojAmountSpan.classList.remove('error-amount'); alojLine.classList.remove('error-line'); }
+            }
+            // IMPORTANT: the displayed Total must always include the actual alojamiento
+            // even if it exceeds the allowed reimbursable amount. The allowed amount
+            // only affects the error styling and internal reimbursement calculation,
+            // but the monetary Total shown to the user sums the full alojamiento.
+            const total = (manutNum + kmNum + alojNum) || 0;
+            totalStrong.textContent = (Number(total) || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+          }
+          // initial update (checkbox default unchecked -> subtract one night)
+          if (checkbox) {
+            checkbox.addEventListener('change', updateForCheckbox);
+            updateForCheckbox();
+          }
+        } catch (e) { /* ignore */ }
+      } else {
+        // If not ambiguous, ensure any justificar container is removed
+        const existing = despEl.querySelector('.justificar-pernocta-field');
+        if (existing) existing.parentNode.removeChild(existing);
+      }
     }
+
+  // Singleton tooltip element appended to body
+  let __globalWarnTooltip = null;
+  function ensureGlobalWarnTooltip() {
+    if (typeof document === 'undefined') return;
+    if (__globalWarnTooltip && document.body.contains(__globalWarnTooltip)) return;
+    __globalWarnTooltip = document.createElement('div');
+    __globalWarnTooltip.className = 'global-warn-tooltip';
+    __globalWarnTooltip.setAttribute('role','tooltip');
+    __globalWarnTooltip.style.position = 'absolute';
+    __globalWarnTooltip.style.left = '0px';
+    __globalWarnTooltip.style.top = '0px';
+    __globalWarnTooltip.style.display = 'none';
+    document.body.appendChild(__globalWarnTooltip);
+  }
+
+  function attachWarnHandlers(wrapper) {
+    if (!wrapper) return;
+    // prevent double attaching
+    if (wrapper.__warnAttached) return; wrapper.__warnAttached = true;
+    const tooltipTextEl = wrapper.querySelector('.warn-tooltip');
+    const text = tooltipTextEl ? tooltipTextEl.textContent || tooltipTextEl.innerText : '';
+    function show() {
+      if (!__globalWarnTooltip) ensureGlobalWarnTooltip();
+      __globalWarnTooltip.innerHTML = text;
+      __globalWarnTooltip.style.display = 'block';
+      // position: try align horizontally center to wrapper
+      const rect = wrapper.getBoundingClientRect();
+      const ttRect = __globalWarnTooltip.getBoundingClientRect();
+      let left = rect.left + window.scrollX;
+      // prefer align left, but ensure it fits in viewport
+      left = Math.max(8, Math.min(left, window.scrollX + document.documentElement.clientWidth - ttRect.width - 8));
+      const top = rect.bottom + window.scrollY + 8;
+      __globalWarnTooltip.style.left = left + 'px';
+      __globalWarnTooltip.style.top = top + 'px';
+      __globalWarnTooltip.classList.add('visible');
+    }
+    function hide() {
+      if (!__globalWarnTooltip) return;
+      __globalWarnTooltip.classList.remove('visible');
+      // keep in DOM but hide after transition
+      setTimeout(() => { if (__globalWarnTooltip) __globalWarnTooltip.style.display = 'none'; }, 140);
+    }
+    wrapper.addEventListener('mouseenter', show);
+    wrapper.addEventListener('focus', show, true);
+    wrapper.addEventListener('mouseleave', hide);
+    wrapper.addEventListener('blur', hide, true);
+  }
 
     function recalculateDesplazamientoById(id) {
       const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
       if (!desp || !window.dietasCalc || !window.dietasCalc.calculateDesplazamiento) return;
+      // If this desplazamiento is marked invalid due to date/time parsing or ordering,
+      // ensure the calc-result is removed/hidden and avoid recalculation to prevent flicker/recreation.
+      try {
+        if (desp.dataset && desp.dataset.dtInvalid === '1') {
+          const existing = desp.querySelector('.calc-result');
+          if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+          return;
+        }
+        const orderErr = desp.querySelector(`#dt-order-error-${id}`);
+        if (orderErr) {
+          const existing = desp.querySelector('.calc-result');
+          if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+          return;
+        }
+      } catch (e) { /* ignore and continue if DOM check fails */ }
     const data = collectDesplazamientoData(desp);
     // Show calculations if both dates/times provided OR if user provided km/alojamiento
     const hasDatesTimes = data.fechaIda && data.horaIda && data.fechaRegreso && data.horaRegreso;
@@ -1311,19 +1647,26 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!desp) return;
       const selector = [`#fecha-ida-${id}`, `#hora-ida-${id}`, `#fecha-regreso-${id}`, `#hora-regreso-${id}`, `#pais-destino-${id}`, `#km-${id}`, `#alojamiento-${id}`].join(',');
       const nodes = desp.querySelectorAll(selector);
+      // IMPORTANT: only recalculate and toggle visibility on blur of the implicated fields.
+      // While the user is typing (input) we avoid showing/hiding calc-result or ticket fields.
       nodes.forEach(n => {
-        n.addEventListener('input', () => { recalculateDesplazamientoById(id); actualizarTicketCena(); });
-        n.addEventListener('change', () => { recalculateDesplazamientoById(id); actualizarTicketCena(); });
+        // keep input handlers lightweight (formatting is handled elsewhere)
+        n.addEventListener('input', () => { /* do not recalc/show-hide on input */ });
+        // For selects, apply change immediately (more natural UX). For other inputs, defer to blur.
+        if (n.tagName === 'SELECT') {
+          n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); actualizarTicketCena(); });
+        } else {
+          // On change we defer to blur to avoid flicker while typing
+          n.addEventListener('change', () => { /* noop: defer to blur */ });
+          // On blur we perform validation, recalc and update visibility
+          n.addEventListener('blur', () => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); actualizarTicketCena(); });
+        }
       });
       // Specifically watch km input to decide vehicle card visibility
       const kmInput = desp.querySelector(`#km-${id}`);
       if (kmInput) {
-        kmInput.addEventListener('input', () => {
-          evaluarKmParaMostrarFicha();
-          recalculateDesplazamientoById(id);
-          actualizarTicketCena();
-        });
-        kmInput.addEventListener('change', () => {
+        // Do not toggle vehicle ficha or recalc while typing; act on blur only
+        kmInput.addEventListener('blur', () => {
           evaluarKmParaMostrarFicha();
           recalculateDesplazamientoById(id);
           actualizarTicketCena();

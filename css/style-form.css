@@ -199,6 +199,24 @@ input[type="number"] {
   transition: border-color 0.2s ease;
 }
 
+/* Campo con formato inválido (fecha/hora): mostrar el texto en color de error */
+.field-error {
+  color: #c50909;
+}
+
+/* Mensaje inline de error de orden de fechas */
+.dt-order-error {
+  color: #c50909;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  text-align: center;
+  background-color: #f9e9e9;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  margin: 0 0 1rem 0;
+  border-left: 4px solid #c50909;
+}
+
 /* Info decreto centrado y tamaño pequeño */
 #infoDecreto {
   text-align: center;
@@ -444,13 +462,12 @@ input[type="number"]:focus {
 /* Calc result styling: dotted leaders and right-aligned amounts */
 .calc-result {
   margin-top: 0.6rem;
-  padding: 0.6rem 1rem;
+  padding: 0.6rem;
   background: #fff;
-  border: 1px solid #ccc;
+  border: 1px dashed #ddd;
   border-radius: 6px;
   font-family: inherit;
   color: #222;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 .calc-result .calc-line,
 .calc-result .calc-total {
@@ -462,8 +479,64 @@ input[type="number"]:focus {
 .calc-result .label { white-space: nowrap; }
 .calc-result .leader { flex: 1 1 auto; border-bottom: 1px dotted #999; height: 1px; margin: 0.7rem 0 0 0; }
 .calc-result .amount { white-space: nowrap; text-align: right; min-width: 8ch; }
-.calc-result .calc-total { justify-content: flex-end; font-weight: 600; }
-strong.total-amount { font-weight: bold; }
+.calc-result .amount.error-amount { color: #c50909; }
+.calc-result .calc-total { justify-content: flex-end; }
+.calc-result .calc-total .label { margin-right: 0.6rem; white-space: nowrap; }
+.warn-icon {
+  color: #c50909;
+  margin-left: 0.45rem;
+  font-size: 0.95em;
+  cursor: help;
+  vertical-align: middle;
+}
+
+/* Warn wrapper & tooltip */
+.warn-wrapper { display: inline-flex; align-items: center; position: relative; margin-right: 0.45rem; }
+.warn-wrapper .warn-icon { margin-left: 0; margin-right: 0.4rem; }
+.warn-tooltip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  background: rgba(28,28,28,0.96);
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+  z-index: 1200;
+}
+.global-warn-tooltip {
+  position: absolute;
+  background: rgba(28,28,28,0.96);
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+  z-index: 5000;
+}
+.global-warn-tooltip.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.warn-wrapper:hover .warn-tooltip,
+.warn-wrapper:focus-within .warn-tooltip { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+/* When alojamiento exceeds max, highlight the entire calc line */
+.calc-result .error-line {
+  color: #c50909;
+}
+.calc-result .error-line .leader { border-bottom-color: #c50909; }
+.calc-result .error-line .amount { color: #c50909; }
+.calc-result .error-line .label { color: inherit; }
+.calc-result .calc-total .amount strong.slight { font-weight: 600; }
 
 
 .confirm-body {

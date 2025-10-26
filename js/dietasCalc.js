@@ -101,19 +101,58 @@
       }
     }
 
-    // Noches
+    // Noches (nuevo algoritmo con ambigüedad entre 1:01 y 6:59)
+    // NP: número entero de días resultado de restar fechaRegreso - fechaIda
+    let baseNP = 0;
+    if (fechaIdaDate && fechaRegresoDate) baseNP = daysBetweenMidnights(fechaIdaDate, fechaRegresoDate);
+
     let noches = 0;
-    if (isSameDay) {
-      // si vuelve el mismo día, por defecto 0 noches
+    let ambiguous = false;
+    let nochesIfCounted = 0; // NP assuming pernoctado
+    let nochesIfNotCounted = 0; // NP assuming no pernocta (restar una)
+
+    // Nuevo comportamiento: aplicamos reglas cuando baseNP > 0
+    if (baseNP <= 0) {
+      // ninguna noche completa entre fechas
       noches = 0;
+      nochesIfCounted = 0;
+      nochesIfNotCounted = 0;
     } else {
-      if (fechaIdaDate && fechaRegresoDate) {
-        noches = daysBetweenMidnights(fechaIdaDate, fechaRegresoDate);
+      nochesIfCounted = baseNP;
+      nochesIfNotCounted = Math.max(0, baseNP - 1);
+
+      // Determinar minuto relativo de la hora de regreso (t) de forma robusta.
+      // Preferimos la hora parseada; si no está disponible intentamos extraerla
+      // del string original para evitar casos en que parseTime falló.
+      let t = null;
+      if (horaRegreso && typeof horaRegreso.hh === 'number' && typeof horaRegreso.mm === 'number') {
+        t = horaRegreso.hh * 60 + horaRegreso.mm;
+      } else if (input && input.horaRegreso) {
+        // intentar extraer hh:mm desde el string (acepta 'hh:mm' o 'h:mm')
+        const m = String(input.horaRegreso || '').match(/(\d{1,2})\s*[:h]\s*(\d{2})/);
+        if (m) {
+          const hh = parseInt(m[1], 10);
+          const mm = parseInt(m[2], 10);
+          if (!isNaN(hh) && !isNaN(mm)) t = hh * 60 + mm;
+        }
       }
-      // se añade una noche más si vuelve más tarde de la 1:00
-      if (horaRegreso) {
-        const t = horaRegreso.hh * 60 + horaRegreso.mm;
-        if (t > (1*60)) noches += 1;
+
+      if (t === null) {
+        // sin información fiable de hora: por seguridad asumimos que sí pernocta
+        noches = nochesIfCounted;
+      } else {
+        if (t >= (7 * 60)) {
+          // vuelve a las 7:00 o después -> asumimos que ha pernoctado
+          noches = nochesIfCounted;
+        } else if (t <= (1 * 60)) {
+          // vuelve a la 1:00 o antes -> asumimos que NO ha pernoctado
+          noches = nochesIfNotCounted;
+        } else {
+          // entre 01:01 y 06:59 -> ambigüedad: el usuario debe justificar
+          ambiguous = true;
+          // por defecto, mientras no justifique, restaremos una noche
+          noches = nochesIfNotCounted;
+        }
       }
     }
 
@@ -137,13 +176,35 @@
     }
 
     const manutencionesAmount = Math.round((manutenciones * precioManutencion + Number.EPSILON) * 100) / 100;
-    const nochesAmount = Math.round((noches * precioNoche + Number.EPSILON) * 100) / 100;
+  const nochesAmount = Math.round((noches * precioNoche + Number.EPSILON) * 100) / 100;
+  const nochesAmountIfCounted = Math.round((nochesIfCounted * precioNoche + Number.EPSILON) * 100) / 100;
+  const nochesAmountIfNotCounted = Math.round((nochesIfNotCounted * precioNoche + Number.EPSILON) * 100) / 100;
     const kmAmount = Math.round((kmNum * precioKm + Number.EPSILON) * 100) / 100;
 
   result.manutenciones = manutenciones;
     result.manutencionesAmount = manutencionesAmount;
     result.noches = noches;
     result.nochesAmount = nochesAmount;
+    result.nochesBase = baseNP;
+    result.nochesIfCounted = nochesIfCounted;
+    result.nochesIfNotCounted = nochesIfNotCounted;
+    result.nochesAmountIfCounted = nochesAmountIfCounted;
+    result.nochesAmountIfNotCounted = nochesAmountIfNotCounted;
+    result.nochesAmbiguous = ambiguous;
+    // If ambiguous, provide the penultimate and last dates for the justification text
+    if (ambiguous && fechaRegresoDate) {
+      const last = new Date(fechaRegresoDate.getTime());
+      const penult = new Date(last.getTime());
+      penult.setDate(last.getDate() - 1);
+      function fmtDate(d) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = String(d.getFullYear());
+        return `${dd}/${mm}/${yyyy}`;
+      }
+      result.nochesAmbiguousFrom = fmtDate(penult);
+      result.nochesAmbiguousTo = fmtDate(last);
+    }
     result.km = kmNum;
     result.kmAmount = kmAmount;
     result.alojamiento = alojamientoNum;
