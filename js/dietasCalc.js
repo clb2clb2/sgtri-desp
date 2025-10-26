@@ -57,47 +57,80 @@
     const dtIda = toDateTime(fechaIdaDate, horaIda);
     const dtVuelta = toDateTime(fechaRegresoDate, horaRegreso);
 
-    // Manutenciones
+    // Manutenciones (nuevo cálculo basado en normativa seleccionada)
     let manutenciones = 0;
-    // Special case: same calendar day
+    // determine normative: 'rd' or 'decreto' using input.tipoProyecto and datos.json
+    let normative = 'decreto';
+    try {
+      const datos = (typeof window !== 'undefined' && window.__sgtriDatos) ? window.__sgtriDatos : null;
+      if (datos && datos.normativasPorTipoProyecto && datos.normativasPorTipoProyecto.rd) {
+        const rdList = datos.normativasPorTipoProyecto.rd || [];
+        if (input && input.tipoProyecto && rdList.indexOf(input.tipoProyecto) !== -1) normative = 'rd';
+      }
+    } catch (e) { /* ignore and default to decreto */ }
+
+    // helper: compute minutes from time object
+    function minutesOf(t) { return (t && typeof t.hh === 'number' && typeof t.mm === 'number') ? (t.hh * 60 + t.mm) : null; }
+
+    const tDep = minutesOf(horaIda);
+    const tRet = minutesOf(horaRegreso);
+
     const isSameDay = fechaIdaDate && fechaRegresoDate && fechaIdaDate.getFullYear() === fechaRegresoDate.getFullYear() && fechaIdaDate.getMonth() === fechaRegresoDate.getMonth() && fechaIdaDate.getDate() === fechaRegresoDate.getDate();
+
     if (isSameDay) {
-      // If both times present, decide 0 / 0.5 / 1 according to rules:
-      //  - 0 if sale después de 15:00 AND vuelve antes de 22:01 (i.e. <= 22:00)
-      //  - 0.5 if sale después de 15:00 OR vuelve antes de 22:01
-      //  - 1 otherwise
-      if (horaIda && horaRegreso) {
-        const tDep = horaIda.hh * 60 + horaIda.mm;
-        const tRet = horaRegreso.hh * 60 + horaRegreso.mm;
-        const depAfter15 = tDep > (15 * 60);
-        const retBeforeOrAt2200 = tRet <= (22 * 60);
-        if (depAfter15 && retBeforeOrAt2200) manutenciones = 0;
-        else if (depAfter15 || retBeforeOrAt2200) manutenciones = 0.5;
-        else manutenciones = 1;
-      } else {
-        // incomplete times: cannot compute confidently, keep 0
+      // Single-day rules
+      if (tDep == null || tRet == null) {
+        // Missing times: cannot confidently award manutenciones -> 0
         manutenciones = 0;
+      } else {
+        const durationHours = (dtVuelta.getTime() - dtIda.getTime()) / 3600000;
+        if (normative === 'rd') {
+          // RD 462/2002 single-day
+          // The dinner half (return >= 22:00 + ticket) is applied independently of total duration.
+          const retHalf = (tRet >= (22 * 60) && input && input.ticketCena) ? 0.5 : 0;
+          // For the "departure before 14:00 & return after 16:00" half, a minimum
+          // duration of 5 hours is required. If duration < 5h, only the dinner half (if any)
+          // is awarded.
+          if (durationHours < 5) {
+            manutenciones = retHalf;
+          } else {
+            const depHalf = (tDep < (14 * 60) && tRet >= (16 * 60)) ? 0.5 : 0;
+            manutenciones = depHalf + retHalf;
+          }
+        } else {
+          // Decreto 42/2025 single-day
+          const depCond = (tDep < (14 * 60) && tRet >= (16 * 60)) ? 0.5 : 0;
+          const retCond = (tRet >= (22 * 60)) ? 0.5 : 0;
+          manutenciones = depCond + retCond;
+        }
       }
     } else {
-      // salida
-      if (horaIda) {
-        const t = horaIda.hh * 60 + horaIda.mm;
-        if (t <= (15*60)) manutenciones += 1; // antes o igual 15:00
-        else if (t > (15*60) && t <= (22*60)) manutenciones += 0.5; // entre 15:01 y 22:00
+      // Multi-day rules (both RD and Decreto share these rules with subtle difference on return full-day)
+      // Day of departure
+      if (tDep != null) {
+  if (tDep < (14 * 60)) manutenciones += 1;
+  else if (tDep >= (14 * 60) && tDep < (22 * 60)) manutenciones += 0.5;
+        // else 0
       }
 
-      // días completos entre fechas
+      // Intermediate full days between salida and regreso
       if (fechaIdaDate && fechaRegresoDate) {
         const days = daysBetweenMidnights(fechaIdaDate, fechaRegresoDate);
-        // Cada día completo entre fecha de salida y regreso
-        if (days > 0) manutenciones += days;
+        const intermediate = Math.max(0, days - 1);
+        if (intermediate > 0) manutenciones += intermediate;
       }
 
-      // regreso
-      if (horaRegreso) {
-        const t = horaRegreso.hh * 60 + horaRegreso.mm;
-        if (t > (22*60)) manutenciones += 1; // vuelve más tarde de 22:00
-        else if (t > (15*60) && t <= (22*60)) manutenciones += 0.5; // entre 15:01 y 22:00
+      // Day of regreso
+      if (tRet != null) {
+        if (normative === 'rd') {
+          // RD: full (1) if regreso >= 22:00 AND ticketCena checked (>= used as 'posterior')
+          if (tRet >= (22 * 60) && input && input.ticketCena) manutenciones += 1;
+          else if (tRet >= (14 * 60)) manutenciones += 0.5;
+        } else {
+          // Decreto: full (1) if regreso >=22:00 (no ticket required)
+          if (tRet >= (22 * 60)) manutenciones += 1;
+          else if (tRet >= (14 * 60)) manutenciones += 0.5;
+        }
       }
     }
 
@@ -157,8 +190,31 @@
     }
 
     // Valores
-  const precioManutencion = 50.55;
-  const precioNoche = 98.88;
+    // Determine per-country prices from datos.json when available
+  let precioManutencion = 50.55;
+  let precioNoche = 98.88;
+  try {
+    const datos = (typeof window !== 'undefined' && window.__sgtriDatos) ? window.__sgtriDatos : null;
+    if (datos && datos.dietasPorPais && Array.isArray(datos.dietasPorPais.paises)) {
+      const paisesArr = datos.dietasPorPais.paises || [];
+      // Prefer explicit paisIndex passed from UI (select.selectedIndex). If not provided, fall back to indexOf(input.pais).
+      let idx = -1;
+      if (typeof input.paisIndex === 'number' && input.paisIndex >= 0) idx = input.paisIndex;
+      if (idx === -1) idx = paisesArr.indexOf(input && input.pais ? input.pais : '');
+      if (idx === -1) idx = Math.max(0, paisesArr.length - 1); // fallback to 'Resto del mundo' (last)
+      if (normative === 'rd' && datos.dietasPorPais.rd462_2002) {
+        const mArr = datos.dietasPorPais.rd462_2002.manutencion || [];
+        const aArr = datos.dietasPorPais.rd462_2002.alojamiento || [];
+        if (mArr[idx] != null) precioManutencion = Number(mArr[idx]);
+        if (aArr[idx] != null) precioNoche = Number(aArr[idx]);
+      } else if (normative === 'decreto' && datos.dietasPorPais.decreto42_2025) {
+        const mArr = datos.dietasPorPais.decreto42_2025.manutencion || [];
+        const aArr = datos.dietasPorPais.decreto42_2025.alojamiento || [];
+        if (mArr[idx] != null) precioManutencion = Number(mArr[idx]);
+        if (aArr[idx] != null) precioNoche = Number(aArr[idx]);
+      }
+    }
+  } catch (e) { /* fallback to defaults above */ }
   const precioKm = (input && input.kmTarifa) ? Number(input.kmTarifa) : 0.26;
 
     // Parse km and alojamiento from input (they should be numbers already but be robust)
@@ -183,6 +239,9 @@
 
   result.manutenciones = manutenciones;
     result.manutencionesAmount = manutencionesAmount;
+      // expose per-unit prices used for labels in the UI
+      result.precioManutencion = precioManutencion;
+      result.precioNoche = precioNoche;
     result.noches = noches;
     result.nochesAmount = nochesAmount;
     result.nochesBase = baseNP;
@@ -211,6 +270,93 @@
   result.alojamientoMaxAmount = nochesAmount; // esto es el importe máximo calculado
   // incluir precio por km usado en el cálculo
   result.precioKm = precioKm;
+
+    // === Cálculo IRPF: importe sujeto a retención por manutención ===
+    try {
+      // Decide de forma determinista los límites a usar ANTES de calcular los detalles por día.
+      const datosFallback = (typeof window !== 'undefined' && window.__sgtriDatos) ? window.__sgtriDatos : null;
+      let usedLimits = null;
+      // If datos available, prefer explicit paisIndex passed from UI. If not, try to infer by name.
+      if (datosFallback && datosFallback.limitesIRPF) {
+        if (typeof input.paisIndex === 'number' && input.paisIndex >= 0) {
+          usedLimits = (input.paisIndex === 0) ? datosFallback.limitesIRPF.esp : datosFallback.limitesIRPF.ext;
+          result.irpfSource = (input.paisIndex === 0) ? 'esp' : 'ext';
+        } else {
+          // attempt to detect by country name
+          const paisesArr = (datosFallback.dietasPorPais && Array.isArray(datosFallback.dietasPorPais.paises)) ? datosFallback.dietasPorPais.paises : null;
+          let idx = -1;
+          if (paisesArr && input && input.pais) {
+            idx = paisesArr.indexOf(input.pais);
+            if (idx === -1) {
+              const normalize = s => (s && s.normalize) ? s.normalize('NFD').replace(/[ -\u036f]/g, '') .toLowerCase() : (s || '').toLowerCase();
+              const target = normalize(String(input.pais));
+              idx = paisesArr.findIndex(p => normalize(String(p)) === target);
+            }
+          }
+          if (idx === 0) { usedLimits = datosFallback.limitesIRPF.esp; result.irpfSource = 'esp'; }
+          else { usedLimits = datosFallback.limitesIRPF.ext; result.irpfSource = 'ext'; }
+        }
+      }
+      // final fallback default
+      if (!usedLimits || !Array.isArray(usedLimits) || usedLimits.length < 2) usedLimits = [26.67, 53.34];
+
+  // (debug traces removed in cleanup)
+
+      // Build per-day manutención amounts (monetary) to apply exemptions per day
+      const perDayManutencionUnits = [];
+      if (isSameDay) {
+        // single calendar day: single entry equal to manutenciones (0/0.5/1)
+        perDayManutencionUnits.push(manutenciones);
+      } else {
+        // multi-day: departure day, intermediate full days, return day
+        // departure
+        let depUnits = 0;
+        if (tDep != null) {
+          if (tDep < (14 * 60)) depUnits = 1;
+          else if (tDep >= (14 * 60) && tDep < (22 * 60)) depUnits = 0.5;
+          else depUnits = 0;
+        }
+        perDayManutencionUnits.push(depUnits);
+        // intermediate full days
+        if (fechaIdaDate && fechaRegresoDate) {
+          const days = daysBetweenMidnights(fechaIdaDate, fechaRegresoDate);
+          const intermediate = Math.max(0, days - 1);
+          for (let i = 0; i < intermediate; i++) perDayManutencionUnits.push(1);
+        }
+        // return day
+        let retUnits = 0;
+        if (tRet != null) {
+          if (normative === 'rd') {
+            if (tRet >= (22 * 60) && input && input.ticketCena) retUnits = 1;
+            else if (tRet >= (14 * 60)) retUnits = 0.5;
+          } else {
+            if (tRet >= (22 * 60)) retUnits = 1;
+            else if (tRet >= (14 * 60)) retUnits = 0.5;
+          }
+        }
+        perDayManutencionUnits.push(retUnits);
+      }
+
+      // Compute per-day monetary amounts and apply exemptions: for all days except last use
+      // exemption WITH pernoctación (usedLimits[1]); for last day use exemption WITHOUT pernoctación (usedLimits[0]).
+      const perDayDetails = [];
+      let irpfSujetoTotal = 0;
+      for (let i = 0; i < perDayManutencionUnits.length; i++) {
+        const units = perDayManutencionUnits[i] || 0;
+        const bruto = Math.round((units * precioManutencion + Number.EPSILON) * 100) / 100;
+        const isLast = (i === perDayManutencionUnits.length - 1);
+        const exento = isLast ? Number(usedLimits[0]) : Number(usedLimits[1]);
+        let sujeto = bruto - exento;
+        if (sujeto < 0) sujeto = 0;
+        sujeto = Math.round((sujeto + Number.EPSILON) * 100) / 100;
+        perDayDetails.push({ dayIndex: i + 1, units, bruto, exento, sujeto, isLast });
+        irpfSujetoTotal += sujeto;
+      }
+      irpfSujetoTotal = Math.round((irpfSujetoTotal + Number.EPSILON) * 100) / 100;
+      result.irpf = { sujeto: irpfSujetoTotal, breakdown: perDayDetails, limitesUsed: usedLimits };
+    } catch (e) {
+      result.irpf = { sujeto: 0, breakdown: [], limitesUsed: [26.67, 53.34] };
+    }
 
     // devolver objeto con resultados
     return result;

@@ -572,3 +572,16 @@ input[type="number"]:focus {
   outline: 2px solid rgba(106,139,69,0.4);
   outline-offset: 2px;
 }
+
+/* Segment title styling and separator after each segment */
+.calc-seg-title {
+  color: #53868b;
+  font-style: italic;
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+.calc-result-segment {
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.6rem;
+  border-bottom: 1px solid #9dbfc2;
+}

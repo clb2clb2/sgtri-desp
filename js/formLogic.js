@@ -659,8 +659,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const m = valor.match(/^(\d{1,2}):(\d{2})$/);
       if (m) {
         const hh = parseInt(m[1], 10);
-        const mm = parseInt(m[2], 10);
-        if (hh > 22 || (hh === 22 && mm >= 1)) mostrar = true;
+        // const mm = parseInt(m[2], 10);
+        // Mostrar ticket-cena para RD462/2002 cuando la hora de regreso sea >= 22:00
+        if (hh >= 22) mostrar = true;
       }
       field.style.display = mostrar ? 'block' : 'none';
     });
@@ -677,12 +678,31 @@ document.addEventListener("DOMContentLoaded", () => {
       fronterasFields.style.display = 'block';
       cruceIda.required = true;
       cruceVuelta.required = true;
+      // Immediately remove/hide any existing calc-result until cruces are valid
+      try {
+        const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${desplazamientoId}"]`);
+        if (desp) {
+          const calc = desp.querySelector('.calc-result'); if (calc && calc.parentNode) calc.parentNode.removeChild(calc);
+          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+        }
+        // Then run validation which will insert the specific error message under fronteras
+        validateCrucesAndUpdateUI(desplazamientoId);
+      } catch (e) {}
     } else {
       fronterasFields.style.display = 'none';
       cruceIda.required = false;
       cruceVuelta.required = false;
       cruceIda.value = '';
       cruceVuelta.value = '';
+      // Clear any cruce-related error message and allow recalculation
+      try {
+        const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${desplazamientoId}"]`);
+        if (desp && desp.dataset && desp.dataset.dtInvalid) delete desp.dataset.dtInvalid;
+        const existingMsg = document.getElementById(`cruce-order-error-${desplazamientoId}`);
+        if (existingMsg && existingMsg.parentNode) existingMsg.parentNode.removeChild(existingMsg);
+        // trigger recalculation to show calc-result again if dates/times present
+        const id = desplazamientoId; setTimeout(() => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); }, 60);
+      } catch (e) {}
     }
   }
 
@@ -935,6 +955,126 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {
       return false;
     }
+  }
+
+  // Validate cruce-ida and cruce-vuelta dates relative to salida/regreso.
+  // Marks fields with .field-error when inconsistent and hides calc-result until corrected.
+  function validateCrucesAndUpdateUI(id) {
+    try {
+      const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+      if (!desp) return true;
+      const fechaIdEl = document.getElementById(`fecha-ida-${id}`);
+      const fechaRegEl = document.getElementById(`fecha-regreso-${id}`);
+      const cruceIdEl = document.getElementById(`cruce-ida-${id}`);
+      const cruceVueltaEl = document.getElementById(`cruce-vuelta-${id}`);
+      const calc = desp.querySelector('.calc-result');
+      // Determine if this desplazamiento is marked as international by the pais select
+      const paisEl = desp.querySelector(`#pais-destino-${id}`);
+      const isInternational = paisEl && paisEl.value && String(paisEl.value).trim() !== '' && String(paisEl.value).trim() !== 'España';
+      // If cruce fields not present and not international, clear state
+      if (!cruceIdEl || !cruceVueltaEl) {
+        if (!isInternational) return true;
+        // International but cruces inputs missing: treat as invalid until provided
+        // mark as invalid and show message
+        if (desp) { desp.dataset.dtInvalid = '1'; }
+        if (calc) calc.style.display = 'none';
+        try {
+          const existingMsg = desp.querySelector(`#cruce-order-error-${id}`);
+          if (!existingMsg && desp) {
+            const fronteras = desp.querySelector(`#fronteras-fields-${id}`);
+            const msg = document.createElement('div');
+            msg.id = `cruce-order-error-${id}`;
+            msg.className = 'dt-order-error';
+            msg.textContent = 'Por favor, revisa las fechas.';
+            // Insertar como hermano siguiente del contenedor de fronteras para que quede debajo, no dentro
+            if (fronteras && fronteras.insertAdjacentElement) fronteras.insertAdjacentElement('afterend', msg);
+            else if (fronteras && fronteras.parentNode) fronteras.parentNode.insertBefore(msg, fronteras.nextSibling);
+            else if (calc && calc.parentNode) calc.parentNode.insertBefore(msg, calc);
+          }
+        } catch (e) {}
+        return false;
+      }
+
+      // If international and cruces exist but are empty -> hide calculations and wait (no message)
+      if (isInternational && (String(cruceIdEl.value || '').trim() === '' || String(cruceVueltaEl.value || '').trim() === '')) {
+        if (desp) { desp.dataset.dtInvalid = '1'; }
+        if (calc) calc.style.display = 'none';
+        // Do not show an inline error message for blank cruces; wait for user input
+        return false;
+      }
+
+      const fId = parseDateStrict(fechaIdEl && fechaIdEl.value);
+      const fReg = parseDateStrict(fechaRegEl && fechaRegEl.value);
+      const cId = parseDateStrict(cruceIdEl && cruceIdEl.value);
+      const cV = parseDateStrict(cruceVueltaEl && cruceVueltaEl.value);
+
+      // If any cruce field has partial/invalid format -> hide calc and set dtInvalid
+      const anyInvalidFormat = ((!cId && cruceIdEl.value) || (!cV && cruceVueltaEl.value));
+      if (anyInvalidFormat) {
+        if (desp) { desp.dataset.dtInvalid = '1'; }
+        if (calc) calc.style.display = 'none';
+        // Insert inline message telling user to review dates
+        try {
+          const existingMsg = desp.querySelector(`#cruce-order-error-${id}`);
+          if (!existingMsg && desp) {
+            const fronteras = desp.querySelector(`#fronteras-fields-${id}`);
+            const msg = document.createElement('div');
+            msg.id = `cruce-order-error-${id}`;
+            msg.className = 'dt-order-error';
+            msg.textContent = 'Por favor, revisa las fechas.';
+            if (fronteras && fronteras.insertAdjacentElement) fronteras.insertAdjacentElement('afterend', msg);
+            else if (fronteras && fronteras.parentNode) fronteras.parentNode.insertBefore(msg, fronteras.nextSibling);
+            else if (calc && calc.parentNode) calc.parentNode.insertBefore(msg, calc);
+          }
+        } catch (e) {}
+        // mark but do not set red unless ordering wrong
+        return false;
+      }
+
+      // If any of the cruce fields are empty and dtInvalid flagged, keep calc hidden
+      if (!cId || !cV) {
+        if (desp && desp.dataset && desp.dataset.dtInvalid === '1') {
+          if (calc) calc.style.display = 'none';
+          return false;
+        }
+        // remove any previous error markers
+        [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.remove('field-error'));
+        return true;
+      }
+
+      // Now check logical ordering: fechaId <= cruceId <= cruceVuelta <= fechaRegreso
+      let orderingOk = true;
+      if (fId && cId && cId < fId) orderingOk = false;
+      if (fReg && cV && cV > fReg) orderingOk = false;
+      if (cId && cV && cV < cId) orderingOk = false;
+
+      if (!orderingOk) {
+        // mark cruces in red and hide calc
+        [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.add('field-error'));
+        if (calc) calc.style.display = 'none';
+        try {
+          const existingMsg = desp.querySelector(`#cruce-order-error-${id}`);
+          if (!existingMsg && desp) {
+            const fronteras = desp.querySelector(`#fronteras-fields-${id}`);
+            const msg = document.createElement('div');
+            msg.id = `cruce-order-error-${id}`;
+            msg.className = 'dt-order-error';
+            msg.textContent = 'Por favor, revisa las fechas.';
+            // Preferir insertar justo después del contenedor de fronteras para que el mensaje quede debajo
+            if (fronteras && fronteras.insertAdjacentElement) fronteras.insertAdjacentElement('afterend', msg);
+            else if (fronteras && fronteras.parentNode) fronteras.parentNode.insertBefore(msg, fronteras.nextSibling);
+            else if (calc && calc.parentNode) calc.parentNode.insertBefore(msg, calc);
+          }
+        } catch (e) {}
+        return false;
+      }
+
+      // OK: remove error classes and allow calc to show (visibility controlled elsewhere)
+      [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.remove('field-error'));
+      if (desp && desp.dataset && desp.dataset.dtInvalid) delete desp.dataset.dtInvalid;
+      try { const existingMsg = desp.querySelector(`#cruce-order-error-${id}`); if (existingMsg && existingMsg.parentNode) existingMsg.parentNode.removeChild(existingMsg); } catch(e) {}
+      return true;
+    } catch (e) { return true; }
   }
 
   // Delegación para formatear inputs de fecha al perder foco
@@ -1380,9 +1520,18 @@ document.addEventListener("DOMContentLoaded", () => {
         horaIda: safeVal(despEl.querySelector(`#hora-ida-${id}`)),
         fechaRegreso: safeVal(despEl.querySelector(`#fecha-regreso-${id}`)),
         horaRegreso: safeVal(despEl.querySelector(`#hora-regreso-${id}`)),
+        // fechas de cruce de fronteras (opcional, usadas para viajes internacionales)
+        cruceIda: safeVal(despEl.querySelector(`#cruce-ida-${id}`)),
+        cruceVuelta: safeVal(despEl.querySelector(`#cruce-vuelta-${id}`)),
         pais: safeVal(despEl.querySelector(`#pais-destino-${id}`)),
+        // include the selectedIndex of the pais select so the calc can use the index directly
+        paisIndex: (function(){ const el = despEl.querySelector(`#pais-destino-${id}`); return (el && typeof el.selectedIndex === 'number') ? el.selectedIndex : -1; })(),
         km: safeVal(despEl.querySelector(`#km-${id}`)),
-        alojamiento: safeVal(despEl.querySelector(`#alojamiento-${id}`))
+        alojamiento: safeVal(despEl.querySelector(`#alojamiento-${id}`)),
+        // include whether the ticket-cena checkbox is checked for this desplazamiento
+        ticketCena: !!(despEl.querySelector(`#ticket-cena-${id}`) && despEl.querySelector(`#ticket-cena-${id}`).checked),
+        // include global tipoProyecto selection so calc can pick normative rules
+        tipoProyecto: (document.getElementById('tipoProyecto') ? document.getElementById('tipoProyecto').value : '')
       };
     }
 
@@ -1397,18 +1546,24 @@ document.addEventListener("DOMContentLoaded", () => {
       let tipoVehiculo = 'coche';
       try { const rv = document.querySelector('input[name="vehiculo-tipo"]:checked'); if (rv && rv.value) tipoVehiculo = rv.value; } catch(e){}
 
-      const manutLabel = `Manutención: ${fmtInt(result.manutenciones)} × 50,55 €`;
-      const manutAmount = fmt(result.manutencionesAmount);
+  // Use per-country per-unit manutención price if provided by calc
+  const precioManUnit = (result && result.precioManutencion) ? Number(result.precioManutencion) : 50.55;
+  const precioManTxt = precioManUnit.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const manutLabel = `Manutención: ${fmtInt(result.manutenciones)} × ${precioManTxt} €`;
+  const manutAmount = fmt(result.manutencionesAmount);
 
   // Show appropriate alojamiento max depending on ambiguity:
   // - If ambiguous: by default show the 'not counted' value (checkbox unchecked),
   //   the checkbox will allow switching to the counted value.
   // - If not ambiguous: show the actual computed noches and amount.
   let alojamientoLabel = '';
+  // Use per-country per-unit alojamiento price if provided by calc
+  const precioNocheUnit = (result && result.precioNoche) ? Number(result.precioNoche) : 98.88;
+  const precioNocheTxt = precioNocheUnit.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (result.nochesAmbiguous) {
-    alojamientoLabel = `Alojamiento: <em>[ máx: ${fmtInt(result.nochesIfNotCounted || 0)} noches × 98,88 € = ${fmt(result.nochesAmountIfNotCounted || 0)} € ]</em>`;
+    alojamientoLabel = `Alojamiento: <em>[ máx: ${fmtInt(result.nochesIfNotCounted || 0)} noches × ${precioNocheTxt} € = ${fmt(result.nochesAmountIfNotCounted || 0)} € ]</em>`;
   } else {
-    alojamientoLabel = `Alojamiento: <em>[ máx: ${fmtInt(result.noches || 0)} noches × 98,88 € = ${fmt(result.nochesAmount || 0)} € ]</em>`;
+    alojamientoLabel = `Alojamiento: <em>[ máx: ${fmtInt(result.noches || 0)} noches × ${precioNocheTxt} € = ${fmt(result.nochesAmount || 0)} € ]</em>`;
   }
   const alojamientoAmount = fmt(Number(result.alojamiento || 0));
 
@@ -1417,9 +1572,37 @@ document.addEventListener("DOMContentLoaded", () => {
       const kmLabel = `Km. en vehículo propio: ${fmtInt(result.km)} × ${tarifaTxt} €`;
       const kmAmount = fmt(result.kmAmount);
 
-      // Total: sumar manutencionesAmount + alojamiento (real) + kmAmount
-      const totalVal = (Number(result.manutencionesAmount || 0) + Number(result.kmAmount || 0) + Number(result.alojamiento || 0));
-      const totalStr = fmt(totalVal);
+      // IRPF: importe sujeto a retención (si viene en result, mostrar desglose)
+          const irpfSujetoVal = (result && result.irpf && typeof result.irpf.sujeto !== 'undefined') ? Number(result.irpf.sujeto) : 0;
+          const irpfSujetoStr = fmt(irpfSujetoVal);
+          // Build a detailed per-day operations string (always present when breakdown exists)
+          let irpfDetailsHtml = '';
+          // Also show which limits were applied (helpful to debug esp vs ext)
+          let irpfLimitsNote = '';
+          try {
+            if (result && result.irpf && Array.isArray(result.irpf.limitesUsed)) {
+              const lims = result.irpf.limitesUsed;
+              const src = result.irpfSource || (result.paisIndex === 0 ? 'esp' : 'ext');
+              irpfLimitsNote = `<div class="irpf-limits-note">límites aplicados: <strong>${src}</strong> [sin pernocta: ${fmt(lims[0])} € / con pernocta: ${fmt(lims[1])} €] (paisIndex: ${typeof result.paisIndex !== 'undefined' ? result.paisIndex : 'n/a'})</div>`;
+            }
+          } catch (e) { irpfLimitsNote = ''; }
+          try {
+            if (result && result.irpf && Array.isArray(result.irpf.breakdown) && result.irpf.breakdown.length > 0) {
+              const rows = result.irpf.breakdown.map(d => {
+                const unitsTxt = (d.units % 1 === 0) ? String(d.units) : String(d.units).replace('.', ',');
+                const brutoTxt = fmt(d.bruto);
+                const exentoTxt = fmt(d.exento);
+                const sujetoTxt = fmt(d.sujeto);
+                const diaLabel = d.isLast ? 'último día' : `día ${d.dayIndex}`;
+                return `<div class="irpf-row">${diaLabel}: ${unitsTxt} × ${precioManTxt} € = <strong>${brutoTxt} €</strong>; exento: ${exentoTxt} € → sujeto: <strong>${sujetoTxt} €</strong></div>`;
+              });
+              irpfDetailsHtml = `<div class="irpf-breakdown">${rows.join('')}</div>`;
+            }
+          } catch (e) { irpfDetailsHtml = ''; }
+
+          // Total: sumar manutencionesAmount + alojamiento (real) + kmAmount
+          const totalVal = (Number(result.manutencionesAmount || 0) + Number(result.kmAmount || 0) + Number(result.alojamiento || 0));
+          const totalStr = fmt(totalVal);
 
   // Check if alojamiento exceeds max allowed. For ambiguous cases the default
   // allowed amount is the 'not counted' nights amount (checkbox unchecked).
@@ -1442,18 +1625,94 @@ document.addEventListener("DOMContentLoaded", () => {
       const alojamientoAmountHtml = `${warnHtml}<span class="amount${alojamientoExceedsMax ? ' error-amount' : ''}">${alojamientoAmount} €</span>`;
 
       const id = despEl.dataset && despEl.dataset.desplazamientoId ? despEl.dataset.desplazamientoId : Math.random().toString(36).slice(2,8);
-      // Do not inject the justificar checkbox inside the calc-result.
-      // We'll render it as a sibling div under the ticket-cena-field for the same desplazamiento
-      // so it visually matches the ticket-cena fields.
-      const html = `
-        <div class="calc-result" aria-live="polite" data-desp-id="${id}">
-          <div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmount} €</span></div>
-          <div class="calc-line aloj-line${alojamientoExceedsMax ? ' error-line' : ''}"><span class="label">${alojamientoLabel}</span><span class="leader" aria-hidden="true"></span>${alojamientoAmountHtml.replace('class="amount', 'class="amount aloj')}</div>
-          
-          <div class="calc-line"><span class="label">${kmLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmount} €</span></div>
-          <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalStr} €</strong></span></div>
-        </div>`;
-      if (out) out.outerHTML = html; else despEl.insertAdjacentHTML('beforeend', html);
+
+      // If we received segmentsResults, render each segment separately and then show km
+      if (result && Array.isArray(result.segmentsResults)) {
+        const segs = result.segmentsResults;
+        const segHtml = segs.map((r, idx) => {
+    const segTitle = r && r.segTitle ? r.segTitle : `Tramo ${idx + 1} — ${r.pais || (r.paisIndex === 0 ? 'España' : 'Extranjero')}`;
+          const precioManUnitSeg = (r && r.precioManutencion) ? Number(r.precioManutencion) : precioManUnit;
+          const precioNocheUnitSeg = (r && r.precioNoche) ? Number(r.precioNoche) : precioNocheUnit;
+          const manutLabelSeg = `Manutención: ${fmtInt(r.manutenciones)} × ${precioManUnitSeg.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €`;
+          const manutAmountSeg = fmt(Number(r.manutencionesAmount || 0));
+          // Alojamiento máx formatted left-aligned (no '= total' here; total shown after leader)
+          const alojMaxTxt = `${fmtInt(r.noches || 0)} noches × ${precioNocheUnitSeg.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €`;
+          const irpfValSeg = (r && r.irpf && typeof r.irpf.sujeto !== 'undefined') ? Number(r.irpf.sujeto) : 0;
+          const irpfStrSeg = fmt(irpfValSeg);
+          // Build IRPF line only if > 0
+          const irpfLineSeg = (irpfValSeg && Number(irpfValSeg) > 0) ? `<div class="calc-line irpf-line"><span class="label">Sujeto a retención:</span><span class="leader" aria-hidden="true"></span><span class="amount irpf">${irpfStrSeg} €</span></div>` : '';
+          // For domestic segments (paisIndex === 0) we do not render per-day IRPF breakdown/details elsewhere; here only show the total sujeto per segment when >0
+          return `
+            <div class="calc-result-segment">
+              <div class="calc-seg-title">${segTitle}</div>
+              <div class="calc-line"><span class="label">${manutLabelSeg}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmountSeg} €</span></div>
+              ${irpfLineSeg}
+              <div class="calc-line aloj-line"><span class="label">Alojamiento máx: ${alojMaxTxt}</span><span class="leader" aria-hidden="true"></span><span class="amount aloj">${fmt(Number(r.nochesAmount || 0))} €</span></div>
+            </div>
+          `;
+        }).join('');
+
+  // Sum IRPF across segments and conditionally build IRPF total (omit if zero)
+  const totalIrpfValue = segs.reduce((acc, r) => acc + (r && r.irpf && typeof r.irpf.sujeto !== 'undefined' ? Number(r.irpf.sujeto) : 0), 0);
+  const totalIrpfStr = fmt(Math.round((totalIrpfValue + Number.EPSILON) * 100) / 100);
+  // If total IRPF is zero, omit the line entirely; otherwise render aligned-right like .calc-total
+  const irpfTotalHtml = (totalIrpfValue && Number(totalIrpfValue) > 0) ? `<div class="calc-total"><span class="label">Total sujeto a retención:</span><span class="amount"><span class="irpf-total-val">${totalIrpfStr} €</span></span></div>` : '';
+
+  // Kilometraje line separately (render like in national: 'XXX × Y,YY €' on the label, amount right)
+  const tarifaTxtSeg = (tipoVehiculo === 'motocicleta') ? (result.precioKm || tarifa).toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : (result.precioKm || tarifa).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const kmAmountSeg = (typeof result.kmAmount !== 'undefined') ? fmt(result.kmAmount) : kmAmount;
+  const kmCountTxt = (typeof result.km !== 'undefined') ? fmtInt(result.km) : fmtInt(0);
+  const kmLineHtml = `<div class="calc-line"><span class="label">Km. en vehículo propio: ${kmCountTxt} × ${tarifaTxtSeg} €</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmountSeg} €</span></div>`;
+        // Compute aggregated alojamiento máx across segments (use nochesAmount or nochesAmountIfNotCounted depending on segment)
+        const totalAlojMax = segs.reduce((acc, r) => {
+          const v = (r && typeof r.nochesAmount !== 'undefined') ? Number(r.nochesAmount || 0) : 0;
+          return acc + v;
+        }, 0);
+        const totalAlojMaxStr = fmt(totalAlojMax);
+        // Sum manutenciones across segments for the TOTALES block
+        const totalManut = segs.reduce((acc, r) => acc + (r && typeof r.manutencionesAmount !== 'undefined' ? Number(r.manutencionesAmount || 0) : 0), 0);
+        const totalManutStr = fmt(totalManut);
+        const manutTotalHtml = `<div class="calc-line"><span class="label">Total manutención</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${totalManutStr} €</span></div>`;
+        // user-provided alojamiento (numeric) is in result.alojamientoUser
+        const alojUserNum = (typeof result.alojamientoUser !== 'undefined') ? Number(result.alojamientoUser) : 0;
+        const alojUserStr = fmt(alojUserNum);
+        const alojWarn = (alojUserNum > totalAlojMax) ? `
+          <span class="warn-wrapper" tabindex="0" aria-live="polite">
+            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento proporcionado supera el máximo permitido.</span>
+          </span>` : '';
+        // Determine if user alojamiento exceeds the aggregated maximum
+        const alojExceeds = alojUserNum > totalAlojMax;
+  // Aggregated alojamiento line: show max inside brackets (italic) at left, user amount aligned to right; mark error-line if exceeded
+  const alojAggregatedHtml = `<div class="calc-line aloj-aggregated${alojExceeds ? ' error-line' : ''}"><span class="label">Alojamiento: <em>[ máx. ${totalAlojMaxStr} € ]</em></span><span class="leader" aria-hidden="true"></span><span class="aloj-user">${alojWarn}<span class="amount aloj-user${alojExceeds ? ' error-amount' : ''}">${alojUserStr} €</span></span></div>`;
+
+        const htmlSeg = `
+          <div class="calc-result composite" data-desp-id="${id}">
+            ${segHtml}
+            <div class="calc-seg-title">TOTALES:</div>
+            ${manutTotalHtml}
+            ${alojAggregatedHtml}
+            ${kmLineHtml}
+            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${fmt((segs.reduce((a,s) => a + (Number(s.manutencionesAmount || 0) || 0), 0) + Number(result.kmAmount || 0) + alojUserNum))} €</strong></span></div>
+            ${irpfTotalHtml}
+          </div>
+        `;
+        if (out) out.outerHTML = htmlSeg; else despEl.insertAdjacentHTML('beforeend', htmlSeg);
+      } else {
+        // Single-result rendering (existing behavior)
+        const html = `
+          <div class="calc-result" aria-live="polite" data-desp-id="${id}">
+            <div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmount} €</span></div>
+            <div class="calc-line aloj-line${alojamientoExceedsMax ? ' error-line' : ''}"><span class="label">${alojamientoLabel}</span><span class="leader" aria-hidden="true"></span>${alojamientoAmountHtml.replace('class="amount', 'class="amount aloj')}</div>
+            
+            <div class="calc-line"><span class="label">${kmLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmount} €</span></div>
+            ${ (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? `<div class="calc-line irpf-line"><span class="label">Sujeto a retención:</span><span class="leader" aria-hidden="true"></span><span class="amount irpf">${irpfSujetoStr} €</span></div>` : '' }
+            ${ (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? ( (result && typeof result.paisIndex !== 'undefined' && Number(result.paisIndex) === 0) ? '' : irpfLimitsNote ) : '' }
+            ${ (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? ( (result && typeof result.paisIndex !== 'undefined' && Number(result.paisIndex) === 0) ? '' : irpfDetailsHtml ) : '' }
+            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalStr} €</strong></span></div>
+          </div>`;
+        if (out) out.outerHTML = html; else despEl.insertAdjacentHTML('beforeend', html);
+      }
 
       // --- Tooltip portal handling: move tooltip to body to avoid clipping by overflow on ancestors
       ensureGlobalWarnTooltip();
@@ -1495,7 +1754,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // actualizar etiqueta máxima de alojamiento (noches y cantidad)
             try {
               if (alojLabelSpan) {
-                alojLabelSpan.innerHTML = `Alojamiento: <em>[ máx: ${fmtInt(checked ? result.nochesIfCounted : result.nochesIfNotCounted)} noches × 98,88 € = ${fmt(checked ? result.nochesAmountIfCounted : result.nochesAmountIfNotCounted)} € ]</em>`;
+                alojLabelSpan.innerHTML = `Alojamiento: <em>[ máx: ${fmtInt(checked ? result.nochesIfCounted : result.nochesIfNotCounted)} noches × ${precioNocheTxt} € = ${fmt(checked ? result.nochesAmountIfCounted : result.nochesAmountIfNotCounted)} € ]</em>`;
               }
             } catch (e) {}
             // Manage warn icon/tooltip dynamically: create or remove warn-wrapper
@@ -1638,6 +1897,116 @@ document.addEventListener("DOMContentLoaded", () => {
     data.tipoVehiculo = tipoVehiculo;
     data.kmTarifa = kmTarifa;
 
+    // Si es viaje internacional y se han indicado fechas de cruce, dividir en segmentos
+    const isInternational = (data.pais && String(data.pais).trim() !== '' && String(data.pais).trim() !== 'España');
+    const hasCruces = data.cruceIda && data.cruceVuelta;
+    // Validate cruces before doing any segmentation; if invalid or missing for international, hide/clear results
+    if (isInternational) {
+      const okCruces = validateCrucesAndUpdateUI(id);
+      if (!okCruces) {
+        const existing = desp.querySelector('.calc-result'); if (existing) existing.parentNode.removeChild(existing);
+        const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+        return;
+      }
+    }
+    if (isInternational && hasCruces) {
+      // Build up to 3 segments according to the rules:
+      // 1) España (si cruceIda != fechaIda): desde fechaIda/horaIda hasta cruceIda 07:00 (España rates)
+      // 2) País destino: desde cruceIda (hora: horaIda si fechaIda===cruceIda else 07:00) hasta cruceVuelta 07:00
+      // 3) España: desde cruceVuelta 07:00 hasta fechaRegreso/horaRegreso (España rates)
+      const segments = [];
+      const fmt07 = '07:00';
+      const fechaIda = data.fechaIda;
+      const fechaRegreso = data.fechaRegreso;
+      const cruceIda = data.cruceIda;
+      const cruceVuelta = data.cruceVuelta;
+
+      // Helper to create an input object for a segment. We set km and alojamiento to 0 so that
+      // per-segment results show computed manutenciones/noches/irpf without duplicating km/alojamiento.
+      function makeSegInput(fIni, hIni, fFin, hFin, paisIdx, paisLabel) {
+        return {
+          fechaIda: fIni,
+          horaIda: hIni || '',
+          fechaRegreso: fFin,
+          horaRegreso: hFin || '',
+          pais: paisLabel || '',
+          paisIndex: typeof paisIdx === 'number' ? paisIdx : -1,
+          km: 0,
+          alojamiento: 0,
+          ticketCena: !!data.ticketCena,
+          tipoProyecto: data.tipoProyecto || '',
+          kmTarifa: data.kmTarifa || kmTarifa
+        };
+      }
+
+      // If cruceIda is different date than fechaIda -> first Spain segment
+      if (cruceIda && fechaIda && cruceIda !== fechaIda) {
+        segments.push(makeSegInput(fechaIda, data.horaIda || '', cruceIda, fmt07, 0, 'España'));
+      }
+
+      // Middle segment: destination country
+      // startHour = horaIda if fechaIda === cruceIda, otherwise 07:00
+      const midStartHora = (cruceIda === fechaIda) ? (data.horaIda || '') : fmt07;
+      segments.push(makeSegInput(cruceIda, midStartHora, cruceVuelta, fmt07, data.paisIndex, data.pais));
+
+      // Final Spain segment: from cruceVuelta 07:00 to fechaRegreso/horaRegreso
+      segments.push(makeSegInput(cruceVuelta, fmt07, fechaRegreso, data.horaRegreso || '', 0, 'España'));
+
+      // Filter out any segments that have equal start and end date/time or missing dates
+      function segHasDuration(s) {
+        if (!s || !s.fechaIda || !s.fechaRegreso) return false;
+        // if dates equal but times missing or equal, treat as zero-length and skip
+        if (s.fechaIda === s.fechaRegreso) {
+          const hi = s.horaIda || '';
+          const hf = s.horaRegreso || '';
+          if (!hi || !hf) return false;
+          if (hi === hf) return false;
+        }
+        return true;
+      }
+      const realSegments = segments.filter(segHasDuration);
+
+      // Compute each segment via dietasCalc
+      const segResults = realSegments.map(seg => {
+        try {
+          return window.dietasCalc.calculateDesplazamiento(seg);
+        } catch (e) { return null; }
+      }).filter(Boolean);
+
+      // Build human-readable titles per segment using the original user inputs (only show times the user provided)
+      segResults.forEach((r, idx) => {
+        const seg = realSegments[idx];
+        const startDate = seg && seg.fechaIda ? seg.fechaIda : '';
+        const endDate = seg && seg.fechaRegreso ? seg.fechaRegreso : '';
+        let startTimePart = '';
+        let endTimePart = '';
+        // show start time only if the start date equals the user's fechaIda and user provided horaIda
+        if (startDate && data.fechaIda && data.horaIda && startDate === data.fechaIda) startTimePart = ` a las ${data.horaIda} h`;
+        // show end time only if the end date equals the user's fechaRegreso and user provided horaRegreso
+        if (endDate && data.fechaRegreso && data.horaRegreso && endDate === data.fechaRegreso) endTimePart = ` a las ${data.horaRegreso} h`;
+        const paisLabel = seg && seg.pais ? seg.pais : (seg && seg.paisIndex === 0 ? 'España' : 'Extranjero');
+        r.segTitle = `Tramo ${idx + 1}. ${paisLabel}, del ${startDate}${startTimePart} al ${endDate}${endTimePart}:`;
+      });
+
+      // Build a composite result object for rendering: include segmentsResults and overall km info
+      const composite = {
+        segmentsResults: segResults,
+        // pass through km info so renderCalcResult can show it after segments
+        km: (function(){ try { if (typeof data.km === 'number') return data.km; const s = String(data.km || '').replace(/[^0-9,\.]/g,'').replace(/\./g,'').replace(/,/g,'.'); return parseFloat(s) || 0; } catch(e){ return 0; } })(),
+        precioKm: data.kmTarifa || kmTarifa,
+        kmAmount: (function(){ try { const s = (typeof data.km === 'number') ? data.km : String(data.km || '').replace(/[^0-9,\.]/g,'').replace(/\./g,'').replace(/,/g,'.'); const k = parseFloat(s) || 0; const t = Number(data.kmTarifa || kmTarifa) || 0; return Math.round((k * t + Number.EPSILON) * 100) / 100; } catch(e){ return 0; } })(),
+        // user-provided alojamiento (numeric) for final aggregation
+        alojamientoUser: (function(){
+          if (!data.alojamiento) return 0;
+          if (typeof data.alojamiento === 'number') return data.alojamiento;
+          try { const s = String(data.alojamiento).replace(/[^0-9,\.]/g,'').replace(/\./g,'').replace(/,/g,'.'); return parseFloat(s) || 0; } catch(e){ return 0; }
+        })()
+      };
+      renderCalcResult(desp, composite);
+      return;
+    }
+
+    // Default single calculation (domestic or no cruces provided)
     const res = window.dietasCalc.calculateDesplazamiento(data);
     renderCalcResult(desp, res);
     }
@@ -1645,7 +2014,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function attachCalcListenersToDesplazamiento(id) {
       const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
       if (!desp) return;
-      const selector = [`#fecha-ida-${id}`, `#hora-ida-${id}`, `#fecha-regreso-${id}`, `#hora-regreso-${id}`, `#pais-destino-${id}`, `#km-${id}`, `#alojamiento-${id}`].join(',');
+  const selector = [`#fecha-ida-${id}`, `#hora-ida-${id}`, `#fecha-regreso-${id}`, `#hora-regreso-${id}`, `#cruce-ida-${id}`, `#cruce-vuelta-${id}`, `#pais-destino-${id}`, `#km-${id}`, `#alojamiento-${id}`].join(',');
       const nodes = desp.querySelectorAll(selector);
       // IMPORTANT: only recalculate and toggle visibility on blur of the implicated fields.
       // While the user is typing (input) we avoid showing/hiding calc-result or ticket fields.
@@ -1668,6 +2037,16 @@ document.addEventListener("DOMContentLoaded", () => {
         // Do not toggle vehicle ficha or recalc while typing; act on blur only
         kmInput.addEventListener('blur', () => {
           evaluarKmParaMostrarFicha();
+          recalculateDesplazamientoById(id);
+          actualizarTicketCena();
+        });
+      }
+      // Watch ticket-cena checkbox: recalc on change so manutenciones update immediately
+      const ticketCheckbox = desp.querySelector(`#ticket-cena-${id}`);
+      if (ticketCheckbox) {
+        ticketCheckbox.addEventListener('change', () => {
+          // Changing ticket affects both validation-dependent rules and amounts
+          validateDateTimePairAndUpdateUI(id);
           recalculateDesplazamientoById(id);
           actualizarTicketCena();
         });

@@ -45,8 +45,8 @@
     }
   },
   "limitesIRPF": {
-    "decreto": [26.67, 53.34],
-    "rd": [66.11, 91.35]
+    "esp": [26.67, 53.34],
+    "ext": [48.08, 91.35]
   },
   "normativasPorTipoProyecto": {
     "rd": ["G24","PEI","NAL"],
