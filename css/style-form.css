@@ -133,6 +133,13 @@ select:focus {
   border-bottom: none;
 }
 
+.residencia-eventual-badge {
+  margin-top: 0.45rem;
+  margin-bottom: 0.6rem;
+  font-weight: 700;
+  color: #b23a3a;
+}
+
 /* Proyecto title should look like desplazamiento title */
 .proyecto-titulo {
   color: #53868b;
