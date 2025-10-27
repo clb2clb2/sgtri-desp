@@ -2052,9 +2052,18 @@ document.addEventListener("DOMContentLoaded", () => {
         return date;
       }
       function addMonthsAndDays(d, months, days) {
-        const nd = new Date(d.getTime());
-        nd.setMonth(nd.getMonth() + months);
-        nd.setDate(nd.getDate() + days);
+        // Add months in a date-to-date manner: when the target month has fewer days
+        // than the source day, use the last day of the target month (so 31/01 + 1 month -> 28/02).
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        const day = d.getDate();
+        const targetMonth = m + months;
+        // last day of target month
+        const lastDayOfTarget = new Date(y, targetMonth + 1, 0).getDate();
+        const useDay = Math.min(day, lastDayOfTarget);
+        const nd = new Date(y, targetMonth, useDay, d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+        // then add extra days
+        if (days) nd.setDate(nd.getDate() + days);
         return nd;
       }
       function segmentExceedsThreshold(seg) {
@@ -2141,9 +2150,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return date;
       }
       function addMonthsAndDays(d, months, days) {
-        const nd = new Date(d.getTime());
-        nd.setMonth(nd.getMonth() + months);
-        nd.setDate(nd.getDate() + days);
+        // Add months in a date-to-date manner: when the target month has fewer days
+        // than the source day, use the last day of the target month (so 31/01 + 1 month -> 28/02).
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        const day = d.getDate();
+        const targetMonth = m + months;
+        const lastDayOfTarget = new Date(y, targetMonth + 1, 0).getDate();
+        const useDay = Math.min(day, lastDayOfTarget);
+        const nd = new Date(y, targetMonth, useDay, d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+        if (days) nd.setDate(nd.getDate() + days);
         return nd;
       }
       try {
