@@ -859,11 +859,16 @@ document.addEventListener("DOMContentLoaded", () => {
   function parseTimeStrict(hhmm) {
     if (!hhmm) return null;
     const raw = String(hhmm).trim();
-    const m = raw.match(/^(\d{1,2}):(\d{2})$/);
+    // Accept formats: H, HH, H:MM, HH:MM. If minutes omitted, assume 00.
+    const m = raw.match(/^(\d{1,2})(?::(\d{1,2}))?$/);
     if (!m) return null;
     const hh = parseInt(m[1], 10);
-    const mm = parseInt(m[2], 10);
+    let mm = (typeof m[2] !== 'undefined' && m[2] !== '') ? parseInt(m[2], 10) : 0;
     if (isNaN(hh) || isNaN(mm)) return null;
+    // If minutes provided with one digit, treat as tens (e.g., '9:5' -> '09:05') handled elsewhere
+    if (mm >= 0 && mm <= 9 && m[2] && m[2].length === 1) {
+      // keep as is (05), parseInt already correct
+    }
     if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
     return { hh, mm };
   }
@@ -1137,11 +1142,13 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const parts = v.split(':').map(p => p.replace(/[^0-9]/g, ''));
-      let hh = parts[0] || '';
-      let mm = parts[1] || '';
-      if (hh.length === 1) hh = '0' + hh;
-      if (mm.length === 1) mm = '0' + mm;
+  const parts = v.split(':').map(p => p.replace(/[^0-9]/g, ''));
+  let hh = parts[0] || '';
+  let mm = (typeof parts[1] !== 'undefined') ? (parts[1] || '') : '';
+  // If user provided only hours (e.g. "9" or "18"), assume minutes = '00'
+  if (mm === '') mm = '00';
+  if (hh.length === 1) hh = '0' + hh;
+  if (mm.length === 1) mm = '0' + mm;
       // validar rangos
       const hnum = parseInt(hh, 10);
       const mnum = parseInt(mm, 10);
@@ -1196,6 +1203,25 @@ document.addEventListener("DOMContentLoaded", () => {
       el.value = parts[0] + ',' + parts[1] + ' €';
     }
   }, true);
+
+  // Keydown handler: cuando el usuario pulsa ':' dentro de un campo de hora
+  // y el valor actual son solo horas, autocompletamos a ':00' inmediatamente.
+  document.addEventListener('keydown', (e) => {
+    const el = e.target;
+    if (!el || !el.classList || !el.classList.contains('input-hora')) return;
+    if (e.key === ':') {
+      const v = (el.value || '').trim();
+      // si el valor actual es solo 1-2 dígitos (horas), interceptar
+      if (/^\d{1,2}$/.test(v)) {
+        e.preventDefault();
+        let hh = v;
+        if (hh.length === 1) hh = '0' + hh;
+        // dejar el ':' y posicionar el cursor después para que el usuario escriba minutos
+        el.value = hh + ':';
+        try { el.setSelectionRange(el.value.length, el.value.length); } catch (err) {}
+      }
+    }
+  });
 
   // Al entrar en un campo km, quitar la unidad y desformatear para permitir edición
   document.addEventListener('focusin', (e) => {
@@ -1619,7 +1645,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const warnHtml = alojamientoExceedsMax ? `
         <span class="warn-wrapper" tabindex="0" aria-live="polite">
           <span class="warn-icon" aria-hidden="true">⚠️</span>
-          <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento es superior al máximo permitido, conforme al ${normativaLabel}.</span>
+          <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>
         </span>
       ` : '';
       const alojamientoAmountHtml = `${warnHtml}<span class="amount${alojamientoExceedsMax ? ' error-amount' : ''}">${alojamientoAmount} €</span>`;
@@ -1656,7 +1682,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const totalIrpfValue = segs.reduce((acc, r) => acc + (r && r.irpf && typeof r.irpf.sujeto !== 'undefined' ? Number(r.irpf.sujeto) : 0), 0);
   const totalIrpfStr = fmt(Math.round((totalIrpfValue + Number.EPSILON) * 100) / 100);
   // If total IRPF is zero, omit the line entirely; otherwise render aligned-right like .calc-total
-  const irpfTotalHtml = (totalIrpfValue && Number(totalIrpfValue) > 0) ? `<div class="calc-total"><span class="label">Total sujeto a retención:</span><span class="amount"><span class="irpf-total-val">${totalIrpfStr} €</span></span></div>` : '';
+  const irpfTotalHtml = (totalIrpfValue && Number(totalIrpfValue) > 0) ? `<div class="calc-total"><span class="label">Sujeto a retención:</span><span class="amount"><span class="irpf-total-val">${totalIrpfStr} €</span></span></div>` : '';
 
   // Kilometraje line separately (render like in national: 'XXX × Y,YY €' on the label, amount right)
   const tarifaTxtSeg = (tipoVehiculo === 'motocicleta') ? (result.precioKm || tarifa).toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : (result.precioKm || tarifa).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1679,7 +1705,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const alojWarn = (alojUserNum > totalAlojMax) ? `
           <span class="warn-wrapper" tabindex="0" aria-live="polite">
             <span class="warn-icon" aria-hidden="true">⚠️</span>
-            <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento proporcionado supera el máximo permitido.</span>
+            <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>
           </span>` : '';
         // Determine if user alojamiento exceeds the aggregated maximum
         const alojExceeds = alojUserNum > totalAlojMax;
@@ -1700,16 +1726,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (out) out.outerHTML = htmlSeg; else despEl.insertAdjacentHTML('beforeend', htmlSeg);
       } else {
         // Single-result rendering (existing behavior)
+        // Build IRPF single-result line (aligned right under Total) only if sujeto > 0
+        const irpfSingleHtml = (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? `<div class="calc-total"><span class="label">Sujeto a retención:</span><span class="amount"><span class="irpf-total-val">${irpfSujetoStr} €</span></span></div>` : '';
+
         const html = `
           <div class="calc-result" aria-live="polite" data-desp-id="${id}">
             <div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmount} €</span></div>
             <div class="calc-line aloj-line${alojamientoExceedsMax ? ' error-line' : ''}"><span class="label">${alojamientoLabel}</span><span class="leader" aria-hidden="true"></span>${alojamientoAmountHtml.replace('class="amount', 'class="amount aloj')}</div>
             
             <div class="calc-line"><span class="label">${kmLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmount} €</span></div>
-            ${ (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? `<div class="calc-line irpf-line"><span class="label">Sujeto a retención:</span><span class="leader" aria-hidden="true"></span><span class="amount irpf">${irpfSujetoStr} €</span></div>` : '' }
+            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalStr} €</strong></span></div>
+            ${irpfSingleHtml}
             ${ (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? ( (result && typeof result.paisIndex !== 'undefined' && Number(result.paisIndex) === 0) ? '' : irpfLimitsNote ) : '' }
             ${ (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? ( (result && typeof result.paisIndex !== 'undefined' && Number(result.paisIndex) === 0) ? '' : irpfDetailsHtml ) : '' }
-            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalStr} €</strong></span></div>
           </div>`;
         if (out) out.outerHTML = html; else despEl.insertAdjacentHTML('beforeend', html);
       }
@@ -1770,7 +1799,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   warnEl.className = 'warn-wrapper';
                   warnEl.tabIndex = 0;
                   warnEl.setAttribute('aria-live','polite');
-                  warnEl.innerHTML = `<span class="warn-icon" aria-hidden="true">⚠️</span><span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento es superior al máximo permitido, conforme al ${normativaLabel}.</span>`;
+                  warnEl.innerHTML = `<span class="warn-icon" aria-hidden="true">⚠️</span><span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>`;
                   alojAmountSpan.parentNode.insertBefore(warnEl, alojAmountSpan);
                   // Attach tooltip handlers so it behaves like the original ones
                   try { attachWarnHandlers(warnEl); } catch(e) {}
