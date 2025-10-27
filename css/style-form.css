@@ -134,10 +134,18 @@ select:focus {
 }
 
 .residencia-eventual-badge {
-  margin-top: 0.45rem;
-  margin-bottom: 0.6rem;
-  font-weight: 700;
+    margin-top: 0.2rem;
+    margin-bottom: 0.6rem;
+    color: #b23a3a;
+    font-style: italic;
+    border-bottom: 1px dotted #d99696;
+    padding-bottom: 0.2rem;
+}
+
+/* Color for the small '× 80%' marker shown when residencia eventual applies */
+.resid-80 {
   color: #b23a3a;
+  font-weight: 600;
 }
 
 /* Proyecto title should look like desplazamiento title */
