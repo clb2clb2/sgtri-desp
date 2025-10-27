@@ -1584,7 +1584,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const precioManTxt = precioManUnit.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   // If residencia eventual applies to the whole desplazamiento, reduce manutenciones by 20% for display
   const manutFlag = !!result.residenciaEventual;
-  const manutLabel = `Manutención: ${fmtInt(result.manutenciones)} × ${precioManTxt} €${manutFlag ? ' × 80%' : ''}`;
+  const manutLabel = `Manutención: ${fmtInt(result.manutenciones)} × ${precioManTxt} €${manutFlag ? ' <span class="resid-80">× 80%</span>' : ''}`;
   const manutAmount = fmt(applyResidMul(Number(result.manutencionesAmount || 0), manutFlag));
 
   // Show appropriate alojamiento max depending on ambiguity:
@@ -1599,12 +1599,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const nochesCnt = fmtInt(result.nochesIfNotCounted || 0);
     const nochesAmt = Number(result.nochesAmountIfNotCounted || 0);
     const nochesAmtDisplayed = fmt(applyResidMul(nochesAmt, !!result.residenciaEventual));
-    alojamientoLabel = `Alojamiento: <em>[ máx: ${nochesCnt} noches × ${precioNocheTxt} €${result.residenciaEventual ? ' × 80%' : ''} = ${nochesAmtDisplayed} € ]</em>`;
+  alojamientoLabel = `Alojamiento: <em>[ máx: ${nochesCnt} noches × ${precioNocheTxt} €${result.residenciaEventual ? ' <span class="resid-80">× 80%</span>' : ''} = ${nochesAmtDisplayed} € ]</em>`;
   } else {
     const nochesCnt = fmtInt(result.noches || 0);
     const nochesAmt = Number(result.nochesAmount || 0);
     const nochesAmtDisplayed = fmt(applyResidMul(nochesAmt, !!result.residenciaEventual));
-    alojamientoLabel = `Alojamiento: <em>[ máx: ${nochesCnt} noches × ${precioNocheTxt} €${result.residenciaEventual ? ' × 80%' : ''} = ${nochesAmtDisplayed} € ]</em>`;
+  alojamientoLabel = `Alojamiento: <em>[ máx: ${nochesCnt} noches × ${precioNocheTxt} €${result.residenciaEventual ? ' <span class="resid-80">× 80%</span>' : ''} = ${nochesAmtDisplayed} € ]</em>`;
   }
   const alojamientoAmount = fmt(Number(result.alojamiento || 0));
 
@@ -1679,10 +1679,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const precioNocheUnitSeg = (r && r.precioNoche) ? Number(r.precioNoche) : precioNocheUnit;
           // Apply residencia eventual per-segment if marked
           const segResid = !!r.residenciaEventual;
-          const manutLabelSeg = segResid ? `Manutención: ${fmtInt(r.manutenciones)} × ${precioManUnitSeg.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € × 80%` : `Manutención: ${fmtInt(r.manutenciones)} × ${precioManUnitSeg.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €`;
+          const manutLabelSeg = segResid ? `Manutención: ${fmtInt(r.manutenciones)} × ${precioManUnitSeg.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € <span class="resid-80">× 80%</span>` : `Manutención: ${fmtInt(r.manutenciones)} × ${precioManUnitSeg.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €`;
           const manutAmountSeg = fmt(applyResidMul(Number(r.manutencionesAmount || 0), segResid));
           // Alojamiento máx formatted left-aligned (no '= total' here; total shown after leader)
-          const alojMaxTxt = `${fmtInt(r.noches || 0)} noches × ${precioNocheUnitSeg.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €${segResid ? ' × 80%' : ''}`;
+          const alojMaxTxt = `${fmtInt(r.noches || 0)} noches × ${precioNocheUnitSeg.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €${segResid ? ' <span class="resid-80">× 80%</span>' : ''}`;
           const irpfValSeg = (r && r.irpf && typeof r.irpf.sujeto !== 'undefined') ? Number(r.irpf.sujeto) : 0;
           const irpfStrSeg = fmt(irpfValSeg);
           // Build IRPF line only if > 0
@@ -1814,7 +1814,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const nochesCnt = fmtInt(checked ? result.nochesIfCounted : result.nochesIfNotCounted);
                 const nochesAmtRaw = Number(checked ? result.nochesAmountIfCounted : result.nochesAmountIfNotCounted || 0);
                 const nochesAmtDisp = fmt(applyResidMul(nochesAmtRaw, !!result.residenciaEventual));
-                alojLabelSpan.innerHTML = `Alojamiento: <em>[ máx: ${nochesCnt} noches × ${precioNocheTxt} €${result.residenciaEventual ? ' × 80%' : ''} = ${nochesAmtDisp} € ]</em>`;
+                alojLabelSpan.innerHTML = `Alojamiento: <em>[ máx: ${nochesCnt} noches × ${precioNocheTxt} €${result.residenciaEventual ? ' <span class="resid-80">× 80%</span>' : ''} = ${nochesAmtDisp} € ]</em>`;
               }
             } catch (e) {}
             // Manage warn icon/tooltip dynamically: create or remove warn-wrapper
@@ -2077,15 +2077,32 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) { return false; }
       }
       let compositeResidencia = false;
-      // mark each segResult with residenciaEventual when its segment exceeds threshold
-      realSegments.forEach((seg, idx) => {
-        const r = segResults[idx];
-        if (!r) return;
-        const exceed = segmentExceedsThreshold(seg);
-        if (exceed) compositeResidencia = true;
-        r.residenciaEventual = !!exceed;
-      });
-  // note: will attach composite.residenciaEventual after composite object is created
+      // If this is an international desplazamiento, DO NOT apply per-segment thresholds
+      // (the rule for internacionales is based on overall fechaIda/fechaRegreso > 3 meses).
+      if (!isInternational) {
+        // mark each segResult with residenciaEventual when its segment exceeds threshold
+        realSegments.forEach((seg, idx) => {
+          const r = segResults[idx];
+          if (!r) return;
+          const exceed = segmentExceedsThreshold(seg);
+          if (exceed) compositeResidencia = true;
+          r.residenciaEventual = !!exceed;
+        });
+      }
+      // Additionally, for international desplazamientos evaluate overall trip duration
+      // using fechaIda/fechaRegreso alone: if overall trip > 3 months + 1 day -> residencia eventual
+      try {
+        const sTrip = parseDateTime(data.fechaIda, data.horaIda);
+        const eTrip = parseDateTime(data.fechaRegreso, data.horaRegreso);
+        if (sTrip && eTrip) {
+          const overallLimit = addMonthsAndDays(sTrip, 3, 1);
+          if (eTrip >= overallLimit) {
+            compositeResidencia = true;
+            // mark all segment results so 80% applies to each tramo
+            try { segResults.forEach(r => { if (r) r.residenciaEventual = true; }); } catch (err) {}
+          }
+        }
+      } catch (e) { /* ignore */ }
 
       // Build human-readable titles per segment using the original user inputs (only show times the user provided)
       segResults.forEach((r, idx) => {
@@ -2125,6 +2142,25 @@ document.addEventListener("DOMContentLoaded", () => {
           composite.segmentsResults.forEach(s => { if (s) s.residenciaEventual = true; });
         } catch (e) {}
       }
+      // Recalculate IRPF for any segment that now has residenciaEventual flagged.
+      // This is needed because the initial call to dietasCalc happened before
+      // we determined residencia eventual for the composite/segments.
+      try {
+        composite.segmentsResults.forEach((r, idx) => {
+          if (!r) return;
+          if (!r.residenciaEventual) return;
+          try {
+            const segInput = realSegments[idx];
+            if (!segInput) return;
+            // copy segInput and set residenciaEventual so dietasCalc uses the reduced bruto
+            const segForRecalc = Object.assign({}, segInput, { residenciaEventual: true });
+            const recalced = window.dietasCalc.calculateDesplazamiento(segForRecalc);
+            if (recalced && recalced.irpf) {
+              r.irpf = recalced.irpf;
+            }
+          } catch (err) { /* ignore per-seg recalculation errors */ }
+        });
+      } catch (e) { }
       renderCalcResult(desp, composite);
       return;
     }
@@ -2172,6 +2208,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } catch (err) { /* ignore */ }
     })();
+    // If this single-result desplazamiento is residencia eventual, recalculate IRPF
+    // so that dietasCalc can apply the 80% reduction when computing sujeto.
+    try {
+      if (res && res.residenciaEventual) {
+        const dataForRecalc = Object.assign({}, data, { residenciaEventual: true });
+        try {
+          const recalced = window.dietasCalc.calculateDesplazamiento(dataForRecalc);
+          if (recalced && recalced.irpf) res.irpf = recalced.irpf;
+        } catch (err) { /* ignore recalculation errors */ }
+      }
+    } catch (e) { /* ignore */ }
     renderCalcResult(desp, res);
     }
 

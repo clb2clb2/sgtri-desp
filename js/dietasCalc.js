@@ -339,17 +339,22 @@
 
       // Compute per-day monetary amounts and apply exemptions: for all days except last use
       // exemption WITH pernoctación (usedLimits[1]); for last day use exemption WITHOUT pernoctación (usedLimits[0]).
+      // IMPORTANT: if input.residenciaEventual is true, the manutención de cada día se reduce al 80%
+      // para efectos de la retención. Conservamos brutoOriginal para información y usamos brutoToUse
+      // para calcular la parte sujeta.
       const perDayDetails = [];
       let irpfSujetoTotal = 0;
+      const residMul = (input && input.residenciaEventual) ? 0.8 : 1;
       for (let i = 0; i < perDayManutencionUnits.length; i++) {
         const units = perDayManutencionUnits[i] || 0;
-        const bruto = Math.round((units * precioManutencion + Number.EPSILON) * 100) / 100;
+        const brutoOriginal = Math.round((units * precioManutencion + Number.EPSILON) * 100) / 100;
+        const brutoToUse = Math.round((brutoOriginal * residMul + Number.EPSILON) * 100) / 100;
         const isLast = (i === perDayManutencionUnits.length - 1);
         const exento = isLast ? Number(usedLimits[0]) : Number(usedLimits[1]);
-        let sujeto = bruto - exento;
+        let sujeto = brutoToUse - exento;
         if (sujeto < 0) sujeto = 0;
         sujeto = Math.round((sujeto + Number.EPSILON) * 100) / 100;
-        perDayDetails.push({ dayIndex: i + 1, units, bruto, exento, sujeto, isLast });
+        perDayDetails.push({ dayIndex: i + 1, units, brutoOriginal, bruto: brutoToUse, exento, sujeto, isLast });
         irpfSujetoTotal += sujeto;
       }
       irpfSujetoTotal = Math.round((irpfSujetoTotal + Number.EPSILON) * 100) / 100;
