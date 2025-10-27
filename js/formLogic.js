@@ -1710,31 +1710,31 @@ document.addEventListener("DOMContentLoaded", () => {
   const kmAmountSeg = (typeof result.kmAmount !== 'undefined') ? fmt(result.kmAmount) : kmAmount;
   const kmCountTxt = (typeof result.km !== 'undefined') ? fmtInt(result.km) : fmtInt(0);
   const kmLineHtml = `<div class="calc-line"><span class="label">Km. en vehículo propio: ${kmCountTxt} × ${tarifaTxtSeg} €</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmountSeg} €</span></div>`;
-        // Compute aggregated alojamiento máx across segments (use nochesAmount or nochesAmountIfNotCounted depending on segment)
+        // Compute aggregated alojamiento máx across segments: sum per-segment nochesAmount
+        // applying 80% reduction per segment when that segment has residenciaEventual.
         const totalAlojMax = segs.reduce((acc, r) => {
-          const v = (r && typeof r.nochesAmount !== 'undefined') ? Number(r.nochesAmount || 0) : 0;
-          // if segment has residencia eventual, its nochesAmount already should be considered for reduction when displayed;
-          // here we keep the base total and apply composite reduction if composite.residenciaEventual is true
-          return acc + v;
+          const base = (r && typeof r.nochesAmount !== 'undefined') ? Number(r.nochesAmount || 0) : 0;
+          const reduced = (r && r.residenciaEventual) ? (base * 0.8) : base;
+          return acc + reduced;
         }, 0);
-        const totalAlojMaxDisplayed = fmt(applyResidMul(totalAlojMax, !!result.residenciaEventual));
+        const totalAlojMaxDisplayed = fmt(totalAlojMax);
         // Sum manutenciones across segments for the TOTALES block
-        const totalManut = segs.reduce((acc, r) => acc + (r && typeof r.manutencionesAmount !== 'undefined' ? (r.residenciaEventual ? Number(r.manutencionesAmount || 0) * 0.8 : Number(r.manutencionesAmount || 0)) : 0), 0);
+  const totalManut = segs.reduce((acc, r) => acc + (r && typeof r.manutencionesAmount !== 'undefined' ? (r.residenciaEventual ? Number(r.manutencionesAmount || 0) * 0.8 : Number(r.manutencionesAmount || 0)) : 0), 0);
         const totalManutStr = fmt(totalManut);
         const manutTotalHtml = `<div class="calc-line"><span class="label">Total manutención</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${totalManutStr} €</span></div>`;
         // user-provided alojamiento (numeric) is in result.alojamientoUser
         const alojUserNum = (typeof result.alojamientoUser !== 'undefined') ? Number(result.alojamientoUser) : 0;
         const alojUserStr = fmt(alojUserNum);
-        const allowedAlojMax = applyResidMul(totalAlojMax, !!result.residenciaEventual);
+        const allowedAlojMax = totalAlojMax; // already reduced per-segment
         const alojWarn = (alojUserNum > allowedAlojMax) ? `
           <span class="warn-wrapper" tabindex="0" aria-live="polite">
             <span class="warn-icon" aria-hidden="true">⚠️</span>
             <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>
           </span>` : '';
-        // Determine if user alojamiento exceeds the aggregated maximum (consider residencia eventual reduction)
+        // Determine if user alojamiento exceeds the aggregated maximum (consider per-segment reductions)
         const alojExceeds = alojUserNum > allowedAlojMax;
   // Aggregated alojamiento line: show max inside brackets (italic) at left, user amount aligned to right; mark error-line if exceeded
-  const alojAggregatedHtml = `<div class="calc-line aloj-aggregated${alojExceeds ? ' error-line' : ''}"><span class="label">Alojamiento: <em>[ máx. ${totalAlojMaxDisplayed} €${result.residenciaEventual ? ' × 80%' : ''} ]</em></span><span class="leader" aria-hidden="true"></span><span class="aloj-user">${alojWarn}<span class="amount aloj-user${alojExceeds ? ' error-amount' : ''}">${alojUserStr} €</span></span></div>`;
+  const alojAggregatedHtml = `<div class="calc-line aloj-aggregated${alojExceeds ? ' error-line' : ''}"><span class="label">Alojamiento: <em>[ máx. ${totalAlojMaxDisplayed} € ]</em></span><span class="leader" aria-hidden="true"></span><span class="aloj-user">${alojWarn}<span class="amount aloj-user${alojExceeds ? ' error-amount' : ''}">${alojUserStr} €</span></span></div>`;
 
         const badgeHtml = result.residenciaEventual ? '<div class="residencia-eventual-badge">Residencia Eventual</div>' : '';
         const htmlSeg = `
@@ -2107,8 +2107,15 @@ document.addEventListener("DOMContentLoaded", () => {
           try { const s = String(data.alojamiento).replace(/[^0-9,\.]/g,'').replace(/\./g,'').replace(/,/g,'.'); return parseFloat(s) || 0; } catch(e){ return 0; }
         })()
       };
-  // Attach residencia eventual flag detected earlier to composite result
-  try { composite.residenciaEventual = !!compositeResidencia; } catch (e) {}
+      // Attach residencia eventual flag detected earlier to composite result
+      try { composite.residenciaEventual = !!compositeResidencia; } catch (e) {}
+      // If the composite desplazamiento is residencia eventual due to any segment,
+      // apply residenciaEventual to ALL segments so the 80% reduction applies per-tramo
+      if (composite.residenciaEventual) {
+        try {
+          composite.segmentsResults.forEach(s => { if (s) s.residenciaEventual = true; });
+        } catch (e) {}
+      }
       renderCalcResult(desp, composite);
       return;
     }
