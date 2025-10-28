@@ -242,7 +242,59 @@
       </div>
     </section>
 
+    <!-- Sección 4: Asistencia a congresos u otros eventos (plegada por defecto) -->
+    <section class="form-section">
+      <div class="section-title" data-start-collapsed="true">
+        Asistencia a congresos u otros eventos
+        <span class="toggle-section">+</span>
+      </div>
+      <div class="section-content-wrapper">
+        <div class="section-content">
+          <form id="form-eventos">
+            <!-- Línea 1: Nombre del evento (100%) -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="evento-nombre">Nombre del evento</label>
+                <input type="text" id="evento-nombre" name="evento-nombre" class="general-text" maxlength="120" />
+              </div>
+            </div>
+
+            <!-- Línea 2: Celebrado en (50%) + Del día (25%) + Al día (25%) -->
+            <div class="form-row two-cols-50-25">
+              <div class="form-group">
+                <label for="evento-lugar">Celebrado en</label>
+                <input type="text" id="evento-lugar" name="evento-lugar" class="general-text" />
+              </div>
+              <div class="form-group">
+                <label for="evento-del">Del día</label>
+                <input type="text" id="evento-del" name="evento-del" class="input-fecha" placeholder="dd/mm/aa" />
+              </div>
+              <div class="form-group">
+                <label for="evento-al">Al día</label>
+                <input type="text" id="evento-al" name="evento-al" class="input-fecha" placeholder="dd/mm/aa" />
+              </div>
+            </div>
+
+            <!-- Línea 3: Gastos de inscripción (25%) + texto inline + número de comidas (1-99) -->
+            <div class="form-row two-cols-25-75">
+              <div class="form-group">
+                <label for="evento-gastos">Gastos de inscripción</label>
+                <input type="text" id="evento-gastos" name="evento-gastos" class="format-alojamiento" placeholder="0,00 €" />
+              </div>
+              <div class="form-group" style="display:flex; align-items:center; gap:0.6rem;">
+                <div style="flex:1;">Número de comidas incluidas en la inscripción:</div>
+                <div style="width:6.5rem;">
+                  <input type="number" id="evento-num-comidas" name="evento-num-comidas" min="1" max="99" step="1" style="width:100%;" />
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
   </div>
 </body>
 
 </html>
+    

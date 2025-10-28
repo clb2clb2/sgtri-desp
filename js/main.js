@@ -41,10 +41,17 @@ document.addEventListener("DOMContentLoaded", () => {
             wrapper.setAttribute('aria-labelledby', title.id);
             wrapper.setAttribute('aria-hidden', 'false');
 
-            // Ensure initial state: open
-            wrapper.classList.remove('collapsed');
-            wrapper.style.maxHeight = content.scrollHeight + 'px';
-            icon.textContent = '−';
+            // Ensure initial state: open or collapsed based on data attribute/class
+            const startCollapsed = (title.dataset && title.dataset.startCollapsed === 'true') || title.classList.contains('start-collapsed');
+            if (startCollapsed) {
+                // Start collapsed
+                closeSection(wrapper, icon, title);
+                wrapper.setAttribute('aria-hidden', 'true');
+            } else {
+                // Start open
+                openSection(wrapper, icon, title);
+                wrapper.setAttribute('aria-hidden', 'false');
+            }
 
             // Toggle handler
             function toggle() {
