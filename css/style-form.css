@@ -145,7 +145,6 @@ select:focus {
 /* Color for the small '× 80%' marker shown when residencia eventual applies */
 .resid-80 {
   color: #b23a3a;
-  font-weight: 600;
 }
 
 /* Proyecto title should look like desplazamiento title */
@@ -172,27 +171,37 @@ select:focus {
 .form-row.two-cols-50-50 { grid-template-columns: 1fr 1fr; }
 /* Dos columnas con 50% + 25% y espacio restante (25%) reservado
   Útil para casos como: IBAN (50%) + SWIFT (25%) */
-.form-row.two-cols-50-25 { grid-template-columns: 50% 25% 25%; }
+.form-row.two-cols-50-25 { grid-template-columns: 1fr minmax(0, 12rem) minmax(0, 12rem); }
+
+/* Responsive: on very narrow screens stack into a single column */
+@media (max-width: 640px) {
+  .form-row.two-cols-50-25 { grid-template-columns: 1fr; }
+  .form-row.two-cols-50-25 .form-group { width: 100%; }
+}
 /* Tres columnas fijas: 25% | 50% | 25% (uso específico para Pago en + IBAN + SWIFT) */
-.form-row.three-cols-25-50-25 { grid-template-columns: 25% minmax(0, 1fr) 25%; }
+.form-row.three-cols-25-50-25 { grid-template-columns: 25% 25% 50%; }
 /* Ensure children can shrink and inputs don't overflow their grid cell in the three-column layout */
 .form-row.three-cols-25-50-25 > .form-group { min-width: 0; }
 .form-row.three-cols-25-50-25 input,
 .form-row.three-cols-25-50-25 select {
+  /* fill cell but never force the grid to grow; allow wrapping inside */
+  width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-}
-/* Ensure inputs inside the right (SWIFT) column don't cause the cell to grow
-   and visibly overflow: make them block-level, fill the cell, and hide overflow. */
-.form-row.three-cols-25-50-25 input,
-.form-row.three-cols-25-50-25 select {
-  width: 100%;
   min-width: 0;
-  /* allow internal horizontal scrolling if content wider than field
-     instead of cutting or overflowing the column */
-  overflow: auto;
-  white-space: nowrap;
+  overflow: hidden;
+  white-space: normal;
+  text-overflow: ellipsis;
 }
+/* Limit middle column to max 12rem */
+.form-row.three-cols-25-50-25 { grid-template-columns: 25% minmax(0, 12rem) 1fr; }
+/* Reduce columns to a single column on small screens to avoid cramped controls */
+@media (max-width: 720px) {
+  .form-row.three-cols-25-50-25 { grid-template-columns: 1fr; }
+  .form-row.three-cols-25-50-25 .form-group { width: 100%; }
+}
+/* Prevent labels and inline helpers from forcing column growth */
+.form-row.three-cols-25-50-25 .form-group { overflow: hidden; }
 
 /* Normalize padding for time and number inputs to match text fields */
 input[type="date"],
@@ -246,6 +255,19 @@ input[type="number"] {
 .form-row > .form-group {
   min-width: 0;
 }
+.form-row.two-cols-50-25 > .form-group {
+  /* Ensure children can shrink to avoid overflowing the grid column */
+  min-width: 0;
+  overflow: hidden;
+}
+.form-row.two-cols-50-25 .form-group input,
+.form-row.two-cols-50-25 .form-group select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.form-row.two-cols-50-25 .form-group label {
+  white-space: normal;
+}
 .form-group input, .form-group select, .form-group textarea {
   width: 100%;
   box-sizing: border-box;
@@ -262,6 +284,18 @@ input[type="number"] {
   appearance: textfield;
   -webkit-appearance: textfield;
   -moz-appearance: textfield;
+}
+
+/* Restore native spinner for specific number inputs that opt-in */
+input.num-spinner {
+  appearance: auto;
+  -webkit-appearance: auto;
+  -moz-appearance: auto;
+}
+input.num-spinner::-webkit-outer-spin-button,
+input.num-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: auto;
+  margin: 0;
 }
 
 /* Inputs que se usan para formateo (km / alojamiento) */
@@ -510,17 +544,19 @@ input[type="number"]:focus {
 .warn-wrapper .warn-icon { margin-left: 0; margin-right: 0.4rem; }
 .warn-tooltip {
   position: absolute;
-  left: 0;
+  left: 50%;
   top: calc(100% + 8px);
+  transform: translateX(-50%) translateY(-6px);
   background: rgba(28,28,28,0.96);
   color: #fff;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-radius: 6px;
-  font-size: 0.85rem;
-  white-space: nowrap;
+  font-size: 0.9rem;
+  /* Allow wrapping for longer explanatory tooltips; width is controlled manually via HTML breaks */
+  white-space: normal;
+  word-wrap: break-word;
   box-shadow: 0 6px 18px rgba(0,0,0,0.25);
   opacity: 0;
-  transform: translateY(-6px);
   transition: opacity 0.12s ease, transform 0.12s ease;
   pointer-events: none;
   z-index: 1200;
@@ -529,10 +565,12 @@ input[type="number"]:focus {
   position: absolute;
   background: rgba(28,28,28,0.96);
   color: #fff;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-radius: 6px;
-  font-size: 0.85rem;
-  white-space: nowrap;
+  font-size: 0.9rem;
+  /* Allow wrapping like the inline tooltip; width is controlled manually via HTML breaks */
+  white-space: normal;
+  word-wrap: break-word;
   box-shadow: 0 6px 18px rgba(0,0,0,0.25);
   opacity: 0;
   transform: translateY(-6px);

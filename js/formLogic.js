@@ -1193,6 +1193,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (el && el.classList && el.classList.contains('format-alojamiento')) {
       const raw = (el.value || '').toString();
+      // If the field is empty (user didn't type anything), restore empty so placeholder shows
+      if (raw.trim() === '') { el.value = ''; return; }
       // Accept both comma and dot as decimal separator from user input
       const cleaned = raw.replace(/[^0-9,\.]/g, '').replace(/,/g, '.');
       const num = parseFloat(cleaned || '0');
@@ -1201,6 +1203,36 @@ document.addEventListener("DOMContentLoaded", () => {
       const parts = num.toFixed(2).split('.');
       parts[0] = Number(parts[0]).toLocaleString('de-DE');
       el.value = parts[0] + ',' + parts[1] + ' €';
+    }
+  }, true);
+
+  // Limitar inputs con clase 'limit-2digits' a un máximo de 2 dígitos y forzar min/max
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (!el || !el.classList) return;
+    if (el.classList.contains('limit-2digits')) {
+      // Only apply to number-like inputs
+      let v = el.value || '';
+      // Remove non-digit characters
+      v = String(v).replace(/[^0-9]/g, '');
+      if (v.length > 2) v = v.slice(0,2);
+      // Apply back to element; if empty, keep empty
+      el.value = v;
+    }
+  }, true);
+
+  // On blur, ensure number inputs respect min/max
+  document.addEventListener('blur', (e) => {
+    const el = e.target;
+    if (!el || !el.classList) return;
+    if (el.classList.contains('limit-2digits')) {
+      const min = (el.min !== undefined && el.min !== '') ? Number(el.min) : null;
+      const max = (el.max !== undefined && el.max !== '') ? Number(el.max) : null;
+      let v = el.value === '' ? '' : Number(el.value);
+      if (v === '' || isNaN(v)) { el.value = ''; return; }
+      if (min !== null && v < min) v = min;
+      if (max !== null && v > max) v = max;
+      el.value = String(v);
     }
   }, true);
 
@@ -1401,6 +1433,34 @@ document.addEventListener("DOMContentLoaded", () => {
       const btn = desplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
       if (btn) btn.style.display = 'none';
     }
+
+    // Actualizar el select "Evento asociado al desplazamiento" en la sección de congresos
+    try {
+      const eventoSelect = document.getElementById('evento-asociado');
+      const eventoContainer = document.getElementById('evento-asociado-container');
+      if (eventoSelect && eventoContainer) {
+        // Limpiar opciones actuales
+        eventoSelect.innerHTML = '';
+        if (desplazamientos.length > 1) {
+          // Mostrar el contenedor y añadir las opciones; seleccionar desp1 por defecto
+          eventoContainer.style.display = '';
+          desplazamientos.forEach((d, idx) => {
+            const opt = document.createElement('option');
+            opt.value = `desp${idx + 1}`;
+            opt.textContent = `Desplazamiento ${idx + 1}`;
+            eventoSelect.appendChild(opt);
+          });
+          try { eventoSelect.value = 'desp1'; } catch(e) {}
+        } else {
+          // Ocultar cuando no hay múltiple desplazamiento
+          eventoContainer.style.display = 'none';
+        }
+      }
+    } catch (e) {
+      // no hacer nada si no existe el select
+    }
+    // Recomponer descuento si procede
+    try { if (typeof computeDescuentoManutencion === 'function') computeDescuentoManutencion(); } catch (e) {}
   }
 
   // Evento para añadir desplazamiento (con auto-scroll + autofocus)
@@ -1412,6 +1472,72 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(() => firstInput.focus(), 220);
     }
   });
+
+  // --- Cálculo de descuento por comidas incluidas en inscripción (congreso) ---
+  function computeDescuentoManutencion() {
+    try {
+      const numEl = document.getElementById('evento-num-comidas');
+      const hidden = document.getElementById('descuento-manut-congreso');
+      const msg = document.getElementById('descuento-manut-message');
+      const msgAmount = document.getElementById('descuento-manut-amount');
+      if (!numEl || !hidden) return;
+      const n = Number(numEl.value) || 0;
+      if (n <= 0) { hidden.value = '0.00'; if (msg) msg.style.display = 'none'; if (msgAmount) msgAmount.textContent = '0,00 €'; return; }
+
+      const desplazamientos = Array.from(document.querySelectorAll('.desplazamiento-grupo'));
+      if (desplazamientos.length === 0) { hidden.value = '0.00'; return; }
+
+      let paisIndex = 0;
+      if (desplazamientos.length === 1) {
+        const paisSelect = desplazamientos[0].querySelector('select[id^="pais-destino"]');
+        if (paisSelect) paisIndex = paisSelect.selectedIndex >= 0 ? paisSelect.selectedIndex : 0;
+      } else {
+        const eventoSelect = document.getElementById('evento-asociado');
+        if (!eventoSelect) { hidden.value = '0.00'; return; }
+        const val = eventoSelect.value || '';
+        const m = val.match(/^desp(\d+)$/);
+        if (!m) { hidden.value = '0.00'; return; }
+        const idx = parseInt(m[1], 10) - 1;
+        const target = desplazamientos[idx];
+        if (!target) { hidden.value = '0.00'; return; }
+        const paisSelect = target.querySelector('select[id^="pais-destino"]');
+        if (paisSelect) paisIndex = paisSelect.selectedIndex >= 0 ? paisSelect.selectedIndex : 0;
+      }
+
+      // Use the calculation engine to obtain the per-day manutencion price for the selected country
+      if (window && window.dietasCalc && typeof window.dietasCalc.calculateDesplazamiento === 'function') {
+        try {
+          const tipoProj = (document.getElementById('tipoProyecto') || {}).value;
+          const res = window.dietasCalc.calculateDesplazamiento({ paisIndex, tipoProyecto: tipoProj });
+          const precio = (res && typeof res.precioManutencion === 'number') ? res.precioManutencion : (res && res.precioManutencion ? Number(res.precioManutencion) : 0);
+          const descuento = Math.round((precio * 0.5 * n + Number.EPSILON) * 100) / 100;
+          hidden.value = descuento.toFixed(2);
+          if (msg && descuento > 0) {
+            // format with comma as decimal separator and show
+            const txt = descuento.toFixed(2).replace('.', ',') + ' €';
+            if (msgAmount) msgAmount.textContent = txt;
+            msg.style.display = '';
+          } else if (msg) {
+            msg.style.display = 'none';
+            if (msgAmount) msgAmount.textContent = '0,00 €';
+          }
+          return;
+        } catch (err) { /* fallthrough to zero */ }
+      }
+      hidden.value = '0.00';
+    } catch (e) { /* ignore */ }
+  }
+
+  // attach listeners for Congreso fields
+  const eventoNumEl = document.getElementById('evento-num-comidas');
+  if (eventoNumEl) {
+    eventoNumEl.addEventListener('input', computeDescuentoManutencion);
+    eventoNumEl.addEventListener('change', computeDescuentoManutencion);
+  }
+  const eventoSel = document.getElementById('evento-asociado');
+  if (eventoSel) eventoSel.addEventListener('change', computeDescuentoManutencion);
+  // Initial compute in case defaults set
+  try { computeDescuentoManutencion(); } catch (e) {}
 
 
   // -------------------------
@@ -1663,7 +1789,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const warnHtml = alojamientoExceedsMax ? `
         <span class="warn-wrapper" tabindex="0" aria-live="polite">
           <span class="warn-icon" aria-hidden="true">⚠️</span>
-          <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>
+          <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera<br>el máximo permitido, conforme al ${normativaLabel}.</span>
         </span>
       ` : '';
       const alojamientoAmountHtml = `${warnHtml}<span class="amount${alojamientoExceedsMax ? ' error-amount' : ''}">${alojamientoAmount} €</span>`;
@@ -1729,7 +1855,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const alojWarn = (alojUserNum > allowedAlojMax) ? `
           <span class="warn-wrapper" tabindex="0" aria-live="polite">
             <span class="warn-icon" aria-hidden="true">⚠️</span>
-            <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>
+            <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera<br>el máximo permitido, conforme al ${normativaLabel}.</span>
           </span>` : '';
         // Determine if user alojamiento exceeds the aggregated maximum (consider per-segment reductions)
         const alojExceeds = alojUserNum > allowedAlojMax;
@@ -1885,11 +2011,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!wrapper) return;
     // prevent double attaching
     if (wrapper.__warnAttached) return; wrapper.__warnAttached = true;
-    const tooltipTextEl = wrapper.querySelector('.warn-tooltip');
-    const text = tooltipTextEl ? tooltipTextEl.textContent || tooltipTextEl.innerText : '';
+  const tooltipTextEl = wrapper.querySelector('.warn-tooltip');
+  // Use innerHTML so any manual <br> inserted in the tooltip is preserved
+  const html = tooltipTextEl ? tooltipTextEl.innerHTML : '';
+  // Hide the inline tooltip element when using the global portal to avoid duplicates
+  try { if (tooltipTextEl) tooltipTextEl.style.display = 'none'; } catch(e) {}
     function show() {
       if (!__globalWarnTooltip) ensureGlobalWarnTooltip();
-      __globalWarnTooltip.innerHTML = text;
+  // Inject HTML (keeps <br> and basic markup the developer placed)
+  __globalWarnTooltip.innerHTML = html;
       __globalWarnTooltip.style.display = 'block';
       // position: try align horizontally center to wrapper
       const rect = wrapper.getBoundingClientRect();
@@ -1913,6 +2043,19 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.addEventListener('mouseleave', hide);
     wrapper.addEventListener('blur', hide, true);
   }
+
+  // Attach handlers to any static warn-wrapper elements present on page
+  // (e.g. the congress section tooltips added in HTML). This ensures all
+  // warn-tooltip instances are rendered through the global portal and
+  // behave consistently (no duplicates, consistent width/positioning).
+  try {
+    if (typeof document !== 'undefined') {
+      const staticWrappers = Array.from(document.querySelectorAll('.warn-wrapper')) || [];
+      staticWrappers.forEach(w => {
+        try { attachWarnHandlers(w); } catch (e) {}
+      });
+    }
+  } catch (e) {}
 
     function recalculateDesplazamientoById(id) {
       const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
@@ -2234,7 +2377,7 @@ document.addEventListener("DOMContentLoaded", () => {
         n.addEventListener('input', () => { /* do not recalc/show-hide on input */ });
         // For selects, apply change immediately (more natural UX). For other inputs, defer to blur.
         if (n.tagName === 'SELECT') {
-          n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); actualizarTicketCena(); });
+          n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); actualizarTicketCena(); try { if (typeof computeDescuentoManutencion === 'function') computeDescuentoManutencion(); } catch(e){} });
         } else {
           // On change we defer to blur to avoid flicker while typing
           n.addEventListener('change', () => { /* noop: defer to blur */ });

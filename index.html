@@ -66,6 +66,7 @@
                 <!-- El contenido SWIFT se renderiza dinámicamente aquí para Cuenta Extranjera -->
               </div>
             </div>
+            <!-- (el campo de descuento por comidas se renderiza al final de la sección de congresos) -->
           </form>
         </div>
       </div>
@@ -92,7 +93,6 @@
                   Ver Decreto
                 </a>
               </p>
-            </div>
 
             <!-- Contenedor para los proyectos -->
             <div id="proyectos-container">
@@ -275,19 +275,38 @@
               </div>
             </div>
 
-            <!-- Línea 3: Gastos de inscripción (25%) + texto inline + número de comidas (1-99) -->
-            <div class="form-row two-cols-25-75">
+            <!-- Línea 3: Gastos de inscripción (25%) | Nº comidas (25%) | Evento asociado al desplazamiento (50%) -->
+            <div class="form-row three-cols-25-50-25">
               <div class="form-group">
                 <label for="evento-gastos">Gastos de inscripción</label>
                 <input type="text" id="evento-gastos" name="evento-gastos" class="format-alojamiento" placeholder="0,00 €" />
               </div>
-              <div class="form-group" style="display:flex; align-items:center; gap:0.6rem;">
-                <div style="flex:1;">Número de comidas incluidas en la inscripción:</div>
-                <div style="width:6.5rem;">
-                  <input type="number" id="evento-num-comidas" name="evento-num-comidas" min="1" max="99" step="1" style="width:100%;" />
-                </div>
+              <div class="form-group">
+                <label for="evento-num-comidas">Incluye comidas:
+                  <span class="warn-wrapper" tabindex="0" aria-label="Información sobre comidas incluidas">
+                    <span class="warn-icon" aria-hidden="true">ℹ️</span>
+                    <span class="warn-tooltip">Indique aquí, si las hay, el número de<br>comidas/cenas incluidas en la inscripción</span>
+                  </span>
+                </label>
+                <input type="number" id="evento-num-comidas" name="evento-num-comidas" class="num-spinner limit-2digits" min="0" max="99" step="1" value="0" />
+              </div>
+              <div class="form-group" id="evento-asociado-container" style="display: none;">
+                <label for="evento-asociado">Evento asociado al desplazamiento:
+                  <span class="warn-wrapper" tabindex="0" aria-label="Información sobre evento asociado">
+                    <span class="warn-icon" aria-hidden="true">ℹ️</span>
+                    <span class="warn-tooltip">Señale en qué desplazamiento está<br>incluida la asistencia a este evento</span>
+                  </span>
+                </label>
+                <select id="evento-asociado" name="evento-asociado">
+                  <option value="">-</option>
+                </select>
               </div>
             </div>
+            <!-- Mensaje de descuento calculado (se muestra sólo si hay importe > 0) -->
+            <div id="descuento-manut-message" class="conditional-row" style="display:none; margin-top: 0.6rem;">
+              <label>Se descontarán <span id="descuento-manut-amount">0,00 €</span> al importe final de la liquidación.</label>
+            </div>
+            <input type="hidden" id="descuento-manut-congreso" name="descuento-manut-congreso" value="0.00" />
           </form>
         </div>
       </div>
