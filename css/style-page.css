@@ -1,6 +1,6 @@
 body {
     font-family: "Segoe UI", Roboto, Arial, sans-serif;
-    background-color: #e0e0e0; /* fondo ligeramente más oscuro */
+    background-color: #f8f8f8;
     color: #333;
     margin: 0;
     padding: 0;
@@ -11,25 +11,34 @@ body {
     background-color: #53868b;
     color: white;
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 0 40px;
+    justify-content: center; /* center the title */
+    align-items: center; /* vertical centering */
+    position: relative;
+    padding: 0 24px;
+    min-height: 120px; /* keep a consistent header band height */
     margin-bottom: 1rem;
 }
 
 .Encabezado .logo {
-    height: 80px;
+    height: 96px;
     width: auto;
-    margin: 10px;
+    margin: 0 8px;
+    position: absolute;
+    left: 24px; /* match header padding */
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
 }
 
 .Encabezado h1 {
-    font-family: "Roboto", Arial, sans-serif;
-    font-weight: 700;
-    flex: 1;
+    font-family: "Saira", Arial, sans-serif;
+    font-weight: 400;
     font-size: 2rem;
-    text-align: center;
     margin: 0;
+    text-align: center;
+    white-space: nowrap;
+    line-height: 1;
+    pointer-events: none;
 }
 
 /* Contenedor único para secciones */
@@ -44,14 +53,14 @@ body {
 .section-title {
     background-color: #53868b;
     color: white;
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem;
     font-size: 1.2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
-    font-family: "Roboto", Arial, sans-serif;
-    font-weight: 700;
+    font-family: "Saira", Arial, sans-serif;
+    font-weight: 400;
     margin: 0 0 5px 0;
 }
 
@@ -66,7 +75,6 @@ body {
     display: inline-block;
     width: 14px;
     height: 14px;
-    vertical-align: middle;
     transition: transform 180ms ease;
     fill: currentColor;
 }

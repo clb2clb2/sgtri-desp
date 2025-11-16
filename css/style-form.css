@@ -8,7 +8,8 @@ form {
 .form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 0.5rem; /* espacio vertical entre campos */
+  margin-bottom: 0.5rem;
+  /* espacio vertical entre campos */
 }
 
 label {
@@ -24,7 +25,8 @@ input[type="time"],
 input[type="number"] {
   padding: 0.4rem 0.6rem;
   border: 1px solid #ccc;
-  border-radius: 4px; /* campos con radio 4px */
+  border-radius: 4px;
+  /* campos con radio 4px */
   font-size: 0.95rem;
   transition: border-color 0.15s ease;
 }
@@ -36,7 +38,9 @@ select {
 }
 
 /* Edge/IE: hide native expand button spacing so background looks consistent */
-select::-ms-expand { display: none; }
+select::-ms-expand {
+  display: none;
+}
 
 input[type="text"]:focus,
 select:focus {
@@ -52,33 +56,37 @@ select:focus {
 .proyecto-grupo {
   background-color: #f9f9f9;
   padding: 0.5rem 1rem 1rem 1rem;
-  border-radius: 6px; /* fichas con radio 6px */
+  border-radius: 4px;
+  /* fichas con radio 4px */
   margin-bottom: 1.25rem;
   position: relative;
   border: 1px solid #ccc;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   transition: all 0.18s ease;
 }
 
 .proyecto-grupo:hover {
   /* hover desactivado: mantener estilo por defecto */
   border-color: #ccc;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn-add-proyecto {
-  background-color: #53868b;
-  color: white;
-  padding: 0.8rem 1.5rem;
-  border: none;
-  border-radius: 6px;
+  font-family: "Saira", Arial, sans-serif;
+  font-weight: 500;
+  background-color: #deeaec;
+  color: #53868b;
+  padding: 0.6rem 1.5rem;
+  border: 1px solid #53868b;
+  border-radius: 4px;
   cursor: pointer;
-  font-weight: 600;
   transition: background-color 0.2s ease;
+  font-size: 1rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn-add-proyecto:hover {
-  background-color: #3f6b73;
+  background-color: #c9dbde;
 }
 
 .btn-eliminar-proyecto {
@@ -99,6 +107,27 @@ select:focus {
   background-color: #b22f3f;
 }
 
+/* Button icon spans (plus / minus) */
+.btn-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.4rem;
+  font-weight: 700;
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+/* specific colours */
+.btn-icon-minus {
+  color: white; /* used inside red delete buttons */
+}
+
+.btn-add-proyecto .btn-icon,
+.btn-add-desplazamiento .btn-icon,
+.btn-icon-add {
+  color: #53868b; /* match add button text */
+}
+
 /* ========================================= */
 /* Estilos para Desplazamientos */
 /* ========================================= */
@@ -110,21 +139,24 @@ select:focus {
 .desplazamiento-grupo {
   background-color: #f9f9f9;
   padding: 0.5rem 1rem 1rem 1rem;
-  border-radius: 6px; /* fichas con radio 6px */
+  border-radius: 4px;
+  /* fichas con radio 4px */
   margin-bottom: 1.25rem;
   position: relative;
   border: 1px solid #ccc;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   transition: all 0.18s ease;
 }
 
 .desplazamiento-grupo:hover {
   /* hover desactivado: mantener estilo por defecto */
   border-color: #ccc;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .desplazamiento-titulo {
+  font-family: "SAira", Arial, sans-serif;
+  font-weight: 500;
   color: #53868b;
   font-size: 1rem;
   margin-top: 0.1rem;
@@ -134,12 +166,12 @@ select:focus {
 }
 
 .residencia-eventual-badge {
-    margin-top: 0.2rem;
-    margin-bottom: 0.6rem;
-    color: #b23a3a;
-    font-style: italic;
-    border-bottom: 1px dotted #d99696;
-    padding-bottom: 0.2rem;
+  margin-top: 0.2rem;
+  margin-bottom: 0.6rem;
+  color: #b23a3a;
+  font-style: italic;
+  border-bottom: 1px dotted #d99696;
+  padding-bottom: 0.2rem;
 }
 
 /* Color for the small '× 80%' marker shown when residencia eventual applies */
@@ -149,6 +181,8 @@ select:focus {
 
 /* Proyecto title should look like desplazamiento title */
 .proyecto-titulo {
+  font-family: "SAira", Arial, sans-serif;
+  font-weight: 500;
   color: #53868b;
   font-size: 1rem;
   margin-top: 0.1rem;
@@ -161,27 +195,51 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.6rem;
-  margin-bottom: 0; /* margen controlado por .form-group */
+  margin-bottom: 0;
+  /* margen controlado por .form-group */
   align-items: start;
 }
 
 /* Utility grid presets */
-.form-row.two-cols-75-25 { grid-template-columns: 1fr 25%; }
-.form-row.two-cols-25-75 { grid-template-columns: 25% minmax(0, 1fr); }
-.form-row.two-cols-50-50 { grid-template-columns: 1fr 1fr; }
+.form-row.two-cols-75-25 {
+  grid-template-columns: 1fr 25%;
+}
+
+.form-row.two-cols-25-75 {
+  grid-template-columns: 25% minmax(0, 1fr);
+}
+
+.form-row.two-cols-50-50 {
+  grid-template-columns: 1fr 1fr;
+}
+
 /* Dos columnas con 50% + 25% y espacio restante (25%) reservado
   Útil para casos como: IBAN (50%) + SWIFT (25%) */
-.form-row.two-cols-50-25 { grid-template-columns: 1fr minmax(0, 12rem) minmax(0, 12rem); }
+.form-row.two-cols-50-25 {
+  grid-template-columns: 1fr minmax(0, 12rem) minmax(0, 12rem);
+}
 
 /* Responsive: on very narrow screens stack into a single column */
 @media (max-width: 640px) {
-  .form-row.two-cols-50-25 { grid-template-columns: 1fr; }
-  .form-row.two-cols-50-25 .form-group { width: 100%; }
+  .form-row.two-cols-50-25 {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row.two-cols-50-25 .form-group {
+    width: 100%;
+  }
 }
+
 /* Tres columnas fijas: 25% | 50% | 25% (uso específico para Pago en + IBAN + SWIFT) */
-.form-row.three-cols-25-50-25 { grid-template-columns: 25% 25% 50%; }
+.form-row.three-cols-25-50-25 {
+  grid-template-columns: 25% 25% 50%;
+}
+
 /* Ensure children can shrink and inputs don't overflow their grid cell in the three-column layout */
-.form-row.three-cols-25-50-25 > .form-group { min-width: 0; }
+.form-row.three-cols-25-50-25>.form-group {
+  min-width: 0;
+}
+
 .form-row.three-cols-25-50-25 input,
 .form-row.three-cols-25-50-25 select {
   /* fill cell but never force the grid to grow; allow wrapping inside */
@@ -193,15 +251,27 @@ select:focus {
   white-space: normal;
   text-overflow: ellipsis;
 }
+
 /* Limit middle column to max 12rem */
-.form-row.three-cols-25-50-25 { grid-template-columns: 25% minmax(0, 12rem) 1fr; }
+.form-row.three-cols-25-50-25 {
+  grid-template-columns: 25% minmax(0, 12rem) 1fr;
+}
+
 /* Reduce columns to a single column on small screens to avoid cramped controls */
 @media (max-width: 720px) {
-  .form-row.three-cols-25-50-25 { grid-template-columns: 1fr; }
-  .form-row.three-cols-25-50-25 .form-group { width: 100%; }
+  .form-row.three-cols-25-50-25 {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row.three-cols-25-50-25 .form-group {
+    width: 100%;
+  }
 }
+
 /* Prevent labels and inline helpers from forcing column growth */
-.form-row.three-cols-25-50-25 .form-group { overflow: visible; }
+.form-row.three-cols-25-50-25 .form-group {
+  overflow: visible;
+}
 
 /* Normalize padding for time and number inputs to match text fields */
 input[type="date"],
@@ -218,7 +288,7 @@ input[type="number"] {
 .input-fecha {
   padding: 0.4rem 0.6rem;
   border: 1px solid #ccc;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 1rem;
   transition: border-color 0.2s ease;
 }
@@ -236,7 +306,7 @@ input[type="number"] {
   text-align: center;
   background-color: #f9e9e9;
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: 4px;
   margin: 0 0 1rem 0;
   border-left: 4px solid #c50909;
 }
@@ -249,31 +319,42 @@ input[type="number"] {
 }
 
 /* Utilidades de grid de columna fija */
-.form-row.four-cols-25 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.form-row.four-cols-25 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 
 /* Allow grid children to shrink properly and ensure inputs fill their cell */
-.form-row > .form-group {
+.form-row>.form-group {
   min-width: 0;
 }
-.form-row.two-cols-50-25 > .form-group {
+
+.form-row.two-cols-50-25>.form-group {
   /* Ensure children can shrink to avoid overflowing the grid column */
   min-width: 0;
   /* allow overflow so inline tooltips can escape the cell */
   overflow: visible;
 }
+
 .form-row.two-cols-50-25 .form-group input,
 .form-row.two-cols-50-25 .form-group select {
   width: 100%;
   box-sizing: border-box;
 }
+
 .form-row.two-cols-50-25 .form-group label {
   white-space: normal;
 }
-.form-group input, .form-group select, .form-group textarea {
+
+.form-group input,
+.form-group select,
+.form-group textarea {
   width: 100%;
   box-sizing: border-box;
 }
-.form-row.three-cols-33 { grid-template-columns: repeat(3, 1fr); }
+
+.form-row.three-cols-33 {
+  grid-template-columns: repeat(3, 1fr);
+}
 
 /* Quitar flechas de inputs number */
 input[type="number"]::-webkit-outer-spin-button,
@@ -281,6 +362,7 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
 input[type="number"] {
   appearance: textfield;
   -webkit-appearance: textfield;
@@ -293,6 +375,7 @@ input.num-spinner {
   -webkit-appearance: auto;
   -moz-appearance: auto;
 }
+
 input.num-spinner::-webkit-outer-spin-button,
 input.num-spinner::-webkit-inner-spin-button {
   -webkit-appearance: auto;
@@ -300,7 +383,8 @@ input.num-spinner::-webkit-inner-spin-button {
 }
 
 /* Inputs que se usan para formateo (km / alojamiento) */
-.format-km, .format-alojamiento {
+.format-km,
+.format-alojamiento {
   padding: 0.4rem 0.6rem;
   border: 1px solid #ccc;
   border-radius: 4px;
@@ -321,7 +405,7 @@ input[type="number"]:focus {
 .conditional-row {
   background-color: #ddf3f5;
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: 4px;
   margin: 0.5rem 0;
   border-left: 4px solid #53868b;
 }
@@ -345,6 +429,7 @@ input[type="number"]:focus {
 .conditional-row {
   text-align: left;
 }
+
 .conditional-row .form-group,
 .conditional-row label {
   display: block;
@@ -352,12 +437,16 @@ input[type="number"]:focus {
 }
 
 /* Ajustes concretos para el ticket-cena: quitar espacio inferior y centrar checkbox */
-#ticket-cena-field-1 .form-group { margin-bottom: 0; }
+#ticket-cena-field-1 .form-group {
+  margin-bottom: 0;
+}
+
 #ticket-cena-field-1 label {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
 }
+
 #ticket-cena-field-1 input[type="checkbox"] {
   vertical-align: middle;
   margin-top: 4px;
@@ -366,23 +455,37 @@ input[type="number"]:focus {
 }
 
 /* Aplicar centrado vertical también a bloques dinÃ¡micos generados (por si hay mÃ¡s desplazamientos) */
-.ticket-cena-field .form-group { margin-bottom: 0; }
-.ticket-cena-field label { display: inline-flex; align-items: center; gap: 0.5rem; }
-.ticket-cena-field input[type="checkbox"] { vertical-align: middle; margin-top: 4px; }
+.ticket-cena-field .form-group {
+  margin-bottom: 0;
+}
+
+.ticket-cena-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ticket-cena-field input[type="checkbox"] {
+  vertical-align: middle;
+  margin-top: 4px;
+}
 
 .btn-add-desplazamiento {
-  background-color: #53868b;
-  color: white;
-  padding: 0.8rem 1.5rem;
-  border: none;
-  border-radius: 6px;
+  font-family: "Saira", Arial, sans-serif;
+  font-weight: 500;
+  background-color: #deeaec;
+  color: #53868b;
+  padding: 0.6rem 1.5rem;
+  border: 1px solid #53868b;
+  border-radius: 4px;
   cursor: pointer;
-  font-weight: 600;
   transition: background-color 0.2s ease;
+  font-size: 1rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn-add-desplazamiento:hover {
-  background-color: #3f6b73;
+  background-color: #c9dbde;
 }
 
 .btn-eliminar-desplazamiento {
@@ -400,7 +503,8 @@ input[type="number"]:focus {
 }
 
 /* Icono en botones de eliminar */
-.btn-eliminar-proyecto svg, .btn-eliminar-desplazamiento svg {
+.btn-eliminar-proyecto svg,
+.btn-eliminar-desplazamiento svg {
   width: 14px;
   height: 14px;
   vertical-align: middle;
@@ -414,7 +518,7 @@ input[type="number"]:focus {
 
 /* Focus style for accordion titles */
 .section-title:focus {
-  outline: 3px solid rgba(106,139,69,0.25);
+  outline: 3px solid rgba(106, 139, 69, 0.25);
   outline-offset: 2px;
 }
 
@@ -422,7 +526,7 @@ input[type="number"]:focus {
 .confirm-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -435,7 +539,7 @@ input[type="number"]:focus {
   border-radius: 8px;
   min-width: 320px;
   max-width: 90%;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
 
 /* Modal enter/exit animation */
@@ -443,13 +547,16 @@ input[type="number"]:focus {
   opacity: 0;
   transition: opacity 0.18s ease-out;
 }
+
 .confirm-overlay .confirm-dialog {
   transform: translateY(8px) scale(0.995);
   transition: transform 0.18s ease-out;
 }
+
 .confirm-overlay.visible {
   opacity: 1;
 }
+
 .confirm-overlay.visible .confirm-dialog {
   transform: translateY(0) scale(1);
 }
@@ -460,10 +567,14 @@ input[type="number"]:focus {
   transform: translateY(8px);
   transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
-.proyecto-grupo, .desplazamiento-grupo {
+
+.proyecto-grupo,
+.desplazamiento-grupo {
   transition: opacity 0.22s ease-out, transform 0.22s ease-out;
 }
-.proyecto-grupo.entry, .desplazamiento-grupo.entry {
+
+.proyecto-grupo.entry,
+.desplazamiento-grupo.entry {
   opacity: 0;
   transform: translateY(8px);
 }
@@ -475,15 +586,17 @@ input[type="number"]:focus {
   padding: 1rem;
   background: #fafafa;
   border: 1px solid #ccc;
-  border-radius: 6px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
+
 .vehiculo-ficha .veh-row {
   display: flex;
   gap: 4rem;
   align-items: center;
   white-space: nowrap;
 }
+
 .vehiculo-ficha .veh-label {
   font-weight: bold;
   margin: 0;
@@ -491,23 +604,29 @@ input[type="number"]:focus {
   color: #53868b;
   font-size: 1rem;
 }
+
 .vehiculo-ficha .veh-radio-label {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
   margin: 0;
 }
+
 .vehiculo-ficha .veh-radio {
   transform: scale(1.18);
   margin: 0;
 }
+
 .vehiculo-ficha .veh-datos-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.6rem;
   margin-top: 0.6rem;
 }
-.vehiculo-ficha .veh-datos-row .form-group { margin-bottom: 0; }
+
+.vehiculo-ficha .veh-datos-row .form-group {
+  margin-bottom: 0;
+}
 
 /* Calc result styling: dotted leaders and right-aligned amounts */
 .calc-result {
@@ -515,10 +634,11 @@ input[type="number"]:focus {
   padding: 0.6rem;
   background: #fffef3;
   border: 1px solid #d0cfaa;
-  border-radius: 6px;
+  border-radius: 4px;
   font-family: inherit;
   color: #222;
 }
+
 .calc-result .calc-line,
 .calc-result .calc-total {
   display: flex;
@@ -526,12 +646,37 @@ input[type="number"]:focus {
   gap: 0.6rem;
   margin: 0.15rem 0;
 }
-.calc-result .label { white-space: nowrap; }
-.calc-result .leader { flex: 1 1 auto; border-bottom: 1px dotted #999; height: 1px; margin: 0.7rem 0 0 0; }
-.calc-result .amount { white-space: nowrap; text-align: right; min-width: 8ch; }
-.calc-result .amount.error-amount { color: #c50909; }
-.calc-result .calc-total { justify-content: flex-end; }
-.calc-result .calc-total .label { margin-right: 0.6rem; white-space: nowrap; }
+
+.calc-result .label {
+  white-space: nowrap;
+}
+
+.calc-result .leader {
+  flex: 1 1 auto;
+  border-bottom: 1px dotted #999;
+  height: 1px;
+  margin: 0.7rem 0 0 0;
+}
+
+.calc-result .amount {
+  white-space: nowrap;
+  text-align: right;
+  min-width: 8ch;
+}
+
+.calc-result .amount.error-amount {
+  color: #c50909;
+}
+
+.calc-result .calc-total {
+  justify-content: flex-end;
+}
+
+.calc-result .calc-total .label {
+  margin-right: 0.6rem;
+  white-space: nowrap;
+}
+
 .warn-icon {
   color: #c50909;
   margin-left: 0.45rem;
@@ -547,69 +692,86 @@ input[type="number"]:focus {
   position: relative;
   margin-right: 0.45rem;
 }
-.warn-wrapper { overflow: visible; z-index: 0; }
-.warn-wrapper .warn-icon { margin-left: 0; margin-right: 0.4rem; }
+
+.warn-wrapper {
+  overflow: visible;
+  z-index: 0;
+}
+
+.warn-wrapper .warn-icon {
+  margin-left: 0;
+  margin-right: 0.4rem;
+}
+
 .warn-tooltip {
   position: absolute;
   left: 40%;
-  bottom: calc(100% + 8px); /* always place above the icon */
-  transform: translateX(calc(-50% - 25%)) translateY(0); /* shift 25% left so triangle aligns over icon */
-  background: linear-gradient(135deg, rgba(76,76,76,1) 0%,rgba(89,89,89,1) 12%,rgba(102,102,102,1) 25%,rgba(71,71,71,1) 39%,rgba(44,44,44,1) 50%,rgba(0,0,0,1) 51%,rgba(17,17,17,1) 60%,rgba(43,43,43,1) 76%,rgba(28,28,28,1) 91%,rgba(19,19,19,1) 100%);
+  bottom: calc(100% + 8px);
+  /* always place above the icon */
+  transform: translateX(calc(-50% - 25%)) translateY(0);
+  /* shift 25% left so triangle aligns over icon */
+  background: linear-gradient(135deg, rgba(76, 76, 76, 1) 0%, rgba(89, 89, 89, 1) 12%, rgba(102, 102, 102, 1) 25%, rgba(71, 71, 71, 1) 39%, rgba(44, 44, 44, 1) 50%, rgba(0, 0, 0, 1) 51%, rgba(17, 17, 17, 1) 60%, rgba(43, 43, 43, 1) 76%, rgba(28, 28, 28, 1) 91%, rgba(19, 19, 19, 1) 100%);
   color: #fff;
   padding: 8px 14px;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 0.9rem;
   line-height: 1.25;
   /* Allow wrapping and manual <br> in HTML */
   white-space: normal;
   word-wrap: break-word;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   opacity: 0;
   transition: opacity 0.12s ease, transform 0.12s ease;
   pointer-events: none;
-  z-index: 99999; /* ensure tooltip floats above other elements */
+  z-index: 99999;
+  /* ensure tooltip floats above other elements */
   display: inline-block;
   box-sizing: border-box;
-  min-width: 40ch; /* make tooltips wider by default (approx 40 characters) */
+  min-width: 40ch;
+  /* make tooltips wider by default (approx 40 characters) */
   /* Keep tooltips within viewport but allow generous width otherwise */
   max-width: min(40rem, calc(100vw - 3rem));
   overflow-wrap: break-word;
   text-align: center;
   width: auto;
 }
-.warn-tooltip::after{
+
+.warn-tooltip::after {
   /* small downward-pointing triangle positioned ~25% from the right edge */
   content: "";
   position: absolute;
   top: 100%;
-  left: 75%; /* 75% from left -> approx 25% from right */
+  left: 75%;
+  /* 75% from left -> approx 25% from right */
   transform: translateX(-50%);
   width: 0;
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 8px solid rgba(28,28,28,0.96);
+  border-top: 8px solid rgba(28, 28, 28, 0.96);
 }
+
 .global-warn-tooltip {
   position: absolute;
   left: 50%;
   bottom: calc(100% + 8px);
   transform: translateX(calc(-50% - 25%)) translateY(0);
-  background: rgba(28,28,28,0.96);
+  background: rgba(28, 28, 28, 0.96);
   color: #fff;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 0.9rem;
   white-space: normal;
   word-wrap: break-word;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   opacity: 0;
   transition: opacity 0.12s ease, transform 0.12s ease;
   pointer-events: none;
   z-index: 5000;
   max-width: 36rem;
 }
-.global-warn-tooltip::after{
+
+.global-warn-tooltip::after {
   content: "";
   position: absolute;
   top: 100%;
@@ -619,13 +781,20 @@ input[type="number"]:focus {
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 8px solid rgba(28,28,28,0.96);
+  border-top: 8px solid rgba(28, 28, 28, 0.96);
 }
-.global-warn-tooltip.visible { opacity: 1; transform: translateX(calc(-50% - 25%)) translateY(-6px); pointer-events: auto; }
+
+.global-warn-tooltip.visible {
+  opacity: 1;
+  transform: translateX(calc(-50% - 25%)) translateY(-6px);
+  pointer-events: auto;
+}
+
 .warn-wrapper:hover .warn-tooltip,
 .warn-wrapper:focus-within .warn-tooltip {
   opacity: 1;
-  transform: translateX(calc(-50% - 25%)) translateY(-6px); /* slight lift on show */
+  transform: translateX(calc(-50% - 25%)) translateY(-6px);
+  /* slight lift on show */
   pointer-events: auto;
 }
 
@@ -633,10 +802,22 @@ input[type="number"]:focus {
 .calc-result .error-line {
   color: #c50909;
 }
-.calc-result .error-line .leader { border-bottom-color: #c50909; }
-.calc-result .error-line .amount { color: #c50909; }
-.calc-result .error-line .label { color: inherit; }
-.calc-result .calc-total .amount strong.slight { font-weight: 600; }
+
+.calc-result .error-line .leader {
+  border-bottom-color: #c50909;
+}
+
+.calc-result .error-line .amount {
+  color: #c50909;
+}
+
+.calc-result .error-line .label {
+  color: inherit;
+}
+
+.calc-result .calc-total .amount strong.slight {
+  font-weight: 600;
+}
 
 
 .confirm-body {
@@ -655,7 +836,7 @@ input[type="number"]:focus {
   color: white;
   border: none;
   padding: 0.5rem 0.9rem;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
 }
 
@@ -664,12 +845,13 @@ input[type="number"]:focus {
   color: #333;
   border: none;
   padding: 0.5rem 0.9rem;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
 }
 
-.btn-confirm-yes:focus, .btn-confirm-no:focus {
-  outline: 2px solid rgba(106,139,69,0.4);
+.btn-confirm-yes:focus,
+.btn-confirm-no:focus {
+  outline: 2px solid rgba(106, 139, 69, 0.4);
   outline-offset: 2px;
 }
 
@@ -680,6 +862,7 @@ input[type="number"]:focus {
   font-weight: 600;
   margin-bottom: 0.45rem;
 }
+
 .calc-result-segment {
   padding-bottom: 0.6rem;
   margin-bottom: 0.6rem;

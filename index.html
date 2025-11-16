@@ -13,11 +13,17 @@
   <script src="js/main.js" defer></script>
   <script src="js/dietasCalc.js" defer></script>
   <script src="js/formLogic.js" defer></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,100..900;1,100..900&display=swap"
+    rel="stylesheet">
 </head>
 
 <body>
   <!-- SVG sprite: reusable caret symbol (hidden visually, available via <use>) -->
-  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"
+    xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <symbol id="icon-caret" viewBox="0 0 7 3">
       <path d="M3.4662 2.1802l1.9746-2.176h1.3576L3.6496 3.4228h-.3894L.1152.0042h1.3576L3.4662 2.1802z"></path>
     </symbol>
@@ -36,7 +42,9 @@
       <div class="section-title">
         Datos del beneficiario
         <span class="toggle-section open" aria-hidden="true">
-          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false"><use href="#icon-caret" xlink:href="#icon-caret"></use></svg>
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
+            <use href="#icon-caret" xlink:href="#icon-caret"></use>
+          </svg>
         </span>
       </div>
       <div class="section-content-wrapper">
@@ -85,7 +93,9 @@
       <div class="section-title">
         Datos del proyecto
         <span class="toggle-section open" aria-hidden="true">
-          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false"><use href="#icon-caret" xlink:href="#icon-caret"></use></svg>
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
+            <use href="#icon-caret" xlink:href="#icon-caret"></use>
+          </svg>
         </span>
       </div>
       <div class="section-content-wrapper">
@@ -104,36 +114,40 @@
                 </a>
               </p>
 
-            <!-- Contenedor para los proyectos -->
-            <div id="proyectos-container">
-              <!-- Template para un proyecto -->
-              <div class="proyecto-grupo" data-proyecto-id="1">
-                <h3 class="proyecto-titulo">Proyecto 1</h3>
-                <div class="form-group">
+              <!-- Contenedor para los proyectos -->
+              <div id="proyectos-container">
+                <!-- Template para un proyecto -->
+                <div class="proyecto-grupo" data-proyecto-id="1">
+                  <h3 class="proyecto-titulo">Proyecto 1</h3>
+                  <div class="form-group">
                     <label for="responsable-1">Responsable: D./D.ª</label>
-                  <input type="text" id="responsable-1" name="responsable-1" class="responsable" maxlength="70" required />
-                </div>
-                <div class="form-row two-cols-50-50">
-                  <div class="form-group">
-          <label for="organica-1">Orgánica</label>
-          <input type="text" id="organica-1" name="organica-1" class="organica" pattern="^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){0,4}$" maxlength="14" required />
+                    <input type="text" id="responsable-1" name="responsable-1" class="responsable" maxlength="70"
+                      required />
                   </div>
-                  <div class="form-group">
-                    <label for="referencia-1">Referencia del proyecto</label>
-                    <input type="text" id="referencia-1" name="referencia-1" class="referencia-proyecto" maxlength="50" required />
+                  <div class="form-row two-cols-50-50">
+                    <div class="form-group">
+                      <label for="organica-1">Orgánica</label>
+                      <input type="text" id="organica-1" name="organica-1" class="organica"
+                        pattern="^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){0,4}$" maxlength="14" required />
+                    </div>
+                    <div class="form-group">
+                      <label for="referencia-1">Referencia del proyecto</label>
+                      <input type="text" id="referencia-1" name="referencia-1" class="referencia-proyecto"
+                        maxlength="50" required />
+                    </div>
                   </div>
+                  <button type="button" class="btn-eliminar-proyecto" style="display: none;" aria-label="Eliminar proyecto 1">
+                    <span class="btn-icon btn-icon-minus" aria-hidden="true">−</span>
+                    Eliminar
+                  </button>
                 </div>
-                <button type="button" class="btn-eliminar-proyecto" style="display: none;" aria-label="Eliminar proyecto 1">
-                  <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6zm2 3h14l-1.2 11.3A2 2 0 0 1 15.8 22H8.2a2 2 0 0 1-1.99-1.7L5 9zm5-7h4l1 1H9l1-1z"/></svg>
-                  Eliminar
-                </button>
               </div>
-            </div>
 
-            <!-- Botón para añadir nuevo proyecto -->
-            <button type="button" id="btn-add-proyecto" class="btn-add-proyecto">
-              Añadir otro proyecto
-            </button>
+              <!-- Botón para añadir nuevo proyecto -->
+              <button type="button" id="btn-add-proyecto" class="btn-add-proyecto">
+                <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
+                Añadir otro proyecto
+              </button>
           </form>
         </div>
       </div>
@@ -144,7 +158,9 @@
       <div class="section-title">
         Desplazamientos
         <span class="toggle-section open" aria-hidden="true">
-          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false"><use href="#icon-caret" xlink:href="#icon-caret"></use></svg>
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
+            <use href="#icon-caret" xlink:href="#icon-caret"></use>
+          </svg>
         </span>
       </div>
       <div class="section-content-wrapper">
@@ -155,23 +171,27 @@
               <!-- Template para un desplazamiento -->
               <div class="desplazamiento-grupo" data-desplazamiento-id="1">
                 <h3 class="desplazamiento-titulo">Desplazamiento 1</h3>
-                
+
                 <div class="form-row four-cols-25">
                   <div class="form-group">
                     <label for="fecha-ida-1">Salida el día:</label>
-                    <input type="text" class="input-fecha" id="fecha-ida-1" name="fecha-ida-1" placeholder="dd/mm/aa" required />
+                    <input type="text" class="input-fecha" id="fecha-ida-1" name="fecha-ida-1" placeholder="dd/mm/aa"
+                      required />
                   </div>
                   <div class="form-group">
                     <label for="hora-ida-1">a las:</label>
-                    <input type="text" class="input-hora" id="hora-ida-1" name="hora-ida-1" placeholder="hh:mm" maxlength="5" required />
+                    <input type="text" class="input-hora" id="hora-ida-1" name="hora-ida-1" placeholder="hh:mm"
+                      maxlength="5" required />
                   </div>
                   <div class="form-group">
                     <label for="fecha-regreso-1">Regreso el día:</label>
-                    <input type="text" class="input-fecha" id="fecha-regreso-1" name="fecha-regreso-1" placeholder="dd/mm/aa" required />
+                    <input type="text" class="input-fecha" id="fecha-regreso-1" name="fecha-regreso-1"
+                      placeholder="dd/mm/aa" required />
                   </div>
                   <div class="form-group">
                     <label for="hora-regreso-1">a las:</label>
-                    <input type="text" class="input-hora" id="hora-regreso-1" name="hora-regreso-1" placeholder="hh:mm" maxlength="5" required />
+                    <input type="text" class="input-hora" id="hora-regreso-1" name="hora-regreso-1" placeholder="hh:mm"
+                      maxlength="5" required />
                   </div>
                 </div>
 
@@ -206,11 +226,13 @@
                   <div class="form-row">
                     <div class="form-group">
                       <label for="cruce-ida-1">Cruce de fronteras ida</label>
-                      <input type="text" class="input-fecha" id="cruce-ida-1" name="cruce-ida-1" placeholder="dd/mm/aa" />
+                      <input type="text" class="input-fecha" id="cruce-ida-1" name="cruce-ida-1"
+                        placeholder="dd/mm/aa" />
                     </div>
                     <div class="form-group">
                       <label for="cruce-vuelta-1">Cruce de fronteras vuelta</label>
-                      <input type="text" class="input-fecha" id="cruce-vuelta-1" name="cruce-vuelta-1" placeholder="dd/mm/aa" />
+                      <input type="text" class="input-fecha" id="cruce-vuelta-1" name="cruce-vuelta-1"
+                        placeholder="dd/mm/aa" />
                     </div>
                   </div>
                 </div>
@@ -229,14 +251,15 @@
                   </div>
                   <div class="form-group">
                     <label for="alojamiento-1">Alojamiento (€):</label>
-                    <input type="text" id="alojamiento-1" name="alojamiento-1" class="format-alojamiento" placeholder="0,00 €" />
+                    <input type="text" id="alojamiento-1" name="alojamiento-1" class="format-alojamiento"
+                      placeholder="0,00 €" />
                   </div>
                 </div>
 
                 <!-- (duplicado eliminado) -->
 
                 <button type="button" class="btn-eliminar-desplazamiento" style="display: none;" aria-label="Eliminar desplazamiento 1">
-                  <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6zm2 3h14l-1.2 11.3A2 2 0 0 1 15.8 22H8.2a2 2 0 0 1-1.99-1.7L5 9zm5-7h4l1 1H9l1-1z"/></svg>
+                  <span class="btn-icon btn-icon-minus" aria-hidden="true">−</span>
                   Eliminar
                 </button>
               </div>
@@ -244,11 +267,12 @@
 
             <!-- Botón para añadir nuevo desplazamiento -->
             <button type="button" id="btn-add-desplazamiento" class="btn-add-desplazamiento">
+              <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
               Añadir otro desplazamiento
             </button>
 
-              <!-- Ficha para vehículo particular (se muestra dinámicamente si hay km > 0) -->
-              <div id="vehiculo-particular-container"></div>
+            <!-- Ficha para vehículo particular (se muestra dinámicamente si hay km > 0) -->
+            <div id="vehiculo-particular-container"></div>
           </form>
         </div>
       </div>
@@ -258,8 +282,10 @@
     <section class="form-section">
       <div class="section-title" data-start-collapsed="true">
         Asistencia a congresos u otros eventos
-          <span class="toggle-section" aria-hidden="true">
-          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false"><use href="#icon-caret" xlink:href="#icon-caret"></use></svg>
+        <span class="toggle-section" aria-hidden="true">
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
+            <use href="#icon-caret" xlink:href="#icon-caret"></use>
+          </svg>
         </span>
       </div>
       <div class="section-content-wrapper">
@@ -293,22 +319,26 @@
             <div class="form-row three-cols-25-50-25">
               <div class="form-group">
                 <label for="evento-gastos">Gastos de inscripción</label>
-                <input type="text" id="evento-gastos" name="evento-gastos" class="format-alojamiento" placeholder="0,00 €" />
+                <input type="text" id="evento-gastos" name="evento-gastos" class="format-alojamiento"
+                  placeholder="0,00 €" />
               </div>
               <div class="form-group">
                 <label for="evento-num-comidas">Incluye comidas:
                   <span class="warn-wrapper" tabindex="0" aria-label="Información sobre comidas incluidas">
                     <span class="warn-icon" aria-hidden="true">ℹ️</span>
-                    <span class="warn-tooltip">Indique aquí, si las hay, el número de comidas/cenas incluidas en la inscripción</span>
+                    <span class="warn-tooltip">Indique aquí, si las hay, el número de comidas/cenas incluidas en la
+                      inscripción</span>
                   </span>
                 </label>
-                <input type="number" id="evento-num-comidas" name="evento-num-comidas" class="num-spinner limit-2digits" min="0" max="99" step="1" value="0" />
+                <input type="number" id="evento-num-comidas" name="evento-num-comidas" class="num-spinner limit-2digits"
+                  min="0" max="99" step="1" value="0" />
               </div>
               <div class="form-group" id="evento-asociado-container" style="display: none;">
                 <label for="evento-asociado">Evento asociado al desplazamiento:
                   <span class="warn-wrapper" tabindex="0" aria-label="Información sobre evento asociado">
                     <span class="warn-icon" aria-hidden="true">ℹ️</span>
-                    <span class="warn-tooltip">Señale en qué desplazamiento está incluida la asistencia a este evento</span>
+                    <span class="warn-tooltip">Señale en qué desplazamiento está incluida la asistencia a este
+                      evento</span>
                   </span>
                 </label>
                 <select id="evento-asociado" name="evento-asociado">
@@ -318,7 +348,8 @@
             </div>
             <!-- Mensaje de descuento calculado (se muestra sólo si hay importe > 0) -->
             <div id="descuento-manut-message" class="conditional-row" style="display:none; margin-top: 0.6rem;">
-              <label>Se descontarán <span id="descuento-manut-amount">0,00 €</span> al importe final de la liquidación.</label>
+              <label>Se descontarán <span id="descuento-manut-amount">0,00 €</span> al importe final de la
+                liquidación.</label>
             </div>
             <input type="hidden" id="descuento-manut-congreso" name="descuento-manut-congreso" value="0.00" />
           </form>
@@ -330,4 +361,3 @@
 </body>
 
 </html>
-    
