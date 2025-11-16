@@ -7,7 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const height = content.scrollHeight;
         wrapper.style.maxHeight = height + 'px';
         wrapper.classList.remove('collapsed');
-        icon.textContent = '−';
+        // mark icon as open (CSS rotates caret)
+        icon.classList.add('open');
+        icon.classList.add('toggle-section');
         if (titleEl) titleEl.setAttribute('aria-expanded', 'true');
     }
 
@@ -15,7 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
     function closeSection(wrapper, icon, titleEl) {
         wrapper.style.maxHeight = '0px';
         wrapper.classList.add('collapsed');
-        icon.textContent = '+';
+        // mark icon as closed
+        icon.classList.remove('open');
+        icon.classList.add('toggle-section');
         if (titleEl) titleEl.setAttribute('aria-expanded', 'false');
     }
 

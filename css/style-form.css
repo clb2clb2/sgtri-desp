@@ -201,7 +201,7 @@ select:focus {
   .form-row.three-cols-25-50-25 .form-group { width: 100%; }
 }
 /* Prevent labels and inline helpers from forcing column growth */
-.form-row.three-cols-25-50-25 .form-group { overflow: hidden; }
+.form-row.three-cols-25-50-25 .form-group { overflow: visible; }
 
 /* Normalize padding for time and number inputs to match text fields */
 input[type="date"],
@@ -258,7 +258,8 @@ input[type="number"] {
 .form-row.two-cols-50-25 > .form-group {
   /* Ensure children can shrink to avoid overflowing the grid column */
   min-width: 0;
-  overflow: hidden;
+  /* allow overflow so inline tooltips can escape the cell */
+  overflow: visible;
 }
 .form-row.two-cols-50-25 .form-group input,
 .form-row.two-cols-50-25 .form-group select {
@@ -539,48 +540,94 @@ input[type="number"]:focus {
   vertical-align: middle;
 }
 
-/* Warn wrapper & tooltip */
-.warn-wrapper { display: inline-flex; align-items: center; position: relative; margin-right: 0.45rem; }
+/* Warn wrapper & tooltip: tooltip shown ABOVE the icon with a small pointer triangle */
+.warn-wrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  margin-right: 0.45rem;
+}
+.warn-wrapper { overflow: visible; z-index: 0; }
 .warn-wrapper .warn-icon { margin-left: 0; margin-right: 0.4rem; }
 .warn-tooltip {
   position: absolute;
-  left: 50%;
-  top: calc(100% + 8px);
-  transform: translateX(-50%) translateY(-6px);
-  background: rgba(28,28,28,0.96);
+  left: 40%;
+  bottom: calc(100% + 8px); /* always place above the icon */
+  transform: translateX(calc(-50% - 25%)) translateY(0); /* shift 25% left so triangle aligns over icon */
+  background: linear-gradient(135deg, rgba(76,76,76,1) 0%,rgba(89,89,89,1) 12%,rgba(102,102,102,1) 25%,rgba(71,71,71,1) 39%,rgba(44,44,44,1) 50%,rgba(0,0,0,1) 51%,rgba(17,17,17,1) 60%,rgba(43,43,43,1) 76%,rgba(28,28,28,1) 91%,rgba(19,19,19,1) 100%);
   color: #fff;
-  padding: 8px 10px;
+  padding: 8px 14px;
   border-radius: 6px;
   font-size: 0.9rem;
-  /* Allow wrapping for longer explanatory tooltips; width is controlled manually via HTML breaks */
+  line-height: 1.25;
+  /* Allow wrapping and manual <br> in HTML */
   white-space: normal;
   word-wrap: break-word;
   box-shadow: 0 6px 18px rgba(0,0,0,0.25);
   opacity: 0;
   transition: opacity 0.12s ease, transform 0.12s ease;
   pointer-events: none;
-  z-index: 1200;
+  z-index: 99999; /* ensure tooltip floats above other elements */
+  display: inline-block;
+  box-sizing: border-box;
+  min-width: 40ch; /* make tooltips wider by default (approx 40 characters) */
+  /* Keep tooltips within viewport but allow generous width otherwise */
+  max-width: min(40rem, calc(100vw - 3rem));
+  overflow-wrap: break-word;
+  text-align: center;
+  width: auto;
+}
+.warn-tooltip::after{
+  /* small downward-pointing triangle positioned ~25% from the right edge */
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 75%; /* 75% from left -> approx 25% from right */
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(28,28,28,0.96);
 }
 .global-warn-tooltip {
   position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(calc(-50% - 25%)) translateY(0);
   background: rgba(28,28,28,0.96);
   color: #fff;
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 0.9rem;
-  /* Allow wrapping like the inline tooltip; width is controlled manually via HTML breaks */
   white-space: normal;
   word-wrap: break-word;
   box-shadow: 0 6px 18px rgba(0,0,0,0.25);
   opacity: 0;
-  transform: translateY(-6px);
   transition: opacity 0.12s ease, transform 0.12s ease;
   pointer-events: none;
   z-index: 5000;
+  max-width: 36rem;
 }
-.global-warn-tooltip.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.global-warn-tooltip::after{
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 75%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(28,28,28,0.96);
+}
+.global-warn-tooltip.visible { opacity: 1; transform: translateX(calc(-50% - 25%)) translateY(-6px); pointer-events: auto; }
 .warn-wrapper:hover .warn-tooltip,
-.warn-wrapper:focus-within .warn-tooltip { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.warn-wrapper:focus-within .warn-tooltip {
+  opacity: 1;
+  transform: translateX(calc(-50% - 25%)) translateY(-6px); /* slight lift on show */
+  pointer-events: auto;
+}
 
 /* When alojamiento exceeds max, highlight the entire calc line */
 .calc-result .error-line {

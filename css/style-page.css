@@ -61,6 +61,21 @@ body {
     font-size: 1.2rem;
 }
 
+/* SVG caret inside .toggle-section */
+.toggle-section .caret {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    vertical-align: middle;
+    transition: transform 180ms ease;
+    fill: currentColor;
+}
+
+/* When open, rotate caret 180deg (pointing up) */
+.toggle-section.open .caret {
+    transform: rotate(180deg);
+}
+
 /* Contenido de cada sección */
 .section-content-wrapper {
     /* No usamos un max-height fijo aquí: el JS establece inline max-height
@@ -68,6 +83,12 @@ body {
        dinámico. Mantener overflow hidden para que el colapso oculte el contenido. */
     overflow: hidden;
     transition: max-height 0.28s ease-out;
+}
+
+/* Cuando la sección está desplegada (no collapsed), permitir overflow visible
+   para que los tooltips puedan escapar del contenedor durante el hover. */
+.section-content-wrapper:not(.collapsed) {
+    overflow: visible;
 }
 
 .section-content-wrapper.collapsed {

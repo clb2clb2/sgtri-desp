@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SGTRI - Liquidación de Dietas y Desplazamientos</title>
+  <title>UEx - SGTRI - Liquidación de Dietas y Desplazamientos</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/style-page.css" />
@@ -16,6 +16,12 @@
 </head>
 
 <body>
+  <!-- SVG sprite: reusable caret symbol (hidden visually, available via <use>) -->
+  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <symbol id="icon-caret" viewBox="0 0 7 3">
+      <path d="M3.4662 2.1802l1.9746-2.176h1.3576L3.6496 3.4228h-.3894L.1152.0042h1.3576L3.4662 2.1802z"></path>
+    </symbol>
+  </svg>
   <!-- 🔹 Encabezado principal -->
   <header class="Encabezado">
     <img src="assets/img/logo-uex-blanco.png" alt="Logo UEx" class="logo" />
@@ -29,7 +35,9 @@
     <section class="form-section">
       <div class="section-title">
         Datos del beneficiario
-        <span class="toggle-section">−</span>
+        <span class="toggle-section open" aria-hidden="true">
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false"><use href="#icon-caret" xlink:href="#icon-caret"></use></svg>
+        </span>
       </div>
       <div class="section-content-wrapper">
         <div class="section-content">
@@ -76,7 +84,9 @@
     <section class="form-section">
       <div class="section-title">
         Datos del proyecto
-        <span class="toggle-section">−</span>
+        <span class="toggle-section open" aria-hidden="true">
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false"><use href="#icon-caret" xlink:href="#icon-caret"></use></svg>
+        </span>
       </div>
       <div class="section-content-wrapper">
         <div class="section-content">
@@ -133,7 +143,9 @@
     <section class="form-section">
       <div class="section-title">
         Desplazamientos
-        <span class="toggle-section">−</span>
+        <span class="toggle-section open" aria-hidden="true">
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false"><use href="#icon-caret" xlink:href="#icon-caret"></use></svg>
+        </span>
       </div>
       <div class="section-content-wrapper">
         <div class="section-content">
@@ -246,7 +258,9 @@
     <section class="form-section">
       <div class="section-title" data-start-collapsed="true">
         Asistencia a congresos u otros eventos
-        <span class="toggle-section">+</span>
+          <span class="toggle-section" aria-hidden="true">
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false"><use href="#icon-caret" xlink:href="#icon-caret"></use></svg>
+        </span>
       </div>
       <div class="section-content-wrapper">
         <div class="section-content">
@@ -285,7 +299,7 @@
                 <label for="evento-num-comidas">Incluye comidas:
                   <span class="warn-wrapper" tabindex="0" aria-label="Información sobre comidas incluidas">
                     <span class="warn-icon" aria-hidden="true">ℹ️</span>
-                    <span class="warn-tooltip">Indique aquí, si las hay, el número de<br>comidas/cenas incluidas en la inscripción</span>
+                    <span class="warn-tooltip">Indique aquí, si las hay, el número de comidas/cenas incluidas en la inscripción</span>
                   </span>
                 </label>
                 <input type="number" id="evento-num-comidas" name="evento-num-comidas" class="num-spinner limit-2digits" min="0" max="99" step="1" value="0" />
@@ -294,7 +308,7 @@
                 <label for="evento-asociado">Evento asociado al desplazamiento:
                   <span class="warn-wrapper" tabindex="0" aria-label="Información sobre evento asociado">
                     <span class="warn-icon" aria-hidden="true">ℹ️</span>
-                    <span class="warn-tooltip">Señale en qué desplazamiento está<br>incluida la asistencia a este evento</span>
+                    <span class="warn-tooltip">Señale en qué desplazamiento está incluida la asistencia a este evento</span>
                   </span>
                 </label>
                 <select id="evento-asociado" name="evento-asociado">

@@ -1539,6 +1539,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial compute in case defaults set
   try { computeDescuentoManutencion(); } catch (e) {}
 
+  // Recompute discount when project type changes (affects per-day manutencion price)
+  try {
+    var tipoProyectoEl = document.getElementById('tipoProyecto');
+    if (tipoProyectoEl) {
+      tipoProyectoEl.addEventListener('change', computeDescuentoManutencion);
+      tipoProyectoEl.addEventListener('input', computeDescuentoManutencion);
+    }
+  } catch (e) { /* ignore */ }
+
 
   // -------------------------
   // Render dinámico de campos de pago según #tipo-pago
@@ -1789,7 +1798,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const warnHtml = alojamientoExceedsMax ? `
         <span class="warn-wrapper" tabindex="0" aria-live="polite">
           <span class="warn-icon" aria-hidden="true">⚠️</span>
-          <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera<br>el máximo permitido, conforme al ${normativaLabel}.</span>
+          <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>
         </span>
       ` : '';
       const alojamientoAmountHtml = `${warnHtml}<span class="amount${alojamientoExceedsMax ? ' error-amount' : ''}">${alojamientoAmount} €</span>`;
@@ -1855,7 +1864,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const alojWarn = (alojUserNum > allowedAlojMax) ? `
           <span class="warn-wrapper" tabindex="0" aria-live="polite">
             <span class="warn-icon" aria-hidden="true">⚠️</span>
-            <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera<br>el máximo permitido, conforme al ${normativaLabel}.</span>
+            <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>
           </span>` : '';
         // Determine if user alojamiento exceeds the aggregated maximum (consider per-segment reductions)
         const alojExceeds = alojUserNum > allowedAlojMax;
@@ -1992,56 +2001,32 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-  // Singleton tooltip element appended to body
-  let __globalWarnTooltip = null;
+  // CSS-only tooltip mode: do not move inline tooltips into a JS portal.
+  // The user prefers CSS for display/position, so keep inline
+  // `.warn-tooltip` spans in-place and let CSS hover/focus show them.
   function ensureGlobalWarnTooltip() {
-    if (typeof document === 'undefined') return;
-    if (__globalWarnTooltip && document.body.contains(__globalWarnTooltip)) return;
-    __globalWarnTooltip = document.createElement('div');
-    __globalWarnTooltip.className = 'global-warn-tooltip';
-    __globalWarnTooltip.setAttribute('role','tooltip');
-    __globalWarnTooltip.style.position = 'absolute';
-    __globalWarnTooltip.style.left = '0px';
-    __globalWarnTooltip.style.top = '0px';
-    __globalWarnTooltip.style.display = 'none';
-    document.body.appendChild(__globalWarnTooltip);
+    // Cleanup any previously created global tooltip portal elements that
+    // could have been injected by earlier versions of the script. We
+    // intentionally remove them to ensure CSS-only inline tooltips are
+    // the single source of truth.
+    try {
+      if (typeof document !== 'undefined') {
+        const existing = Array.from(document.querySelectorAll('.global-warn-tooltip')) || [];
+        existing.forEach(e => { if (e && e.parentNode) e.parentNode.removeChild(e); });
+      }
+    } catch (e) { /* ignore */ }
+    return;
   }
 
   function attachWarnHandlers(wrapper) {
     if (!wrapper) return;
-    // prevent double attaching
     if (wrapper.__warnAttached) return; wrapper.__warnAttached = true;
-  const tooltipTextEl = wrapper.querySelector('.warn-tooltip');
-  // Use innerHTML so any manual <br> inserted in the tooltip is preserved
-  const html = tooltipTextEl ? tooltipTextEl.innerHTML : '';
-  // Hide the inline tooltip element when using the global portal to avoid duplicates
-  try { if (tooltipTextEl) tooltipTextEl.style.display = 'none'; } catch(e) {}
-    function show() {
-      if (!__globalWarnTooltip) ensureGlobalWarnTooltip();
-  // Inject HTML (keeps <br> and basic markup the developer placed)
-  __globalWarnTooltip.innerHTML = html;
-      __globalWarnTooltip.style.display = 'block';
-      // position: try align horizontally center to wrapper
-      const rect = wrapper.getBoundingClientRect();
-      const ttRect = __globalWarnTooltip.getBoundingClientRect();
-      let left = rect.left + window.scrollX;
-      // prefer align left, but ensure it fits in viewport
-      left = Math.max(8, Math.min(left, window.scrollX + document.documentElement.clientWidth - ttRect.width - 8));
-      const top = rect.bottom + window.scrollY + 8;
-      __globalWarnTooltip.style.left = left + 'px';
-      __globalWarnTooltip.style.top = top + 'px';
-      __globalWarnTooltip.classList.add('visible');
-    }
-    function hide() {
-      if (!__globalWarnTooltip) return;
-      __globalWarnTooltip.classList.remove('visible');
-      // keep in DOM but hide after transition
-      setTimeout(() => { if (__globalWarnTooltip) __globalWarnTooltip.style.display = 'none'; }, 140);
-    }
-    wrapper.addEventListener('mouseenter', show);
-    wrapper.addEventListener('focus', show, true);
-    wrapper.addEventListener('mouseleave', hide);
-    wrapper.addEventListener('blur', hide, true);
+    // Ensure the inline tooltip element is left visible so CSS can control it
+    try {
+      const tooltipTextEl = wrapper.querySelector('.warn-tooltip');
+      if (tooltipTextEl) tooltipTextEl.style.display = '';
+    } catch (e) { /* ignore */ }
+    // No JS positioning/portal; CSS :hover and :focus-within handle visibility
   }
 
   // Attach handlers to any static warn-wrapper elements present on page
