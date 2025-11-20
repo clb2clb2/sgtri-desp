@@ -1,0 +1,28 @@
+AVIÓN / TREN / AUTOBÚS
+PEAJE
+TAXI
+APARCAMIENTO
+TRANSFER O TRASLADOS
+GASTOS DE INSTALACIÓN
+ALQUILER COCHE
+SEGURO ACCIDENTES
+SEGURO MÉDICO
+TASA TURÍSTICA
+TASAS AGENCIA DE VIAJES
+
+"otrosGastos": [
+    ["Avión / Tren / Autobús", "AVN"],
+    ["Peaje", "PJE"],
+    ["Taxi", "TAX"],
+    ["Aparcamiento", "PRK"],
+    ["Transfer o Traslados", "TRF"],
+    ["Gastos de instalación", "INS"],
+    ["Alquiler de coche", "ALQ"],
+    ["Seguro de accidentes", "SAC"],
+    ["Seguro médico", "SME"],
+    ["Tasa turística", "TTR"],
+    ["Tasa agencia de viajes", "TAG"]
+],
+
+
+→ SEGUIR EN LÍNEA 1200

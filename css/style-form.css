@@ -76,7 +76,8 @@ select:focus {
   font-weight: 500;
   background-color: #deeaec;
   color: #53868b;
-  padding: 0.6rem 1.5rem;
+  padding-top: 9px;
+  padding-bottom: 6px;
   border: 1px solid #53868b;
   border-radius: 4px;
   cursor: pointer;
@@ -90,10 +91,10 @@ select:focus {
 }
 
 .btn-eliminar-proyecto {
-  background-color: #c83e4c;
-  color: white;
-  padding: 0.4rem 1rem;
-  border: none;
+  background-color: #f3ebeb;
+  color: #b64c4c;
+  padding: 7px 1rem 5px 1rem;
+  border: 1px solid #b64c4c;
   border-radius: 4px;
   cursor: pointer;
   position: absolute;
@@ -104,7 +105,7 @@ select:focus {
 }
 
 .btn-eliminar-proyecto:hover {
-  background-color: #b22f3f;
+  background-color: #e1cdcd;
 }
 
 /* Button icon spans (plus / minus) */
@@ -113,19 +114,32 @@ select:focus {
   vertical-align: middle;
   margin-right: 0.4rem;
   font-weight: 700;
-  font-size: 1.05em;
+  font-size: 1.2em;
   line-height: 1;
+  font-weight: 600;
 }
 
 /* specific colours */
 .btn-icon-minus {
-  color: white; /* used inside red delete buttons */
+  color: #b64c4c;
+  /* used inside red delete buttons */
 }
 
 .btn-add-proyecto .btn-icon,
 .btn-add-desplazamiento .btn-icon,
 .btn-icon-add {
-  color: #53868b; /* match add button text */
+  color: #53868b;
+  /* match add button text */
+}
+
+/* Improve plus sign appearance and vertical alignment */
+.btn-icon-add {
+  font-size: 1.7em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-4px);
+  font-weight: 400;
 }
 
 /* ========================================= */
@@ -252,9 +266,9 @@ select:focus {
   text-overflow: ellipsis;
 }
 
-/* Limit middle column to max 12rem */
-.form-row.three-cols-25-50-25 {
-  grid-template-columns: 25% minmax(0, 12rem) 1fr;
+/* Específico para las líneas de Otros gastos */
+.otros-gastos-container .form-row.three-cols-25-50-25 {
+  grid-template-columns: 28% 45% minmax(0, 12rem);
 }
 
 /* Reduce columns to a single column on small screens to avoid cramped controls */
@@ -475,7 +489,8 @@ input[type="number"]:focus {
   font-weight: 500;
   background-color: #deeaec;
   color: #53868b;
-  padding: 0.6rem 1.5rem;
+  padding-top: 9px;
+  padding-bottom: 6px;
   border: 1px solid #53868b;
   border-radius: 4px;
   cursor: pointer;
@@ -488,18 +503,99 @@ input[type="number"]:focus {
   background-color: #c9dbde;
 }
 
-.btn-eliminar-desplazamiento {
-  background-color: #c83e4c;
-  color: white;
-  padding: 0.4rem 1rem;
-  border: none;
+/* Otros gastos: wrapper, container and line styles */
+.otros-gastos-wrapper {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.otros-gastos-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  position: relative;
+  /* keep tooltip positioning normal relative to wrapper */
+}
+
+.btn-otros-gastos {
+  background-color: #deeaec;
+  color: #53868b;
+  padding: 7px 1rem 5px 1rem;
+  border: 1px solid #53868b;
   border-radius: 4px;
   cursor: pointer;
-  position: absolute;
-  top: 0.9rem;
-  right: 1rem;
   font-size: 0.8rem;
-  transition: background-color 0.2s ease;
+}
+
+.btn-otros-gastos .btn-icon {
+  font-size: 1.7em;
+  transform: translateY(-2px);
+}
+
+.btn-otros-gastos:hover {
+  background-color: #c9dbde;
+}
+
+.otros-gastos-container {
+  /* Visually neutral: no background, no border, no padding so the container is invisible */
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  width: 100%;
+  display: none;
+  /* hidden by default; JS will toggle inline style */
+}
+
+/* Position tooltip to the right of the icon when inside the controls near the button */
+/* No override: keep default tooltip positioning (above the icon) */
+
+.otros-gasto-line {}
+
+.btn-remove-otros-gasto {
+  background-color: #f3ebeb;
+  /* color: #53868b; */
+  padding: 0 10px;
+  border: 1px solid #b64c4c;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  width: 2rem;
+  height: 2rem;
+}
+
+.btn-remove-otros-gasto:hover {
+  background-color: #e1cdcd;
+}
+
+.btn-remove-otros-gasto .btn-icon {
+  color: #b64c4c;
+  font-size: 1.4rem;
+  font-weight: 200;
+  margin-right: 0;
+  line-height: 1;
+  transform: rotate(45deg);
+}
+
+.btn-eliminar-desplazamiento {
+    background-color: #f3ebeb;
+    color: #b64c4c;
+    padding: 7px 1rem 5px 1rem;
+    border: 1px solid #b64c4c;
+    border-radius: 4px;
+    cursor: pointer;
+    position: absolute;
+    top: 0.9rem;
+    right: 1rem;
+    font-size: 0.8rem;
+    transition: background-color 0.2s 
+ease;
 }
 
 /* Icono en botones de eliminar */
@@ -513,7 +609,7 @@ input[type="number"]:focus {
 }
 
 .btn-eliminar-desplazamiento:hover {
-  background-color: #b22f3f;
+  background-color: #e1cdcd;
 }
 
 /* Focus style for accordion titles */

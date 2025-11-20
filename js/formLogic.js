@@ -451,7 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <input type="text" id="referencia-${proyectoCounter}" name="referencia-${proyectoCounter}" class="referencia-proyecto" maxlength="50" required />
           </div>
         </div>
-  <button type="button" class="btn-eliminar-proyecto" aria-label="Eliminar proyecto ${proyectoCounter}"><svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6zm2 3h14l-1.2 11.3A2 2 0 0 1 15.8 22H8.2a2 2 0 0 1-1.99-1.7L5 9zm5-7h4l1 1H9l1-1z"/></svg>Eliminar</button>
+  <button type="button" class="btn-eliminar-proyecto" aria-label="Eliminar proyecto ${proyectoCounter}"><span class="btn-icon btn-icon-minus" aria-hidden="true">−</span>Eliminar</button>
     `;
 
     // Añadir clase de entrada para animación
@@ -1376,9 +1376,23 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
 
-      
+      <!-- Otros gastos: botón y contenedor (las nuevas líneas irán debajo del botón) por desplazamiento -->
+      <div class="otros-gastos-wrapper">
+        <div class="otros-gastos-controls">
+          <button type="button" class="btn-otros-gastos">
+            <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
+            Otros gastos
+          </button>
+          <span class="warn-wrapper" tabindex="0" aria-label="Información sobre otros gastos">
+            <span class="warn-icon" aria-hidden="true">ℹ️</span>
+            <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto que financia esta liquidación</span>
+          </span>
+        </div>
 
-  <button type="button" class="btn-eliminar-desplazamiento" aria-label="Eliminar desplazamiento ${desplazamientoCounter}"><svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6zm2 3h14l-1.2 11.3A2 2 0 0 1 15.8 22H8.2a2 2 0 0 1-1.99-1.7L5 9zm5-7h4l1 1H9l1-1z"/></svg>Eliminar</button>
+        <div class="otros-gastos-container" id="otros-gastos-${desplazamientoCounter}"></div>
+      </div>
+
+  <button type="button" class="btn-eliminar-desplazamiento" aria-label="Eliminar desplazamiento ${desplazamientoCounter}"><span class="btn-icon btn-icon-minus" aria-hidden="true">−</span>Eliminar</button>
     `;
 
   // Animación de entrada
@@ -1410,6 +1424,76 @@ document.addEventListener("DOMContentLoaded", () => {
 
     return nuevoDesplazamiento;
   }
+
+  // Crear una línea de "otros gastos" dentro de una ficha de desplazamiento
+  function crearLineaOtroGasto(despEl) {
+    const cont = despEl.querySelector('.otros-gastos-container');
+    if (!cont) return null;
+    const linea = document.createElement('div');
+    linea.className = 'otros-gasto-line form-row three-cols-25-50-25';
+    linea.innerHTML = `
+      <div class="form-group">
+        <label>Tipo de gasto:</label>
+        <select class="otros-gasto-tipo"></select>
+      </div>
+      <div class="form-group">
+        <label>Descripción:</label>
+        <input type="text" class="otros-gasto-desc" />
+      </div>
+      <div class="form-group">
+        <label>Importe:</label>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <input type="text" class="format-alojamiento otros-gasto-importe" placeholder="0,00 €" />
+          <button type="button" class="btn-remove-otros-gasto" aria-label="Eliminar otro gasto"><span class="btn-icon btn-icon-minus" aria-hidden="true">+</span></button>
+        </div>
+      </div>
+    `;
+
+    // Poblamos el select desde los datos cargados
+    const select = linea.querySelector('.otros-gasto-tipo');
+    const otros = (window.__sgtriDatos && window.__sgtriDatos.otrosGastos) ? window.__sgtriDatos.otrosGastos : [];
+    if (select) {
+      otros.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item[1] || item[0];
+        opt.textContent = item[0];
+        select.appendChild(opt);
+      });
+    }
+
+    cont.appendChild(linea);
+    return linea;
+  }
+
+  // Manejo por delegación de eventos dentro de desplazamientosContainer para otros gastos
+  desplazamientosContainer.addEventListener('click', (e) => {
+    // Pulsar el botón '+ Otros gastos'
+    const targetAdd = e.target.closest && e.target.closest('.btn-otros-gastos');
+    if (targetAdd) {
+      const grupo = targetAdd.closest('.desplazamiento-grupo');
+      if (!grupo) return;
+      const cont = grupo.querySelector('.otros-gastos-container');
+      if (cont.style.display === 'none' || cont.style.display === '') {
+        cont.style.display = 'block';
+      }
+      // Añadir una línea nueva
+      const nueva = crearLineaOtroGasto(grupo);
+      if (nueva) {
+        // Autoenfocar el campo descripción
+        const inp = nueva.querySelector('.otros-gasto-desc');
+        if (inp) setTimeout(() => inp.focus(), 80);
+      }
+      return;
+    }
+
+    // Pulsar el botón '-' para eliminar una línea de otros gastos
+    const targetRemove = e.target.closest && e.target.closest('.btn-remove-otros-gasto');
+    if (targetRemove) {
+      const linea = targetRemove.closest('.otros-gasto-line');
+      if (linea && linea.parentNode) linea.parentNode.removeChild(linea);
+      return;
+    }
+  });
 
   // Función para actualizar los números de los desplazamientos
   function actualizarNumerosDesplazamientos() {

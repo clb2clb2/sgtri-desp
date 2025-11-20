@@ -27,6 +27,19 @@
     [ "Otros proyectos R.D. 462/2002", "NAL" ],
     [ "Otros proyectos Decreto 42/2025", "JEX" ]
   ],
+  "otrosGastos": [
+    ["Avión / Tren / Autobús", "AVN"],
+    ["Peaje", "PJE"],
+    ["Taxi", "TAX"],
+    ["Aparcamiento", "PRK"],
+    ["Transfer o Traslados", "TRF"],
+    ["Gastos de instalación", "INS"],
+    ["Alquiler de coche", "ALQ"],
+    ["Seguro de accidentes", "SAC"],
+    ["Seguro médico", "SME"],
+    ["Tasa turística", "TTR"],
+    ["Tasa agencia de viajes", "TAG"]
+],
   "kmTarifas": {
     "coche": 0.26,
     "motocicleta": 0.106

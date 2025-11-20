@@ -231,13 +231,12 @@
                     </div>
                     <div class="form-group">
                       <label for="cruce-vuelta-1">Cruce de fronteras vuelta</label>
-                      <input type="text" class="input-fecha" id="cruce-vuelta-1" name="cruce-vuelta-1"
-                        placeholder="dd/mm/aa" />
+                      <input type="text" class="input-fecha" id="cruce-vuelta-1" name="cruce-vuelta-1" placeholder="dd/mm/aa" />
                     </div>
-                  </div>
-                </div>
+                    </div>
+                    </div>
 
-                <!-- tercera fila eliminada: redundante con la fila superior -->
+                        <!-- tercera fila eliminada: redundante con la fila superior -->
 
                 <div class="form-group">
                   <label for="motivo-1">Motivo del desplazamiento:</label>
@@ -257,6 +256,22 @@
                 </div>
 
                 <!-- (duplicado eliminado) -->
+
+                <!-- Otros gastos: botón y contenedor (las nuevas líneas irán debajo del botón) -->
+                <div class="otros-gastos-wrapper">
+                  <div class="otros-gastos-controls">
+                    <button type="button" class="btn-otros-gastos">
+                      <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
+                      Otros gastos
+                    </button>
+                    <span class="warn-wrapper" tabindex="0" aria-label="Información sobre otros gastos">
+                      <span class="warn-icon" aria-hidden="true">ℹ️</span>
+                      <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto que financia esta liquidación</span>
+                    </span>
+                  </div>
+
+                  <div class="otros-gastos-container" id="otros-gastos-1"></div>
+                </div>
 
                 <button type="button" class="btn-eliminar-desplazamiento" style="display: none;" aria-label="Eliminar desplazamiento 1">
                   <span class="btn-icon btn-icon-minus" aria-hidden="true">−</span>
@@ -348,8 +363,7 @@
             </div>
             <!-- Mensaje de descuento calculado (se muestra sólo si hay importe > 0) -->
             <div id="descuento-manut-message" class="conditional-row" style="display:none; margin-top: 0.6rem;">
-              <label>Se descontarán <span id="descuento-manut-amount">0,00 €</span> al importe final de la
-                liquidación.</label>
+              <label>Se descontarán <span id="descuento-manut-amount">0,00 €</span> al importe final de manutención.</label>
             </div>
             <input type="hidden" id="descuento-manut-congreso" name="descuento-manut-congreso" value="0.00" />
           </form>
