@@ -1429,37 +1429,71 @@ document.addEventListener("DOMContentLoaded", () => {
   function crearLineaOtroGasto(despEl) {
     const cont = despEl.querySelector('.otros-gastos-container');
     if (!cont) return null;
+    // Crear elementos de forma programática para evitar malformaciones HTML
     const linea = document.createElement('div');
     linea.className = 'otros-gasto-line form-row three-cols-25-50-25';
-    linea.innerHTML = `
-      <div class="form-group">
-        <label>Tipo de gasto:</label>
-        <select class="otros-gasto-tipo"></select>
-      </div>
-      <div class="form-group">
-        <label>Descripción:</label>
-        <input type="text" class="otros-gasto-desc" />
-      </div>
-      <div class="form-group">
-        <label>Importe:</label>
-        <div style="display:flex;align-items:center;gap:0.5rem;">
-          <input type="text" class="format-alojamiento otros-gasto-importe" placeholder="0,00 €" />
-          <button type="button" class="btn-remove-otros-gasto" aria-label="Eliminar otro gasto"><span class="btn-icon btn-icon-minus" aria-hidden="true">+</span></button>
-        </div>
-      </div>
-    `;
+
+    // Columna: Tipo
+    const colTipo = document.createElement('div');
+    colTipo.className = 'form-group';
+    const labelTipo = document.createElement('label');
+    labelTipo.textContent = 'Tipo de gasto:';
+    const selectTipo = document.createElement('select');
+    selectTipo.className = 'otros-gasto-tipo';
+    colTipo.appendChild(labelTipo);
+    colTipo.appendChild(selectTipo);
+
+    // Columna: Descripción
+    const colDesc = document.createElement('div');
+    colDesc.className = 'form-group';
+    const labelDesc = document.createElement('label');
+    labelDesc.textContent = 'Descripción:';
+    const inputDesc = document.createElement('input');
+    inputDesc.type = 'text';
+    inputDesc.className = 'otros-gasto-desc';
+    colDesc.appendChild(labelDesc);
+    colDesc.appendChild(inputDesc);
+
+    // Columna: Importe + botón eliminar
+    const colImporte = document.createElement('div');
+    colImporte.className = 'form-group';
+    const labelImp = document.createElement('label');
+    labelImp.textContent = 'Importe:';
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '0.5rem';
+    const inputImp = document.createElement('input');
+    inputImp.type = 'text';
+    inputImp.className = 'format-alojamiento otros-gasto-importe';
+    inputImp.placeholder = '0,00 €';
+    const btnRemove = document.createElement('button');
+    btnRemove.type = 'button';
+    btnRemove.className = 'btn-remove-otros-gasto';
+    btnRemove.setAttribute('aria-label', 'Eliminar otro gasto');
+    const spanIcon = document.createElement('span');
+    spanIcon.className = 'btn-icon btn-icon-minus';
+    spanIcon.setAttribute('aria-hidden', 'true');
+    spanIcon.textContent = '+';
+    btnRemove.appendChild(spanIcon);
+
+    wrapper.appendChild(inputImp);
+    wrapper.appendChild(btnRemove);
+    colImporte.appendChild(labelImp);
+    colImporte.appendChild(wrapper);
+
+    linea.appendChild(colTipo);
+    linea.appendChild(colDesc);
+    linea.appendChild(colImporte);
 
     // Poblamos el select desde los datos cargados
-    const select = linea.querySelector('.otros-gasto-tipo');
     const otros = (window.__sgtriDatos && window.__sgtriDatos.otrosGastos) ? window.__sgtriDatos.otrosGastos : [];
-    if (select) {
-      otros.forEach(item => {
-        const opt = document.createElement('option');
-        opt.value = item[1] || item[0];
-        opt.textContent = item[0];
-        select.appendChild(opt);
-      });
-    }
+    otros.forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item[1] || item[0];
+      opt.textContent = item[0];
+      selectTipo.appendChild(opt);
+    });
 
     cont.appendChild(linea);
     return linea;

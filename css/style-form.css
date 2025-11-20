@@ -553,8 +553,6 @@ input[type="number"]:focus {
 /* Position tooltip to the right of the icon when inside the controls near the button */
 /* No override: keep default tooltip positioning (above the icon) */
 
-.otros-gasto-line {}
-
 .btn-remove-otros-gasto {
   background-color: #f3ebeb;
   /* color: #53868b; */
