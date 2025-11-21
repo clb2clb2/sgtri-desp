@@ -550,6 +550,16 @@ input[type="number"]:focus {
   /* hidden by default; JS will toggle inline style */
 }
 
+/* Mostrar etiquetas sólo en la primera línea de 'Otros gastos'.
+   Todas las demás líneas contienen los campos pero sin etiquetas visibles; los inputs
+   disponen de `aria-label` para accesibilidad. */
+.otros-gastos-container .otros-gasto-line label {
+  display: none;
+}
+.otros-gastos-container .otros-gasto-line:first-child label {
+  display: block;
+}
+
 /* Position tooltip to the right of the icon when inside the controls near the button */
 /* No override: keep default tooltip positioning (above the icon) */
 

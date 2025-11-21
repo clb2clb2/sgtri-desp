@@ -704,6 +704,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const id = desplazamientoId; setTimeout(() => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); }, 60);
       } catch (e) {}
     }
+    // After handling the UI specifics for this desplazamiento, recalculate ALL desplazamientos
+    // because country-specific rates/limits may affect other fichas.
+    try {
+      setTimeout(() => {
+        document.querySelectorAll('.desplazamiento-grupo').forEach(el => {
+          const did = el.dataset && el.dataset.desplazamientoId ? el.dataset.desplazamientoId : null;
+          if (did) try { recalculateDesplazamientoById(did); } catch (e) { /* ignore individual recalc errors */ }
+        });
+      }, 120);
+    } catch (e) { /* ignore */ }
   }
 
   // Función para poblar select de países
@@ -1440,6 +1450,7 @@ document.addEventListener("DOMContentLoaded", () => {
     labelTipo.textContent = 'Tipo de gasto:';
     const selectTipo = document.createElement('select');
     selectTipo.className = 'otros-gasto-tipo';
+    selectTipo.setAttribute('aria-label', 'Tipo de gasto');
     colTipo.appendChild(labelTipo);
     colTipo.appendChild(selectTipo);
 
@@ -1451,6 +1462,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const inputDesc = document.createElement('input');
     inputDesc.type = 'text';
     inputDesc.className = 'otros-gasto-desc';
+    inputDesc.setAttribute('aria-label', 'Descripción del gasto');
     colDesc.appendChild(labelDesc);
     colDesc.appendChild(inputDesc);
 
@@ -1467,6 +1479,7 @@ document.addEventListener("DOMContentLoaded", () => {
     inputImp.type = 'text';
     inputImp.className = 'format-alojamiento otros-gasto-importe';
     inputImp.placeholder = '0,00 €';
+    inputImp.setAttribute('aria-label', 'Importe del gasto');
     const btnRemove = document.createElement('button');
     btnRemove.type = 'button';
     btnRemove.className = 'btn-remove-otros-gasto';
@@ -1496,6 +1509,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     cont.appendChild(linea);
+
+    // Añadir listener para recalcular cuando cambie el importe en esta línea
+    try {
+      const grupo = cont.closest && cont.closest('.desplazamiento-grupo');
+      const gid = grupo && grupo.dataset && grupo.dataset.desplazamientoId ? grupo.dataset.desplazamientoId : null;
+      if (gid) {
+        // pequeño debounce
+        let t = null;
+        inputImp.addEventListener('input', () => {
+          if (t) clearTimeout(t);
+          t = setTimeout(() => { try { recalculateDesplazamientoById(gid); } catch(e){} }, 180);
+        });
+      }
+    } catch (e) { /* ignore */ }
+
     return linea;
   }
 
@@ -1516,6 +1544,8 @@ document.addEventListener("DOMContentLoaded", () => {
         // Autoenfocar el campo descripción
         const inp = nueva.querySelector('.otros-gasto-desc');
         if (inp) setTimeout(() => inp.focus(), 80);
+        // Recalcular para actualizar totales (incluyendo 'Otros gastos')
+        try { const gid = grupo.dataset && grupo.dataset.desplazamientoId ? grupo.dataset.desplazamientoId : null; if (gid) recalculateDesplazamientoById(gid); } catch(e) {}
       }
       return;
     }
@@ -1524,7 +1554,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const targetRemove = e.target.closest && e.target.closest('.btn-remove-otros-gasto');
     if (targetRemove) {
       const linea = targetRemove.closest('.otros-gasto-line');
-      if (linea && linea.parentNode) linea.parentNode.removeChild(linea);
+      if (linea && linea.parentNode) {
+        const grupo = linea.closest('.desplazamiento-grupo');
+        const gid = grupo && grupo.dataset && grupo.dataset.desplazamientoId ? grupo.dataset.desplazamientoId : null;
+        linea.parentNode.removeChild(linea);
+        try { if (gid) recalculateDesplazamientoById(gid); } catch(e) {}
+      }
       return;
     }
   });
@@ -1816,6 +1851,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderCalcResult(despEl, result) {
       if (!despEl || !result) return;
+        // Sumar importes de "Otros gastos" presentes en esta ficha
+        function parseAmountInput(val) {
+          if (!val && val !== 0) return 0;
+          let s = String(val || '').trim();
+          if (s === '') return 0;
+          // Typical formats: "1.234,56 €" or "1234,56" or "1234.56" or "1234"
+          // Remove currency symbols and spaces
+          s = s.replace(/[^0-9,\.\-]/g, '');
+          // If contains comma and dot, assume dot is thousands sep -> remove dots, replace comma with dot
+          if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+            s = s.replace(/\./g, '');
+            s = s.replace(/,/g, '.');
+          } else {
+            // If contains comma but not dot, treat comma as decimal separator
+            if (s.indexOf(',') !== -1) s = s.replace(/,/g, '.');
+          }
+          const n = parseFloat(s);
+          return isNaN(n) ? 0 : n;
+        }
+        const otrosInputs = (despEl.querySelectorAll && Array.from(despEl.querySelectorAll('.otros-gasto-importe'))) || [];
+        const otrosSumNum = otrosInputs.reduce((acc, inp) => acc + parseAmountInput(inp.value), 0);
+        const otrosSumFmt = (n => (Number(n) || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))(otrosSumNum);
       let out = despEl.querySelector('.calc-result');
       // Format numbers with '.' as thousands separator and ',' as decimal (de-DE)
       const fmt = (n, opts) => (Number(n) || 0).toLocaleString('de-DE', Object.assign({ minimumFractionDigits: 2, maximumFractionDigits: 2 }, opts || {}));
@@ -1923,6 +1980,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const id = despEl.dataset && despEl.dataset.desplazamientoId ? despEl.dataset.desplazamientoId : Math.random().toString(36).slice(2,8);
 
+      // Determinar si el usuario ha proporcionado fechas/horas completas
+      const fechaIdEl = despEl.querySelector(`#fecha-ida-${id}`);
+      const horaIdEl = despEl.querySelector(`#hora-ida-${id}`);
+      const fechaRegEl = despEl.querySelector(`#fecha-regreso-${id}`);
+      const horaRegEl = despEl.querySelector(`#hora-regreso-${id}`);
+      const hasFullDates = fechaIdEl && fechaIdEl.value && horaIdEl && horaIdEl.value && fechaRegEl && fechaRegEl.value && horaRegEl && horaRegEl.value;
+      // Km y alojamiento introducidos por el usuario (parseo ligero)
+      const kmInputEl = despEl.querySelector(`#km-${id}`);
+      const parseNumberFromInput = (v) => {
+        if (v === null || typeof v === 'undefined') return 0;
+        const s = String(v).replace(/[^0-9,\.\-]/g, '').replace(/\./g, '').replace(/,/g, '.');
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
+      };
+      const kmNumInput = kmInputEl ? parseNumberFromInput(kmInputEl.value) : 0;
+      const alojInputEl = despEl.querySelector(`#alojamiento-${id}`);
+      const alojUserInputNum = alojInputEl ? parseNumberFromInput(alojInputEl.value) : 0;
+      // Mostrar/ocultar líneas según regla: only show when > 0 (and manut only when full dates present)
+      const showManut = hasFullDates && (Number(result.manutencionesAmount || 0) > 0);
+      const showKm = kmNumInput > 0 || (typeof result.kmAmount !== 'undefined' && Number(result.kmAmount || 0) > 0);
+      const showAloj = alojUserInputNum > 0 || (typeof result.alojamiento !== 'undefined' && Number(result.alojamiento || 0) > 0);
+      const showOtros = otrosSumNum > 0;
+
       // If we received segmentsResults, render each segment separately and then show km
       if (result && Array.isArray(result.segmentsResults)) {
         const segs = result.segmentsResults;
@@ -1947,7 +2027,9 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="calc-seg-title">${segTitle}</div>
               <div class="calc-line"><span class="label">${manutLabelSeg}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmountSeg} €</span></div>
               ${irpfLineSeg}
-              <div class="calc-line aloj-line"><span class="label">Alojamiento máx: ${alojMaxTxt}</span><span class="leader" aria-hidden="true"></span><span class="amount aloj">${alojSegAmountDisplayed} €</span></div>
+                  <!-- For international segments, show the alojamiento MAX description inside brackets
+                    and remove the dotted leader/amount on the right (user amount appears in TOTALES). -->
+                  <div class="calc-line aloj-line"><span class="label">[ Alojamiento máx: ${alojMaxTxt} = ${alojSegAmountDisplayed} € ]</span></div>
             </div>
           `;
         }).join('');
@@ -1990,15 +2072,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const alojAggregatedHtml = `<div class="calc-line aloj-aggregated${alojExceeds ? ' error-line' : ''}"><span class="label">Alojamiento: <em>[ máx. ${totalAlojMaxDisplayed} € ]</em></span><span class="leader" aria-hidden="true"></span><span class="aloj-user">${alojWarn}<span class="amount aloj-user${alojExceeds ? ' error-amount' : ''}">${alojUserStr} €</span></span></div>`;
 
         const badgeHtml = result.residenciaEventual ? '<div class="residencia-eventual-badge">Residencia Eventual</div>' : '';
+        const otrosHtmlComposite = `<div class="calc-line"><span class="label">Total otros gastos</span><span class="leader" aria-hidden="true"></span><span class="amount otros-gastos-total">${otrosSumFmt} €</span></div>`;
+        // In segmented (international) results show the aggregated manutenciones
+        // when the summed value across segments is > 0, regardless of per-result flag.
+        const pieceManut = (Number(totalManut) > 0) ? manutTotalHtml : '';
+        const pieceAloj = showAloj ? alojAggregatedHtml : '';
+        const pieceKm = showKm ? kmLineHtml : '';
+        const pieceOtros = showOtros ? otrosHtmlComposite : '';
+
         const htmlSeg = `
           <div class="calc-result composite" data-desp-id="${id}">
             ${badgeHtml}
             ${segHtml}
             <div class="calc-seg-title">TOTALES:</div>
-            ${manutTotalHtml}
-            ${alojAggregatedHtml}
-            ${kmLineHtml}
-            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${fmt((totalManut + Number(result.kmAmount || 0) + alojUserNum))} €</strong></span></div>
+            ${pieceManut}
+            ${pieceAloj}
+            ${pieceKm}
+            ${pieceOtros}
+            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${fmt((totalManut + Number(result.kmAmount || 0) + alojUserNum + otrosSumNum))} €</strong></span></div>
             ${irpfTotalHtml}
           </div>
         `;
@@ -2009,14 +2100,24 @@ document.addEventListener("DOMContentLoaded", () => {
         const irpfSingleHtml = (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? `<div class="calc-total"><span class="label">Sujeto a retención:</span><span class="amount"><span class="irpf-total-val">${irpfSujetoStr} €</span></span></div>` : '';
 
         const badgeHtmlSingle = result.residenciaEventual ? '<div class="residencia-eventual-badge">Residencia Eventual</div>' : '';
+        // Formatear total incluyendo "Otros gastos"
+        const totalWithOtrosFmt = fmt(totalVal + otrosSumNum);
+        const otrosHtmlSingle = `<div class="calc-line"><span class="label">Total otros gastos</span><span class="leader" aria-hidden="true"></span><span class="amount otros-gastos-total">${otrosSumFmt} €</span></div>`;
+
+        // Conditionally show lines only si los importes son > 0 (y manut sólo si fechas completas)
+        const pieceManutSingle = showManut ? `<div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmount} €</span></div>` : '';
+        const pieceAlojSingle = showAloj ? `<div class="calc-line aloj-line${alojamientoExceedsMax ? ' error-line' : ''}"><span class="label">${alojamientoLabel}</span><span class="leader" aria-hidden="true"></span>${alojamientoAmountHtml.replace('class="amount', 'class="amount aloj')}</div>` : '';
+        const pieceKmSingle = showKm ? `<div class="calc-line"><span class="label">${kmLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmount} €</span></div>` : '';
+        const pieceOtrosSingle = showOtros ? otrosHtmlSingle : '';
+
         const html = `
           <div class="calc-result" aria-live="polite" data-desp-id="${id}">
             ${badgeHtmlSingle}
-            <div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmount} €</span></div>
-            <div class="calc-line aloj-line${alojamientoExceedsMax ? ' error-line' : ''}"><span class="label">${alojamientoLabel}</span><span class="leader" aria-hidden="true"></span>${alojamientoAmountHtml.replace('class="amount', 'class="amount aloj')}</div>
-            
-            <div class="calc-line"><span class="label">${kmLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmount} €</span></div>
-            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalStr} €</strong></span></div>
+            ${pieceManutSingle}
+            ${pieceAlojSingle}
+            ${pieceKmSingle}
+            ${pieceOtrosSingle}
+            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalWithOtrosFmt} €</strong></span></div>
             ${irpfSingleHtml}
             ${ (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? ( (result && typeof result.paisIndex !== 'undefined' && Number(result.paisIndex) === 0) ? '' : irpfLimitsNote ) : '' }
             ${ (irpfSujetoVal && Number(irpfSujetoVal) > 0) ? ( (result && typeof result.paisIndex !== 'undefined' && Number(result.paisIndex) === 0) ? '' : irpfDetailsHtml ) : '' }
@@ -2183,7 +2284,33 @@ document.addEventListener("DOMContentLoaded", () => {
     const data = collectDesplazamientoData(desp);
     // Show calculations if both dates/times provided OR if user provided km/alojamiento
     const hasDatesTimes = data.fechaIda && data.horaIda && data.fechaRegreso && data.horaRegreso;
-    const hasKmOrAlojamiento = (Number(data.km) > 0) || (data.alojamiento && String(data.alojamiento).trim() !== '');
+
+    // Helper: parse numerics from user-entered strings (accepts formats like "1.234,56 €", "1234,56", "123 km")
+    function parseNumericLoose(v) {
+      if (v === null || typeof v === 'undefined') return 0;
+      let s = String(v).trim();
+      if (s === '') return 0;
+      // remove common non-numeric characters (currency symbols, units, spaces)
+      s = s.replace(/[^0-9,\.\-]/g, '');
+      // If both dot and comma present, assume dot is thousands sep -> remove dots, comma decimal
+      if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+        s = s.replace(/\./g, '');
+        s = s.replace(/,/g, '.');
+      } else {
+        // If only comma present, treat as decimal separator
+        if (s.indexOf(',') !== -1) s = s.replace(/,/g, '.');
+      }
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : n;
+    }
+
+    const kmNum = parseNumericLoose(data.km);
+    const alojNum = parseNumericLoose(data.alojamiento);
+    // Also consider any "otros gastos" presentes in the desplazamiento
+    const otrosInputs = (desp.querySelectorAll && Array.from(desp.querySelectorAll('.otros-gasto-importe'))) || [];
+    const otrosSumNum = otrosInputs.reduce((acc, inp) => acc + parseNumericLoose(inp.value), 0);
+
+    const hasKmOrAlojamiento = kmNum > 0 || alojNum > 0 || otrosSumNum > 0;
     if (!hasDatesTimes && !hasKmOrAlojamiento) {
       const existing = desp.querySelector('.calc-result');
       if (existing) existing.remove();
@@ -2480,7 +2607,13 @@ document.addEventListener("DOMContentLoaded", () => {
         n.addEventListener('input', () => { /* do not recalc/show-hide on input */ });
         // For selects, apply change immediately (more natural UX). For other inputs, defer to blur.
         if (n.tagName === 'SELECT') {
-          n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); actualizarTicketCena(); try { if (typeof computeDescuentoManutencion === 'function') computeDescuentoManutencion(); } catch(e){} });
+          // If this select is the country selector, handle via manejarCambioPais so
+          // that changing country forces recalculation of ALL desplazamientos.
+          if (n.id && n.id.indexOf('pais-destino-') === 0) {
+            n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); try { manejarCambioPais(id); } catch(e){}; actualizarTicketCena(); try { if (typeof computeDescuentoManutencion === 'function') computeDescuentoManutencion(); } catch(e){} });
+          } else {
+            n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); actualizarTicketCena(); try { if (typeof computeDescuentoManutencion === 'function') computeDescuentoManutencion(); } catch(e){} });
+          }
         } else {
           // On change we defer to blur to avoid flicker while typing
           n.addEventListener('change', () => { /* noop: defer to blur */ });
