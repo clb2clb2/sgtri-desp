@@ -258,15 +258,20 @@
 
                 <!-- Otros gastos: botón y contenedor (las nuevas líneas irán debajo del botón) -->
                 <div class="otros-gastos-wrapper">
-                  <div class="otros-gastos-controls">
-                    <button type="button" class="btn-otros-gastos">
-                      <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
-                      Otros gastos
-                    </button>
-                    <span class="warn-wrapper" tabindex="0" aria-label="Información sobre otros gastos">
-                      <span class="warn-icon" aria-hidden="true">ℹ️</span>
-                      <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto que financia esta liquidación</span>
-                    </span>
+                  <div class="otros-gastos-row">
+                    <div class="otros-gastos-left">
+                      <label for="no-manutencion-1" class="no-manut-label"><input type="checkbox" id="no-manutencion-1" class="no-manutencion"> No incluir gastos de manutención:</label>
+                    </div>
+                    <div class="otros-gastos-right">
+                      <button type="button" class="btn-otros-gastos">
+                        <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
+                        Otros gastos
+                      </button>
+                      <span class="warn-wrapper" tabindex="0" aria-label="Información sobre otros gastos">
+                        <span class="warn-icon" aria-hidden="true">ℹ️</span>
+                        <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto que financia esta liquidación</span>
+                      </span>
+                    </div>
                   </div>
 
                   <div class="otros-gastos-container" id="otros-gastos-1"></div>

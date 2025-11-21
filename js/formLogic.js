@@ -678,16 +678,13 @@ document.addEventListener("DOMContentLoaded", () => {
       fronterasFields.style.display = 'block';
       cruceIda.required = true;
       cruceVuelta.required = true;
-      // Immediately remove/hide any existing calc-result until cruces are valid
+      // Re-validate cruces; validation decides whether to hide or keep calc-result
       try {
-        const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${desplazamientoId}"]`);
-        if (desp) {
-          const calc = desp.querySelector('.calc-result'); if (calc && calc.parentNode) calc.parentNode.removeChild(calc);
-          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
-        }
-        // Then run validation which will insert the specific error message under fronteras
         validateCrucesAndUpdateUI(desplazamientoId);
       } catch (e) {}
+      // No insertamos avisos aquí. Si faltan cruces, la validación marcará
+      // el desplazamiento como inválido; el flujo de recálculo forzará la
+      // exclusión de manutención (manutención = 0) sin mostrar mensajes.
     } else {
       fronterasFields.style.display = 'none';
       cruceIda.required = false;
@@ -701,18 +698,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const existingMsg = document.getElementById(`cruce-order-error-${desplazamientoId}`);
         if (existingMsg && existingMsg.parentNode) existingMsg.parentNode.removeChild(existingMsg);
         // trigger recalculation to show calc-result again if dates/times present
-        const id = desplazamientoId; setTimeout(() => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); }, 60);
+        const id = desplazamientoId; setTimeout(() => { validateDateTimePairAndUpdateUI(id); scheduleRecalcForId(id); }, 60);
       } catch (e) {}
     }
     // After handling the UI specifics for this desplazamiento, recalculate ALL desplazamientos
     // because country-specific rates/limits may affect other fichas.
     try {
-      setTimeout(() => {
-        document.querySelectorAll('.desplazamiento-grupo').forEach(el => {
-          const did = el.dataset && el.dataset.desplazamientoId ? el.dataset.desplazamientoId : null;
-          if (did) try { recalculateDesplazamientoById(did); } catch (e) { /* ignore individual recalc errors */ }
-        });
-      }, 120);
+      // Debounce y time-slice del recálculo completo para evitar bloqueos UI
+      scheduleFullRecalc(120);
     } catch (e) { /* ignore */ }
   }
 
@@ -883,6 +876,93 @@ document.addEventListener("DOMContentLoaded", () => {
     return { hh, mm };
   }
 
+  // Helper: parsear cadenas con formato monetario/numérico españoles a Number (0 si no válido)
+  function parseNumericLoose(str) {
+    if (!str && str !== 0) return 0;
+    try {
+      const s = String(str || '').trim();
+      if (s === '') return 0;
+      // Aceptar formatos: "1.234,56 €", "1234,56", "1.234" , "1234" , "10 km"
+      // Eliminar símbolo euro, unidad km, espacios y letras
+      let cleaned = s.replace(/€/g, '').replace(/km/g, '').replace(/\s/g, '');
+      // If contains comma as decimal separator, replace thousands dots
+      if (/,/.test(cleaned) && /\./.test(cleaned)) {
+        cleaned = cleaned.replace(/\./g, '');
+      }
+      // Replace comma with dot for parseFloat
+      cleaned = cleaned.replace(/,/g, '.');
+      // Remove any non-digit/dot/negative
+      cleaned = cleaned.replace(/[^0-9.\-]/g, '');
+      const n = parseFloat(cleaned);
+      if (isNaN(n)) return 0;
+      return n;
+    } catch (e) { return 0; }
+  }
+
+  // Helper: suma de importes que no son manutención (km, alojamiento y otros gastos) para un desplazamiento
+  function sumNonManutencionAmounts(desp) {
+    try {
+      if (!desp) return 0;
+      // km
+      const kmEl = desp.querySelector('.format-km');
+      const km = kmEl ? parseNumericLoose(kmEl.value) : 0;
+      // alojamiento
+      const alojEl = desp.querySelector('.format-alojamiento');
+      const aloj = alojEl ? parseNumericLoose(alojEl.value) : 0;
+      // otros gastos
+      let otros = 0;
+      desp.querySelectorAll('.otros-gasto-importe').forEach(inp => { otros += parseNumericLoose(inp.value); });
+      // Return sum (note: km likely needs tariff elsewhere; here we just check >0 presence)
+      return Math.abs(km) + Math.abs(aloj) + Math.abs(otros);
+    } catch (e) { return 0; }
+  }
+
+  // --- Scheduler para recálculo masivo (debounced + time-sliced) ---
+  // Evita bloquear el hilo principal al forzar recálculos de todos los desplazamientos
+  // cuando el usuario cambia un país u otra opción global.
+  let _fullRecalcTimer = null;
+  function scheduleFullRecalc(debounceMs = 120) {
+    try {
+      if (_fullRecalcTimer) clearTimeout(_fullRecalcTimer);
+      _fullRecalcTimer = setTimeout(() => {
+        _fullRecalcTimer = null;
+        performFullRecalc();
+      }, debounceMs);
+    } catch (e) { /* ignore */ }
+  }
+
+  function performFullRecalc() {
+    try {
+      const nodes = Array.from(document.querySelectorAll('.desplazamiento-grupo')) || [];
+      const ids = nodes.map(n => n.dataset && n.dataset.desplazamientoId).filter(Boolean);
+      if (!ids || ids.length === 0) return;
+      // Procesar uno por frame para evitar largos bloqueos
+      let idx = 0;
+      function step() {
+        const id = ids[idx];
+        try { if (id) recalculateDesplazamientoById(id); } catch (e) { /* ignore per-id errors */ }
+        idx++;
+        if (idx < ids.length) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    } catch (e) { /* fallback: intentar recálculo inmediato */
+      try { document.querySelectorAll('.desplazamiento-grupo').forEach(el => { const id = el.dataset && el.dataset.desplazamientoId; if (id) try { recalculateDesplazamientoById(id); } catch (e) {} }); } catch (er) {}
+    }
+  }
+
+  // Debounce por-id para recalc de un único desplazamiento (evita trabajo inmediato repetido)
+  const _perIdTimers = Object.create(null);
+  function scheduleRecalcForId(id, ms = 60) {
+    try {
+      if (!id) return;
+      if (_perIdTimers[id]) clearTimeout(_perIdTimers[id]);
+      _perIdTimers[id] = setTimeout(() => {
+        try { recalculateDesplazamientoById(id); } catch (e) { /* ignore */ }
+        delete _perIdTimers[id];
+      }, ms);
+    } catch (e) { try { recalculateDesplazamientoById(id); } catch (er) {} }
+  }
+
   // Comprueba que fecha/hora de regreso es posterior a salida para un desplazamiento
   // y actualiza la UI: aplica/remueve clase de campo-error y oculta el calc-result si hay error.
   function validateDateTimePairAndUpdateUI(id) {
@@ -900,22 +980,40 @@ document.addEventListener("DOMContentLoaded", () => {
       const tId = parseTimeStrict(horaIdEl.value);
       const tReg = parseTimeStrict(horaRegEl.value);
 
-      // If any of the fields are partially filled or invalid, hide calc-result and mark invalid
+      // If any of the fields are partially filled or invalid, mark invalid.
+      // Instead of hiding the calc-result unconditionally, we keep it visible when
+      // existen otros importes (km, alojamiento u otros gastos) y forzamos manutención a 0.
       const calc = desp ? desp.querySelector('.calc-result') : null;
       const anyInvalidFormat = (!fId && fechaIdEl.value) || (!fReg && fechaRegEl.value) || (!tId && horaIdEl.value) || (!tReg && horaRegEl.value);
       if (anyInvalidFormat) {
-        // If user left an invalid format which we've cleared on blur, hide calc-result
-        // but DO NOT mark the fields in red (red is reserved for ordering errors).
         if (desp) { desp.dataset.dtInvalid = '1'; }
-        if (calc) calc.style.display = 'none';
-        const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
-        if (just) just.style.display = 'none';
+        const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
+        if (otherSum > 0) {
+          // show calc and trigger recalc which will zero manutenciones when dtInvalid flag present
+          if (calc) calc.style.display = '';
+          const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+          if (just) just.style.display = 'none';
+          try { scheduleRecalcForId(id); } catch(e) {}
+        } else {
+          if (calc) calc.style.display = 'none';
+          const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+          if (just) just.style.display = 'none';
+        }
         return false;
       }
 
       // If any are empty (not provided) and there is a dtInvalid flag, keep calc hidden until corrected
       if (!fId || !fReg || !tId || !tReg) {
         if (desp && desp.dataset && desp.dataset.dtInvalid === '1') {
+          const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
+          if (otherSum > 0) {
+            // keep visible and force manutención=0 via recalc
+            if (calc) calc.style.display = '';
+            const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+            if (just) just.style.display = 'none';
+            try { scheduleRecalcForId(id); } catch(e) {}
+            return false;
+          }
           if (calc) calc.style.display = 'none';
           const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
           if (just) just.style.display = 'none';
@@ -935,24 +1033,22 @@ document.addEventListener("DOMContentLoaded", () => {
       const dtReg = new Date(fReg.getFullYear(), fReg.getMonth(), fReg.getDate(), tReg.hh, tReg.mm, 0, 0);
 
       if (dtReg <= dtId) {
-        // invalid order: mark fields in red and hide calc-result
+        // invalid order: mark fields in red. Decide visibility based on other amounts
         [fechaIdEl, horaIdEl, fechaRegEl, horaRegEl].forEach(n => n && n.classList && n.classList.add('field-error'));
-        if (calc) calc.style.display = 'none';
-        const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
-        if (just) just.style.display = 'none';
-        // Insert inline message near the top row of this desplazamiento
-        try {
-          const existingMsg = desp ? desp.querySelector(`#dt-order-error-${id}`) : null;
-          if (!existingMsg && desp) {
-            const topRow = desp.querySelector('.form-row.four-cols-25');
-            const msg = document.createElement('div');
-            msg.id = `dt-order-error-${id}`;
-            msg.className = 'dt-order-error';
-            msg.textContent = 'El regreso debe ser posterior a la salida.';
-            if (topRow && topRow.parentNode) topRow.parentNode.insertBefore(msg, topRow.nextSibling);
-            else if (calc && calc.parentNode) calc.parentNode.insertBefore(msg, calc);
-          }
-        } catch (e) {}
+        const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
+        if (otherSum > 0) {
+          // keep calc visible and force manutencion 0 via recalc
+          if (calc) calc.style.display = '';
+          const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+          if (just) just.style.display = 'none';
+          try { scheduleRecalcForId(id); } catch(e) {}
+        } else {
+          if (calc) calc.style.display = 'none';
+          const just = desp ? desp.querySelector('.justificar-pernocta-field') : null;
+          if (just) just.style.display = 'none';
+        }
+        // No insertamos mensajes por orden incorrecta; marcamos campos con
+        // .field-error y dejamos que el recálculo muestre otros importes si procede.
         return false;
       }
 
@@ -964,8 +1060,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (just) just.style.display = '';
   // Remove any inline order message if present
   try { const existingMsg = desp ? desp.querySelector(`#dt-order-error-${id}`) : null; if (existingMsg && existingMsg.parentNode) existingMsg.parentNode.removeChild(existingMsg); } catch(e) {}
-  // trigger recalculation to ensure calc-result is in sync
-  recalculateDesplazamientoById(id);
+  // trigger recalculation to ensure calc-result is in sync (debounced)
+  scheduleRecalcForId(id);
       return true;
     } catch (e) {
       return false;
@@ -990,30 +1086,30 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!cruceIdEl || !cruceVueltaEl) {
         if (!isInternational) return true;
         // International but cruces inputs missing: treat as invalid until provided
-        // mark as invalid and show message
+        // mark as invalid and show message. Keep calc visible if other amounts exist.
         if (desp) { desp.dataset.dtInvalid = '1'; }
-        if (calc) calc.style.display = 'none';
-        try {
-          const existingMsg = desp.querySelector(`#cruce-order-error-${id}`);
-          if (!existingMsg && desp) {
-            const fronteras = desp.querySelector(`#fronteras-fields-${id}`);
-            const msg = document.createElement('div');
-            msg.id = `cruce-order-error-${id}`;
-            msg.className = 'dt-order-error';
-            msg.textContent = 'Por favor, revisa las fechas.';
-            // Insertar como hermano siguiente del contenedor de fronteras para que quede debajo, no dentro
-            if (fronteras && fronteras.insertAdjacentElement) fronteras.insertAdjacentElement('afterend', msg);
-            else if (fronteras && fronteras.parentNode) fronteras.parentNode.insertBefore(msg, fronteras.nextSibling);
-            else if (calc && calc.parentNode) calc.parentNode.insertBefore(msg, calc);
-          }
-        } catch (e) {}
+        const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
+        if (otherSum > 0) {
+          if (calc) calc.style.display = '';
+          try { scheduleRecalcForId(id); } catch(e) {}
+        } else {
+          if (calc) calc.style.display = 'none';
+        }
+        // No insertamos mensajes por cruces ausentes; la validación marca
+        // dtInvalid y el recálculo forzará manutención=0 si hay otros importes.
         return false;
       }
 
-      // If international and cruces exist but are empty -> hide calculations and wait (no message)
+      // If international and cruces exist but are empty -> consider invalid but keep calc visible
       if (isInternational && (String(cruceIdEl.value || '').trim() === '' || String(cruceVueltaEl.value || '').trim() === '')) {
         if (desp) { desp.dataset.dtInvalid = '1'; }
-        if (calc) calc.style.display = 'none';
+        const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
+        if (otherSum > 0) {
+          if (calc) calc.style.display = '';
+          try { scheduleRecalcForId(id); } catch(e) {}
+        } else {
+          if (calc) calc.style.display = 'none';
+        }
         // Do not show an inline error message for blank cruces; wait for user input
         return false;
       }
@@ -1023,32 +1119,32 @@ document.addEventListener("DOMContentLoaded", () => {
       const cId = parseDateStrict(cruceIdEl && cruceIdEl.value);
       const cV = parseDateStrict(cruceVueltaEl && cruceVueltaEl.value);
 
-      // If any cruce field has partial/invalid format -> hide calc and set dtInvalid
+      // If any cruce field has partial/invalid format -> mark invalid. Keep calc visible if other amounts exist
       const anyInvalidFormat = ((!cId && cruceIdEl.value) || (!cV && cruceVueltaEl.value));
       if (anyInvalidFormat) {
         if (desp) { desp.dataset.dtInvalid = '1'; }
-        if (calc) calc.style.display = 'none';
-        // Insert inline message telling user to review dates
-        try {
-          const existingMsg = desp.querySelector(`#cruce-order-error-${id}`);
-          if (!existingMsg && desp) {
-            const fronteras = desp.querySelector(`#fronteras-fields-${id}`);
-            const msg = document.createElement('div');
-            msg.id = `cruce-order-error-${id}`;
-            msg.className = 'dt-order-error';
-            msg.textContent = 'Por favor, revisa las fechas.';
-            if (fronteras && fronteras.insertAdjacentElement) fronteras.insertAdjacentElement('afterend', msg);
-            else if (fronteras && fronteras.parentNode) fronteras.parentNode.insertBefore(msg, fronteras.nextSibling);
-            else if (calc && calc.parentNode) calc.parentNode.insertBefore(msg, calc);
-          }
-        } catch (e) {}
-        // mark but do not set red unless ordering wrong
+        const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
+        if (otherSum > 0) {
+          if (calc) calc.style.display = '';
+          try { scheduleRecalcForId(id); } catch(e) {}
+        } else {
+          if (calc) calc.style.display = 'none';
+        }
+        // No insertamos mensajes por formato inválido; marcamos dtInvalid y
+        // continuamos para que recálculo pueda mostrar otros importes con
+        // manutención a 0.
         return false;
       }
 
-      // If any of the cruce fields are empty and dtInvalid flagged, keep calc hidden
+      // If any of the cruce fields are empty and dtInvalid flagged, keep calc hidden unless other amounts exist
       if (!cId || !cV) {
         if (desp && desp.dataset && desp.dataset.dtInvalid === '1') {
+          const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
+          if (otherSum > 0) {
+            if (calc) calc.style.display = '';
+            try { scheduleRecalcForId(id); } catch(e) {}
+            return false;
+          }
           if (calc) calc.style.display = 'none';
           return false;
         }
@@ -1064,23 +1160,17 @@ document.addEventListener("DOMContentLoaded", () => {
       if (cId && cV && cV < cId) orderingOk = false;
 
       if (!orderingOk) {
-        // mark cruces in red and hide calc
+        // mark cruces in red and hide calc unless other amounts present
         [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.add('field-error'));
-        if (calc) calc.style.display = 'none';
-        try {
-          const existingMsg = desp.querySelector(`#cruce-order-error-${id}`);
-          if (!existingMsg && desp) {
-            const fronteras = desp.querySelector(`#fronteras-fields-${id}`);
-            const msg = document.createElement('div');
-            msg.id = `cruce-order-error-${id}`;
-            msg.className = 'dt-order-error';
-            msg.textContent = 'Por favor, revisa las fechas.';
-            // Preferir insertar justo después del contenedor de fronteras para que el mensaje quede debajo
-            if (fronteras && fronteras.insertAdjacentElement) fronteras.insertAdjacentElement('afterend', msg);
-            else if (fronteras && fronteras.parentNode) fronteras.parentNode.insertBefore(msg, fronteras.nextSibling);
-            else if (calc && calc.parentNode) calc.parentNode.insertBefore(msg, calc);
-          }
-        } catch (e) {}
+        const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
+        if (otherSum > 0) {
+          if (calc) calc.style.display = '';
+          try { scheduleRecalcForId(id); } catch(e) {}
+        } else {
+          if (calc) calc.style.display = 'none';
+        }
+        // No insertamos mensajes por orden incorrecta; marcar campos con .field-error
+        // y dejar que el recálculo muestre totales no relacionados si procede.
         return false;
       }
 
@@ -1130,7 +1220,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
         if (final === '') {
           // mark this desplazamiento as having an invalid date/time input (cleared on blur)
-          if (desp) { desp.dataset.dtInvalid = '1'; const calc = desp.querySelector('.calc-result'); if (calc) calc.style.display = 'none'; const just = desp.querySelector('.justificar-pernocta-field'); if (just) just.style.display = 'none'; }
+          if (desp) {
+            desp.dataset.dtInvalid = '1';
+            const otherSum = sumNonManutencionAmounts(desp);
+            const calc = desp.querySelector('.calc-result');
+            const just = desp.querySelector('.justificar-pernocta-field');
+              if (otherSum > 0) {
+              if (calc) calc.style.display = '';
+              if (just) just.style.display = 'none';
+              try { scheduleRecalcForId(id); } catch(e) {}
+            } else {
+              if (calc) calc.style.display = 'none';
+              if (just) just.style.display = 'none';
+            }
+          }
         }
         validateDateTimePairAndUpdateUI(id);
       }
@@ -1146,7 +1249,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if (matchEmpty) {
           const id = matchEmpty[3];
           const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
-          if (desp) { desp.dataset.dtInvalid = '1'; const calc = desp.querySelector('.calc-result'); if (calc) calc.style.display = 'none'; const just = desp.querySelector('.justificar-pernocta-field'); if (just) just.style.display = 'none'; }
+          if (desp) {
+            desp.dataset.dtInvalid = '1';
+            const otherSum = sumNonManutencionAmounts(desp);
+            const calc = desp.querySelector('.calc-result');
+            const just = desp.querySelector('.justificar-pernocta-field');
+              if (otherSum > 0) {
+              if (calc) calc.style.display = '';
+              if (just) just.style.display = 'none';
+              try { scheduleRecalcForId(id); } catch(e) {}
+            } else {
+              if (calc) calc.style.display = 'none';
+              if (just) just.style.display = 'none';
+            }
+          }
           validateDateTimePairAndUpdateUI(id);
         }
         return;
@@ -1180,7 +1296,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const id = match[3];
         const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
         if (!valid) {
-          if (desp) { desp.dataset.dtInvalid = '1'; const calc = desp.querySelector('.calc-result'); if (calc) calc.style.display = 'none'; const just = desp.querySelector('.justificar-pernocta-field'); if (just) just.style.display = 'none'; }
+          if (desp) {
+            desp.dataset.dtInvalid = '1';
+            const otherSum = sumNonManutencionAmounts(desp);
+            const calc = desp.querySelector('.calc-result');
+            const just = desp.querySelector('.justificar-pernocta-field');
+              if (otherSum > 0) {
+              if (calc) calc.style.display = '';
+              if (just) just.style.display = 'none';
+              try { scheduleRecalcForId(id); } catch(e) {}
+            } else {
+              if (calc) calc.style.display = 'none';
+              if (just) just.style.display = 'none';
+            }
+          }
         }
         validateDateTimePairAndUpdateUI(id);
       }
@@ -1388,15 +1517,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
       <!-- Otros gastos: botón y contenedor (las nuevas líneas irán debajo del botón) por desplazamiento -->
       <div class="otros-gastos-wrapper">
-        <div class="otros-gastos-controls">
-          <button type="button" class="btn-otros-gastos">
-            <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
-            Otros gastos
-          </button>
-          <span class="warn-wrapper" tabindex="0" aria-label="Información sobre otros gastos">
-            <span class="warn-icon" aria-hidden="true">ℹ️</span>
-            <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto que financia esta liquidación</span>
-          </span>
+        <div class="otros-gastos-row">
+          <div class="otros-gastos-left">
+            <label for="no-manutencion-${desplazamientoCounter}" class="no-manut-label"><input type="checkbox" id="no-manutencion-${desplazamientoCounter}" class="no-manutencion"> No incluir gastos de manutención:</label>
+          </div>
+          <div class="otros-gastos-right">
+            <button type="button" class="btn-otros-gastos">
+              <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
+              Otros gastos
+            </button>
+            <span class="warn-wrapper" tabindex="0" aria-label="Información sobre otros gastos">
+              <span class="warn-icon" aria-hidden="true">ℹ️</span>
+              <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto que financia esta liquidación</span>
+            </span>
+          </div>
         </div>
 
         <div class="otros-gastos-container" id="otros-gastos-${desplazamientoCounter}"></div>
@@ -1515,11 +1649,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const grupo = cont.closest && cont.closest('.desplazamiento-grupo');
       const gid = grupo && grupo.dataset && grupo.dataset.desplazamientoId ? grupo.dataset.desplazamientoId : null;
       if (gid) {
-        // pequeño debounce
-        let t = null;
+        // pequeño debounce -> delegar al scheduler por-id
         inputImp.addEventListener('input', () => {
-          if (t) clearTimeout(t);
-          t = setTimeout(() => { try { recalculateDesplazamientoById(gid); } catch(e){} }, 180);
+          try { scheduleRecalcForId(gid, 180); } catch (e) {}
         });
       }
     } catch (e) { /* ignore */ }
@@ -1545,7 +1677,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const inp = nueva.querySelector('.otros-gasto-desc');
         if (inp) setTimeout(() => inp.focus(), 80);
         // Recalcular para actualizar totales (incluyendo 'Otros gastos')
-        try { const gid = grupo.dataset && grupo.dataset.desplazamientoId ? grupo.dataset.desplazamientoId : null; if (gid) recalculateDesplazamientoById(gid); } catch(e) {}
+        try { const gid = grupo.dataset && grupo.dataset.desplazamientoId ? grupo.dataset.desplazamientoId : null; if (gid) scheduleRecalcForId(gid); } catch(e) {}
       }
       return;
     }
@@ -1558,7 +1690,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const grupo = linea.closest('.desplazamiento-grupo');
         const gid = grupo && grupo.dataset && grupo.dataset.desplazamientoId ? grupo.dataset.desplazamientoId : null;
         linea.parentNode.removeChild(linea);
-        try { if (gid) recalculateDesplazamientoById(gid); } catch(e) {}
+        try { if (gid) scheduleRecalcForId(gid); } catch(e) {}
       }
       return;
     }
@@ -1812,14 +1944,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const botonEliminar = desplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
         if (botonEliminar) botonEliminar.style.display = 'none';
       }
-      // Recalcular todos los desplazamientos y evaluar ficha vehiculo
-      setTimeout(() => {
-        document.querySelectorAll('.desplazamiento-grupo').forEach(el => {
-          const id = el.dataset.desplazamientoId;
-          if (id) recalculateDesplazamientoById(id);
-        });
-        evaluarKmParaMostrarFicha();
-      }, 60);
+      // Recalcular todos los desplazamientos de forma debounced y time-sliced
+      try { scheduleFullRecalc(60); } catch(e) {}
+      // Evaluar visibilidad de ficha de vehículo (no costosa)
+      try { evaluarKmParaMostrarFicha(); } catch(e) {}
     }
   });
 
@@ -1846,6 +1974,9 @@ document.addEventListener("DOMContentLoaded", () => {
         ticketCena: !!(despEl.querySelector(`#ticket-cena-${id}`) && despEl.querySelector(`#ticket-cena-${id}`).checked),
         // include global tipoProyecto selection so calc can pick normative rules
         tipoProyecto: (document.getElementById('tipoProyecto') ? document.getElementById('tipoProyecto').value : '')
+        ,
+        // whether the user opted to exclude manutención for this desplazamiento
+        excludeManutencion: !!(despEl.querySelector(`#no-manutencion-${id}`) && despEl.querySelector(`#no-manutencion-${id}`).checked)
       };
     }
 
@@ -2265,20 +2396,27 @@ document.addEventListener("DOMContentLoaded", () => {
       const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
       if (!desp || !window.dietasCalc || !window.dietasCalc.calculateDesplazamiento) return;
       // If this desplazamiento is marked invalid due to date/time parsing or ordering,
-      // ensure the calc-result is removed/hidden and avoid recalculation to prevent flicker/recreation.
+      // decide whether to abort now or continue: if there are other non-manutención importes
+      // (km, alojamiento, otros gastos) we continue and later force manutención a 0; otherwise
+      // remove calc-result and abort early to avoid unnecessary computation.
       try {
+        const otherSumNow = sumNonManutencionAmounts(desp);
         if (desp.dataset && desp.dataset.dtInvalid === '1') {
-          const existing = desp.querySelector('.calc-result');
-          if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
-          return;
+          if (otherSumNow <= 0) {
+            const existing = desp.querySelector('.calc-result');
+            if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+            const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+            return;
+          }
         }
         const orderErr = desp.querySelector(`#dt-order-error-${id}`);
         if (orderErr) {
-          const existing = desp.querySelector('.calc-result');
-          if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
-          return;
+          if (otherSumNow <= 0) {
+            const existing = desp.querySelector('.calc-result');
+            if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+            const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+            return;
+          }
         }
       } catch (e) { /* ignore and continue if DOM check fails */ }
     const data = collectDesplazamientoData(desp);
@@ -2330,6 +2468,13 @@ document.addEventListener("DOMContentLoaded", () => {
     data.tipoVehiculo = tipoVehiculo;
     data.kmTarifa = kmTarifa;
 
+    // If the desplazamiento was flagged as invalid for date/time (dtInvalid), force excludeManutencion
+    try {
+      if (desp && desp.dataset && desp.dataset.dtInvalid === '1') {
+        data.excludeManutencion = true;
+      }
+    } catch (e) {}
+
     // Si es viaje internacional y se han indicado fechas de cruce, dividir en segmentos
     const isInternational = (data.pais && String(data.pais).trim() !== '' && String(data.pais).trim() !== 'España');
     const hasCruces = data.cruceIda && data.cruceVuelta;
@@ -2337,9 +2482,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isInternational) {
       const okCruces = validateCrucesAndUpdateUI(id);
       if (!okCruces) {
-        const existing = desp.querySelector('.calc-result'); if (existing) existing.parentNode.removeChild(existing);
-        const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
-        return;
+        const otherSumNow = sumNonManutencionAmounts(desp);
+        if (otherSumNow <= 0) {
+          const existing = desp.querySelector('.calc-result'); if (existing) existing.parentNode.removeChild(existing);
+          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+          return;
+        }
+        // otherwise continue; dtInvalid flag will force manutención a 0 below
       }
     }
     if (isInternational && hasCruces) {
@@ -2534,6 +2683,13 @@ document.addEventListener("DOMContentLoaded", () => {
           } catch (err) { /* ignore per-seg recalculation errors */ }
         });
       } catch (e) { }
+      // If the user chose to exclude manutención, zero-out manutención amounts per-segment and any IRPF sujeto
+      try {
+        if (data && data.excludeManutencion) {
+          try { composite.segmentsResults.forEach(s => { if (s) { s.manutencionesAmount = 0; s.manutenciones = 0; if (s.irpf && typeof s.irpf === 'object') s.irpf.sujeto = 0; } }); } catch(e) {}
+          try { if (composite.irpf && typeof composite.irpf === 'object') composite.irpf.sujeto = 0; } catch(e) {}
+        }
+      } catch (e) {}
       renderCalcResult(desp, composite);
       return;
     }
@@ -2592,6 +2748,13 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) { /* ignore recalculation errors */ }
       }
     } catch (e) { /* ignore */ }
+    // If user opted to exclude manutención, force manutención amounts to zero and clear IRPF sujeto
+    try {
+      if (data && data.excludeManutencion) {
+        try { res.manutencionesAmount = 0; res.manutenciones = 0; } catch(e) {}
+        try { if (res.irpf && typeof res.irpf === 'object') res.irpf.sujeto = 0; } catch(e) {}
+      }
+    } catch (e) {}
     renderCalcResult(desp, res);
     }
 
@@ -2612,13 +2775,13 @@ document.addEventListener("DOMContentLoaded", () => {
           if (n.id && n.id.indexOf('pais-destino-') === 0) {
             n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); try { manejarCambioPais(id); } catch(e){}; actualizarTicketCena(); try { if (typeof computeDescuentoManutencion === 'function') computeDescuentoManutencion(); } catch(e){} });
           } else {
-            n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); actualizarTicketCena(); try { if (typeof computeDescuentoManutencion === 'function') computeDescuentoManutencion(); } catch(e){} });
+            n.addEventListener('change', () => { validateDateTimePairAndUpdateUI(id); scheduleRecalcForId(id); actualizarTicketCena(); try { if (typeof computeDescuentoManutencion === 'function') computeDescuentoManutencion(); } catch(e){} });
           }
         } else {
           // On change we defer to blur to avoid flicker while typing
           n.addEventListener('change', () => { /* noop: defer to blur */ });
           // On blur we perform validation, recalc and update visibility
-          n.addEventListener('blur', () => { validateDateTimePairAndUpdateUI(id); recalculateDesplazamientoById(id); actualizarTicketCena(); });
+          n.addEventListener('blur', () => { validateDateTimePairAndUpdateUI(id); scheduleRecalcForId(id); actualizarTicketCena(); });
         }
       });
       // Specifically watch km input to decide vehicle card visibility
@@ -2627,7 +2790,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Do not toggle vehicle ficha or recalc while typing; act on blur only
         kmInput.addEventListener('blur', () => {
           evaluarKmParaMostrarFicha();
-          recalculateDesplazamientoById(id);
+          scheduleRecalcForId(id);
           actualizarTicketCena();
         });
       }
@@ -2637,12 +2800,19 @@ document.addEventListener("DOMContentLoaded", () => {
         ticketCheckbox.addEventListener('change', () => {
           // Changing ticket affects both validation-dependent rules and amounts
           validateDateTimePairAndUpdateUI(id);
-          recalculateDesplazamientoById(id);
+          scheduleRecalcForId(id);
           actualizarTicketCena();
         });
       }
+      // Watch 'No incluir gastos de manutención' checkbox: force manutención to 0
+      const noManut = desp.querySelector(`#no-manutencion-${id}`);
+      if (noManut) {
+        noManut.addEventListener('change', () => {
+          try { scheduleRecalcForId(id); } catch (e) { }
+        });
+      }
       // calcular inicialmente
-      setTimeout(() => { evaluarKmParaMostrarFicha(); recalculateDesplazamientoById(id); }, 100);
+      setTimeout(() => { evaluarKmParaMostrarFicha(); scheduleRecalcForId(id); }, 100);
     }
 
     // Attach to existing desplazamientos on load
@@ -2654,10 +2824,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Listener para cambio de tipo de proyecto (actualizar ticket cena)
     tipoProyecto.addEventListener('change', () => {
       actualizarTicketCena();
-      document.querySelectorAll('.desplazamiento-grupo').forEach(el => {
-        const id = el.dataset.desplazamientoId;
-        if (id) recalculateDesplazamientoById(id);
-      });
+      // cambios en el tipo de proyecto pueden afectar a todas las fichas; programar recálculo no bloqueante
+      try { scheduleFullRecalc(60); } catch(e) {}
     });
 
   // (Paises ya se cargan en la petición principal arriba)
