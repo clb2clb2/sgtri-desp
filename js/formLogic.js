@@ -2047,7 +2047,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const nochesAmtDisplayed = fmt(applyResidMul(nochesAmt, !!result.residenciaEventual));
   alojamientoLabel = `Alojamiento: <em>[ máx: ${nochesCnt} noches × ${precioNocheTxt} €${result.residenciaEventual ? ' <span class="resid-80">× 80%</span>' : ''} = ${nochesAmtDisplayed} € ]</em>`;
   }
-  const alojamientoAmount = fmt(Number(result.alojamiento || 0));
+  let alojamientoAmount = fmt(Number(result.alojamiento || 0));
 
       const tarifa = (result && result.precioKm) ? Number(result.precioKm) : 0.26;
       const tarifaTxt = (tipoVehiculo === 'motocicleta') ? tarifa.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : tarifa.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2083,8 +2083,8 @@ document.addEventListener("DOMContentLoaded", () => {
           } catch (e) { irpfDetailsHtml = ''; }
 
           // Total: sumar manutenciones (aplicando residencia eventual si procede) + alojamiento (real) + kmAmount
-          const manutReducedVal = applyResidMul(Number(result.manutencionesAmount || 0), manutFlag);
-          const totalVal = (manutReducedVal + Number(result.kmAmount || 0) + Number(result.alojamiento || 0));
+          let manutReducedVal = applyResidMul(Number(result.manutencionesAmount || 0), manutFlag);
+          let totalVal = (manutReducedVal + Number(result.kmAmount || 0) + Number(result.alojamiento || 0));
           const totalStr = fmt(totalVal);
 
   // Check if alojamiento exceeds max allowed. For ambiguous cases the default
@@ -2129,10 +2129,21 @@ document.addEventListener("DOMContentLoaded", () => {
       const alojInputEl = despEl.querySelector(`#alojamiento-${id}`);
       const alojUserInputNum = alojInputEl ? parseNumberFromInput(alojInputEl.value) : 0;
       // Mostrar/ocultar líneas según regla: only show when > 0 (and manut only when full dates present)
-      const showManut = hasFullDates && (Number(result.manutencionesAmount || 0) > 0);
-      const showKm = kmNumInput > 0 || (typeof result.kmAmount !== 'undefined' && Number(result.kmAmount || 0) > 0);
-      const showAloj = alojUserInputNum > 0 || (typeof result.alojamiento !== 'undefined' && Number(result.alojamiento || 0) > 0);
+      let showManut = hasFullDates && (Number(result.manutencionesAmount || 0) > 0);
+      let showKm = kmNumInput > 0 || (typeof result.kmAmount !== 'undefined' && Number(result.kmAmount || 0) > 0);
+      let showAloj = alojUserInputNum > 0 || (typeof result.alojamiento !== 'undefined' && Number(result.alojamiento || 0) > 0);
       const showOtros = otrosSumNum > 0;
+
+      // Si las fechas/cruces están marcadas como inválidas (dtInvalid), ocultar y poner a 0
+      // manutención y alojamiento en la capa de resultados.
+      const isDtInvalid = despEl && despEl.dataset && despEl.dataset.dtInvalid === '1';
+      if (isDtInvalid) {
+        showManut = false;
+        showAloj = false;
+        manutReducedVal = 0;
+        alojamientoAmount = fmt(0);
+        totalVal = Number(result.kmAmount || 0) + Number(0);
+      }
 
       // If we received segmentsResults, render each segment separately and then show km
       if (result && Array.isArray(result.segmentsResults)) {
@@ -2211,6 +2222,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const pieceKm = showKm ? kmLineHtml : '';
         const pieceOtros = showOtros ? otrosHtmlComposite : '';
 
+        const totalDisplayedSeg = (isDtInvalid) ? (Number(result.kmAmount || 0) + Number(otrosSumNum || 0)) : (totalManut + Number(result.kmAmount || 0) + alojUserNum + otrosSumNum);
         const htmlSeg = `
           <div class="calc-result composite" data-desp-id="${id}">
             ${badgeHtml}
@@ -2220,7 +2232,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${pieceAloj}
             ${pieceKm}
             ${pieceOtros}
-            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${fmt((totalManut + Number(result.kmAmount || 0) + alojUserNum + otrosSumNum))} €</strong></span></div>
+            <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${fmt(totalDisplayedSeg)} €</strong></span></div>
             ${irpfTotalHtml}
           </div>
         `;
@@ -2400,23 +2412,23 @@ document.addEventListener("DOMContentLoaded", () => {
       // (km, alojamiento, otros gastos) we continue and later force manutención a 0; otherwise
       // remove calc-result and abort early to avoid unnecessary computation.
       try {
-        const otherSumNow = sumNonManutencionAmounts(desp);
-        if (desp.dataset && desp.dataset.dtInvalid === '1') {
-          if (otherSumNow <= 0) {
-            const existing = desp.querySelector('.calc-result');
-            if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-            const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
-            return;
-          }
+        // Si el desplazamiento ya fue marcado como inválido por fecha/horario/ cruces,
+        // NO realizar ningún cálculo: eliminamos el bloque de resultados y retornamos.
+        // Esto evita mostrar importes de manutención/alojamiento que serían erróneos.
+        const existingDtInvalid = desp && desp.dataset && desp.dataset.dtInvalid === '1';
+        if (existingDtInvalid) {
+          const existing = desp.querySelector('.calc-result');
+          if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+          return;
         }
+        // Si hay un mensaje de orden de fechas (dt-order-error) también abortamos el cálculo
         const orderErr = desp.querySelector(`#dt-order-error-${id}`);
         if (orderErr) {
-          if (otherSumNow <= 0) {
-            const existing = desp.querySelector('.calc-result');
-            if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-            const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
-            return;
-          }
+          const existing = desp.querySelector('.calc-result');
+          if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+          return;
         }
       } catch (e) { /* ignore and continue if DOM check fails */ }
     const data = collectDesplazamientoData(desp);
@@ -2472,6 +2484,9 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       if (desp && desp.dataset && desp.dataset.dtInvalid === '1') {
         data.excludeManutencion = true;
+        // Cuando las fechas/cruces no son lógicas, también excluimos alojamiento
+        // para que no aparezca en los totales ni en el cálculo final.
+        data.excludeAlojamiento = true;
       }
     } catch (e) {}
 
@@ -2482,13 +2497,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isInternational) {
       const okCruces = validateCrucesAndUpdateUI(id);
       if (!okCruces) {
-        const otherSumNow = sumNonManutencionAmounts(desp);
-        if (otherSumNow <= 0) {
-          const existing = desp.querySelector('.calc-result'); if (existing) existing.parentNode.removeChild(existing);
-          const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
-          return;
-        }
-        // otherwise continue; dtInvalid flag will force manutención a 0 below
+        // Si la validación de cruces falla, no realizamos cálculos porque serían inválidos.
+        const existing = desp.querySelector('.calc-result'); if (existing) existing.parentNode.removeChild(existing);
+        const just = desp.querySelector('.justificar-pernocta-field'); if (just && just.parentNode) just.parentNode.removeChild(just);
+        return;
       }
     }
     if (isInternational && hasCruces) {
@@ -2690,6 +2702,13 @@ document.addEventListener("DOMContentLoaded", () => {
           try { if (composite.irpf && typeof composite.irpf === 'object') composite.irpf.sujeto = 0; } catch(e) {}
         }
       } catch (e) {}
+      // Si se indicó excluir alojamiento (por fechas inválidas), forzar alojamiento a 0
+      try {
+        if (data && data.excludeAlojamiento) {
+          try { composite.segmentsResults.forEach(s => { if (s) { s.nochesAmount = 0; s.noches = 0; } }); } catch(e) {}
+          try { composite.alojamientoUser = 0; } catch(e) {}
+        }
+      } catch (e) {}
       renderCalcResult(desp, composite);
       return;
     }
@@ -2753,6 +2772,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data && data.excludeManutencion) {
         try { res.manutencionesAmount = 0; res.manutenciones = 0; } catch(e) {}
         try { if (res.irpf && typeof res.irpf === 'object') res.irpf.sujeto = 0; } catch(e) {}
+      }
+    } catch (e) {}
+    // Si se indicó excluir alojamiento (por fechas inválidas), forzar alojamiento a 0
+    try {
+      if (data && data.excludeAlojamiento) {
+        try { res.alojamiento = 0; res.nochesAmount = 0; res.noches = 0; } catch(e) {}
       }
     } catch (e) {}
     renderCalcResult(desp, res);
