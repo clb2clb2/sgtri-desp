@@ -1033,6 +1033,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const dtReg = new Date(fReg.getFullYear(), fReg.getMonth(), fReg.getDate(), tReg.hh, tReg.mm, 0, 0);
 
       if (dtReg <= dtId) {
+        // invalid order: marcar desplazamiento como inválido para abortar cálculos.
+        if (desp) { desp.dataset.dtInvalid = '1'; }
         // invalid order: mark fields in red. Decide visibility based on other amounts
         [fechaIdEl, horaIdEl, fechaRegEl, horaRegEl].forEach(n => n && n.classList && n.classList.add('field-error'));
         const otherSum = desp ? sumNonManutencionAmounts(desp) : 0;
