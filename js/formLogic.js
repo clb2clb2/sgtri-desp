@@ -2287,26 +2287,34 @@ document.addEventListener("DOMContentLoaded", () => {
           // Create checkbox block AFTER the ticket-cena-field to match requested placement
           const ticketField = despEl.querySelector(`#ticket-cena-field-${id}`);
           const justHtml = `<div class="ticket-cena-field conditional-row justificar-pernocta-field" id="justificar-container-${id}"><div class="form-group"><label><input type="checkbox" id="justificar-pernocta-${id}" /> Justifica haber pernoctado la noche del ${result.nochesAmbiguousFrom} al ${result.nochesAmbiguousTo}.</label></div></div>`;
-          if (ticketField && ticketField.insertAdjacentHTML) {
-            ticketField.insertAdjacentHTML('afterend', justHtml);
-          } else if (despEl) {
-            // fallback: append after calcDiv
-            calcDiv.insertAdjacentHTML('afterend', justHtml);
+          // Prefer inserting after ticketField; if missing, after calcDiv; if still missing, append into desplazamiento
+          try {
+            if (ticketField && typeof ticketField.insertAdjacentHTML === 'function') ticketField.insertAdjacentHTML('afterend', justHtml);
+            else if (calcDiv && typeof calcDiv.insertAdjacentHTML === 'function') calcDiv.insertAdjacentHTML('afterend', justHtml);
+            else if (despEl && typeof despEl.insertAdjacentHTML === 'function') despEl.insertAdjacentHTML('beforeend', justHtml);
+          } catch (e) {
+            try { if (despEl && typeof despEl.insertAdjacentHTML === 'function') despEl.insertAdjacentHTML('beforeend', justHtml); } catch (er) {}
           }
           const checkbox = despEl.querySelector(`#justificar-pernocta-${id}`);
-          const alojAmountSpan = calcDiv.querySelector('.amount.aloj');
-          const alojLine = calcDiv.querySelector('.aloj-line');
+          const alojAmountSpan = calcDiv ? (calcDiv.querySelector('.amount.aloj') || calcDiv.querySelector('.amount.aloj-user') || calcDiv.querySelector('.aloj-user .amount') || calcDiv.querySelector('.aloj-user')) : null;
+          const alojLine = calcDiv ? (calcDiv.querySelector('.aloj-line') || calcDiv.querySelector('.aloj-aggregated')) : null;
           const manutNum = Number(result.manutencionesAmount || 0);
           const kmNum = Number(result.kmAmount || 0);
-          const alojNum = Number(result.alojamiento || 0);
-          const allowedYes = Number(result.nochesAmountIfCounted || 0);
-          const allowedNo = Number(result.nochesAmountIfNotCounted || 0);
-          const totalStrong = calcDiv.querySelector('.total-val');
-          const alojLabelSpan = calcDiv.querySelector('.aloj-line .label');
+          // For composite results the user-provided alojamiento may be under alojamientoUser
+          const alojNum = Number(typeof result.alojamientoUser !== 'undefined' ? result.alojamientoUser : result.alojamiento || 0);
+          // If any segment is ambiguous, prefer its allowed amounts when toggling
+          const segWithAmbig = (result && Array.isArray(result.segmentsResults)) ? result.segmentsResults.find(s => s && s.nochesAmbiguous) : null;
+          const allowedYes = Number((segWithAmbig && (segWithAmbig.nochesAmountIfCounted || segWithAmbig.nochesAmount)) || result.nochesAmountIfCounted || 0);
+          const allowedNo = Number((segWithAmbig && (segWithAmbig.nochesAmountIfNotCounted || segWithAmbig.nochesAmount)) || result.nochesAmountIfNotCounted || 0);
+          const totalStrong = calcDiv ? (calcDiv.querySelector('.total-val') || null) : null;
+          const alojLabelSpan = calcDiv ? (calcDiv.querySelector('.aloj-line .label') || calcDiv.querySelector('.aloj-aggregated .label')) : null;
 
           function updateForCheckbox() {
             const checked = !!(checkbox && checkbox.checked);
             const allowed = checked ? allowedYes : allowedNo;
+            const compositeHasSegments = (result && Array.isArray(result.segmentsResults) && result.segmentsResults.length > 0);
+            // Determine per-night price to add: prefer segment value, else top-level
+            const perNightPrice = (segWithAmbig && segWithAmbig.precioNoche) ? Number(segWithAmbig.precioNoche) : ((result && result.precioNoche) ? Number(result.precioNoche) : (typeof precioNocheUnit !== 'undefined' ? Number(precioNocheUnit) : 0));
             // actualizar etiqueta máxima de alojamiento (noches y cantidad)
             try {
               if (alojLabelSpan) {
@@ -2316,14 +2324,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 alojLabelSpan.innerHTML = `Alojamiento: <em>[ máx: ${nochesCnt} noches × ${precioNocheTxt} €${result.residenciaEventual ? ' <span class="resid-80">× 80%</span>' : ''} = ${nochesAmtDisp} € ]</em>`;
               }
             } catch (e) {}
-            // Manage warn icon/tooltip dynamically: create or remove warn-wrapper
+            // For composite results, if checked we add one night's price to the displayed alojamiento
+            const baseAloj = Number(alojNum || 0);
+            const displayedAloj = (compositeHasSegments && checked) ? (baseAloj + perNightPrice) : baseAloj;
+            // Manage warn icon/tooltip dynamically: create or remove warn-wrapper based on displayedAloj
             try {
-              const existingWarn = calcDiv.querySelector('.warn-wrapper');
-              if (alojNum > allowed) {
-                // Add visual error classes
-                alojAmountSpan.classList.add('error-amount');
-                alojLine.classList.add('error-line');
-                // If there's no warn icon, create it and attach handlers
+              const existingWarn = calcDiv ? calcDiv.querySelector('.warn-wrapper') : null;
+              if (displayedAloj > allowed) {
+                if (alojAmountSpan && alojAmountSpan.classList) alojAmountSpan.classList.add('error-amount');
+                if (alojLine && alojLine.classList) alojLine.classList.add('error-line');
                 if (!existingWarn && alojAmountSpan && alojAmountSpan.parentNode) {
                   const warnEl = document.createElement('span');
                   warnEl.className = 'warn-wrapper';
@@ -2331,26 +2340,38 @@ document.addEventListener("DOMContentLoaded", () => {
                   warnEl.setAttribute('aria-live','polite');
                   warnEl.innerHTML = `<span class="warn-icon" aria-hidden="true">⚠️</span><span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido, conforme al ${normativaLabel}.</span>`;
                   alojAmountSpan.parentNode.insertBefore(warnEl, alojAmountSpan);
-                  // Attach tooltip handlers so it behaves like the original ones
                   try { attachWarnHandlers(warnEl); } catch(e) {}
                 }
               } else {
-                // Remove visual error classes and any warn icon
-                alojAmountSpan.classList.remove('error-amount');
-                alojLine.classList.remove('error-line');
+                if (alojAmountSpan && alojAmountSpan.classList) alojAmountSpan.classList.remove('error-amount');
+                if (alojLine && alojLine.classList) alojLine.classList.remove('error-line');
                 if (existingWarn && existingWarn.parentNode) existingWarn.parentNode.removeChild(existingWarn);
               }
             } catch (e) {
-              // fallback: toggle classes
-              if (alojNum > allowed) { alojAmountSpan.classList.add('error-amount'); alojLine.classList.add('error-line'); }
-              else { alojAmountSpan.classList.remove('error-amount'); alojLine.classList.remove('error-line'); }
+              if (displayedAloj > allowed) {
+                if (alojAmountSpan && alojAmountSpan.classList) alojAmountSpan.classList.add('error-amount');
+                if (alojLine && alojLine.classList) alojLine.classList.add('error-line');
+              } else {
+                if (alojAmountSpan && alojAmountSpan.classList) alojAmountSpan.classList.remove('error-amount');
+                if (alojLine && alojLine.classList) alojLine.classList.remove('error-line');
+              }
             }
-            // IMPORTANT: the displayed Total must always include the actual alojamiento
-            // even if it exceeds the allowed reimbursable amount. The allowed amount
-            // only affects the error styling and internal reimbursement calculation,
-            // but the monetary Total shown to the user sums the full alojamiento.
-            const total = (manutNum + kmNum + alojNum) || 0;
-            totalStrong.textContent = (Number(total) || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+            // Update displayed alojamiento amount in DOM and the total
+            try {
+              if (alojAmountSpan) {
+                const formatted = (Number(displayedAloj) || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+                if (alojAmountSpan.classList && (alojAmountSpan.classList.contains('amount') || alojAmountSpan.classList.contains('aloj-user') || alojAmountSpan.classList.contains('aloj'))) {
+                  alojAmountSpan.textContent = formatted;
+                } else {
+                  alojAmountSpan.innerText = formatted;
+                }
+              }
+            } catch (e) {}
+            // Recompute total (manut + km + displayed alojamiento)
+            const total = (manutNum + kmNum + (displayedAloj || 0)) || 0;
+            if (totalStrong && typeof totalStrong.textContent !== 'undefined') {
+              totalStrong.textContent = (Number(total) || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+            }
           }
           // initial update (checkbox default unchecked -> subtract one night)
           if (checkbox) {
