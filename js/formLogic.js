@@ -2784,6 +2784,20 @@ document.addEventListener("DOMContentLoaded", () => {
           try { composite.alojamientoUser = 0; } catch(e) {}
         }
       } catch (e) {}
+      // If user had previously checked justificar-pernocta, apply the extra night
+      try {
+        if (desp && desp.dataset && desp.dataset.justificarPernocta === '1') {
+          // find an ambiguous segment if any
+          const segs = composite.segmentsResults || [];
+          const segWithAmb = segs.find(s => s && s.nochesAmbiguous) || (segs.length ? segs[segs.length - 1] : null);
+          if (segWithAmb) {
+            const perNight = (typeof segWithAmb.precioNoche !== 'undefined') ? Number(segWithAmb.precioNoche || 0) : (typeof composite.precioNoche !== 'undefined' ? Number(composite.precioNoche || 0) : 0);
+            segWithAmb.noches = (Number(segWithAmb.noches) || 0) + 1;
+            segWithAmb.nochesAmount = (Number(segWithAmb.nochesAmount) || 0) + perNight;
+            composite.alojamientoUser = (Number(composite.alojamientoUser) || 0) + perNight;
+          }
+        }
+      } catch (e) {}
       renderCalcResult(desp, composite);
       return;
     }
@@ -2853,6 +2867,15 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       if (data && data.excludeAlojamiento) {
         try { res.alojamiento = 0; res.nochesAmount = 0; res.noches = 0; } catch(e) {}
+      }
+    } catch (e) {}
+    // If user had checked justificar-pernocta for this desplazamiento, apply to single-result too
+    try {
+      if (desp && desp.dataset && desp.dataset.justificarPernocta === '1') {
+        const perNight = (typeof res.precioNoche !== 'undefined') ? Number(res.precioNoche || 0) : 0;
+        res.noches = (Number(res.noches) || 0) + 1;
+        res.nochesAmount = (Number(res.nochesAmount) || 0) + perNight;
+        res.alojamiento = (Number(res.alojamiento) || 0) + perNight;
       }
     } catch (e) {}
     renderCalcResult(desp, res);
