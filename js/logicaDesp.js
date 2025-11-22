@@ -4,9 +4,96 @@
 
 (function () {
   function init() {
-    // Inicialización: attach handlers if needed (will be wired from formLogic or main)
-    // Placeholder: actual wiring will be done when connecting events
-    console.log('logicaDesp initialized');
+    // Inicialización: wiring de listeners delegados para fichas de desplazamiento.
+    // Este init actúa por delegación y usa debounce por-id para evitar recálculos innecesarios.
+    try {
+      const container = document.getElementById('desplazamientos-container');
+      if (!container) return;
+
+      const perIdTimers = Object.create(null);
+      function scheduleForId(id, fn, ms = 120) {
+        if (!id) return;
+        if (perIdTimers[id]) clearTimeout(perIdTimers[id]);
+        perIdTimers[id] = setTimeout(() => { try { fn(); } catch (e) {} ; delete perIdTimers[id]; }, ms);
+      }
+
+      // Delegación: manejar blur en fechas/horas y change en selects/checkboxes
+      container.addEventListener('blur', (e) => {
+        const el = e.target;
+        if (!el) return;
+        // Campos que disparan recálculo en blur
+        if (el.classList && (el.classList.contains('input-fecha') || el.classList.contains('input-hora') || el.classList.contains('format-km') || el.classList.contains('format-alojamiento') )) {
+          const m = (el.id || '').match(/-(\d+)$/);
+          const id = m ? m[1] : (el.closest && el.closest('.desplazamiento-grupo') && el.closest('.desplazamiento-grupo').dataset && el.closest('.desplazamiento-grupo').dataset.desplazamientoId);
+          if (id) scheduleForId(id, () => handleFichaChange(id));
+        }
+      }, true);
+
+      container.addEventListener('change', (e) => {
+        const el = e.target;
+        if (!el) return;
+        // selects, checkboxes, botones otros gastos
+        const grp = el.closest && el.closest('.desplazamiento-grupo');
+        const id = grp && grp.dataset && grp.dataset.desplazamientoId ? grp.dataset.desplazamientoId : null;
+        if (id) scheduleForId(id, () => handleFichaChange(id));
+      });
+
+      // clicks para añadir/eliminar 'otros gastos' ya manejados por formLogic, pero
+      // por si hay eliminación por delegación, escuchamos clicks y recalc
+      container.addEventListener('click', (e) => {
+        const add = e.target.closest && e.target.closest('.btn-otros-gastos');
+        const remove = e.target.closest && e.target.closest('.btn-remove-otros-gasto');
+        const grp = e.target.closest && e.target.closest('.desplazamiento-grupo');
+        const id = grp && grp.dataset && grp.dataset.desplazamientoId ? grp.dataset.desplazamientoId : null;
+        if ((add || remove) && id) scheduleForId(id, () => handleFichaChange(id));
+      });
+
+      console.log('logicaDesp initialized');
+    } catch (e) { console.error('logicaDesp.init error', e); }
+  }
+
+  // Handle a ficha change: validate UI elements, then call cálculo and render
+  function handleFichaChange(id) {
+    try {
+      const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+      if (!desp) return;
+      // show/hide fronteras based on country
+      const paisSel = desp.querySelector(`#pais-destino-${id}`);
+      const fronteras = document.getElementById(`fronteras-fields-${id}`);
+      const isIntl = paisSel && shouldShowTicketCena && isInternationalCountry(paisSel.value) ? true : (paisSel && isInternationalCountry(paisSel.value));
+      if (fronteras) fronteras.style.display = isIntl ? 'block' : 'none';
+
+      // show/hide ticket-cena according to tipoProyecto and hour
+      const tipoProj = (document.getElementById('tipoProyecto') || {}).value;
+      const horaRegEl = desp.querySelector(`#hora-regreso-${id}`);
+      const horaReg = horaRegEl ? horaRegEl.value : '';
+      const ticketField = desp.querySelector(`#ticket-cena-field-${id}`);
+      if (ticketField) ticketField.style.display = shouldShowTicketCena(tipoProj, horaReg) ? 'block' : 'none';
+
+      // show/hide justificar-pernocta placeholder: the renderer will create the checkbox
+      // but we control whether the inputs are valid and set dataset.dtInvalid
+      const fechaIdEl = desp.querySelector(`#fecha-ida-${id}`);
+      const fechaRegEl = desp.querySelector(`#fecha-regreso-${id}`);
+      const horaIdEl = desp.querySelector(`#hora-ida-${id}`);
+      const horaRegE = desp.querySelector(`#hora-regreso-${id}`);
+      const fechaOk = validateFechaOrden(fechaIdEl && fechaIdEl.value, horaIdEl && horaIdEl.value, fechaRegEl && fechaRegEl.value, horaRegE && horaRegE.value);
+      if (!fechaOk) {
+        // mark invalid dataset so calculaDesplazamiento can force manut=0 / aloj=0
+        desp.dataset.dtInvalid = '1';
+      } else {
+        if (desp && desp.dataset && desp.dataset.dtInvalid) delete desp.dataset.dtInvalid;
+      }
+
+      // Call calculoDesp and render
+      try {
+        if (window.calculoDesp && typeof window.calculoDesp.calculaDesplazamientoFicha === 'function') {
+          const res = window.calculoDesp.calculaDesplazamientoFicha(desp);
+          if (window.salidaDesp && typeof window.salidaDesp.renderSalida === 'function') {
+            window.salidaDesp.renderSalida(desp, res && res.canonical, res && res.displayContext);
+          }
+        }
+      } catch (e) { /* ignore render errors */ }
+    } catch (e) { console.error('handleFichaChange error', e); }
   }
 
   function shouldShowTicketCena(tipoProyecto, horaRegreso) {
