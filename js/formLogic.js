@@ -2281,12 +2281,19 @@ document.addEventListener("DOMContentLoaded", () => {
       // First remove any existing justificar div for this desplazamiento to avoid duplicates
       const existingJust = despEl.querySelector('.justificar-pernocta-field');
       if (existingJust) existingJust.parentNode.removeChild(existingJust);
-      if (result.nochesAmbiguous) {
+      // Detect ambiguity either at top-level result or within any segment (for international composite)
+      const compositeHasSegments = (result && Array.isArray(result.segmentsResults) && result.segmentsResults.length > 0);
+      const segWithAmbig = compositeHasSegments ? result.segmentsResults.find(s => s && s.nochesAmbiguous) : null;
+      const ambiguousFlag = !!(result && result.nochesAmbiguous) || !!segWithAmbig;
+      if (ambiguousFlag) {
         try {
           const calcDiv = despEl.querySelector('.calc-result[data-desp-id="' + id + '"]');
           // Create checkbox block AFTER the ticket-cena-field to match requested placement
           const ticketField = despEl.querySelector(`#ticket-cena-field-${id}`);
-          const justHtml = `<div class="ticket-cena-field conditional-row justificar-pernocta-field" id="justificar-container-${id}"><div class="form-group"><label><input type="checkbox" id="justificar-pernocta-${id}" /> Justifica haber pernoctado la noche del ${result.nochesAmbiguousFrom} al ${result.nochesAmbiguousTo}.</label></div></div>`;
+          // Prefer top-level textual bounds if present, otherwise derive from the ambiguous segment
+          const nochesFrom = (result && result.nochesAmbiguousFrom) ? result.nochesAmbiguousFrom : (segWithAmbig && segWithAmbig.nochesAmbiguousFrom) ? segWithAmbig.nochesAmbiguousFrom : '';
+          const nochesTo = (result && result.nochesAmbiguousTo) ? result.nochesAmbiguousTo : (segWithAmbig && segWithAmbig.nochesAmbiguousTo) ? segWithAmbig.nochesAmbiguousTo : '';
+          const justHtml = `<div class="ticket-cena-field conditional-row justificar-pernocta-field" id="justificar-container-${id}"><div class="form-group"><label><input type="checkbox" id="justificar-pernocta-${id}" /> Justifica haber pernoctado la noche del ${nochesFrom} al ${nochesTo}.</label></div></div>`;
           // Prefer inserting after ticketField; if missing, after calcDiv; if still missing, append into desplazamiento
           try {
             if (ticketField && typeof ticketField.insertAdjacentHTML === 'function') ticketField.insertAdjacentHTML('afterend', justHtml);
@@ -2303,7 +2310,6 @@ document.addEventListener("DOMContentLoaded", () => {
           // For composite results the user-provided alojamiento may be under alojamientoUser
           const alojNum = Number(typeof result.alojamientoUser !== 'undefined' ? result.alojamientoUser : result.alojamiento || 0);
           // If any segment is ambiguous, prefer its allowed amounts when toggling
-          const segWithAmbig = (result && Array.isArray(result.segmentsResults)) ? result.segmentsResults.find(s => s && s.nochesAmbiguous) : null;
           const allowedYes = Number((segWithAmbig && (segWithAmbig.nochesAmountIfCounted || segWithAmbig.nochesAmount)) || result.nochesAmountIfCounted || 0);
           const allowedNo = Number((segWithAmbig && (segWithAmbig.nochesAmountIfNotCounted || segWithAmbig.nochesAmount)) || result.nochesAmountIfNotCounted || 0);
           const totalStrong = calcDiv ? (calcDiv.querySelector('.total-val') || null) : null;
@@ -2315,6 +2321,40 @@ document.addEventListener("DOMContentLoaded", () => {
             const compositeHasSegments = (result && Array.isArray(result.segmentsResults) && result.segmentsResults.length > 0);
             // Determine per-night price to add: prefer segment value, else top-level
             const perNightPrice = (segWithAmbig && segWithAmbig.precioNoche) ? Number(segWithAmbig.precioNoche) : ((result && result.precioNoche) ? Number(result.precioNoche) : (typeof precioNocheUnit !== 'undefined' ? Number(precioNocheUnit) : 0));
+
+            // Persist state in dataset so recálculos no lo pierdan
+            const wasApplied = despEl && despEl.dataset && despEl.dataset.justificarPernocta === '1';
+            try {
+              if (compositeHasSegments) {
+                // Apply change to the MODEL (result) so re-render is consistent
+                const segs = result.segmentsResults || [];
+                if (segs.length > 0) {
+                  const last = segs[segs.length - 1];
+                  if (checked && !wasApplied) {
+                    // add one night
+                    last.noches = (Number(last.noches) || 0) + 1;
+                    last.nochesAmount = (Number(last.nochesAmount) || 0) + perNightPrice;
+                    // reflect in aggregated alojamiento user-visible amount
+                    result.alojamientoUser = (Number(result.alojamientoUser) || Number(result.alojamiento) || 0) + perNightPrice;
+                    if (despEl && despEl.dataset) despEl.dataset.justificarPernocta = '1';
+                    // re-render full calc-result for consistency
+                    try { renderCalcResult(despEl, result); } catch (e) {}
+                    return; // render handled
+                  }
+                  if (!checked && wasApplied) {
+                    // remove one night previously added
+                    last.noches = Math.max(0, (Number(last.noches) || 0) - 1);
+                    last.nochesAmount = Math.max(0, (Number(last.nochesAmount) || 0) - perNightPrice);
+                    result.alojamientoUser = Math.max(0, (Number(result.alojamientoUser) || Number(result.alojamiento) || 0) - perNightPrice);
+                    if (despEl && despEl.dataset) despEl.dataset.justificarPernocta = '0';
+                    try { renderCalcResult(despEl, result); } catch (e) {}
+                    return; // render handled
+                  }
+                }
+              }
+            } catch (e) {
+              // if model mutation fails, fall back to DOM-only behavior below
+            }
             // actualizar etiqueta máxima de alojamiento (noches y cantidad)
             try {
               if (alojLabelSpan) {
@@ -2385,6 +2425,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (existing) existing.parentNode.removeChild(existing);
       }
     }
+
+    // If a user previously checked justificar-pernocta and a full recalc happens,
+    // reapply the visual + model change so the checkbox selection persists.
+    // This hook will be used by recalculateDesplazamientoById.
+    try {
+      const prevChecked = despEl && despEl.dataset && despEl.dataset.justificarPernocta === '1';
+      if (prevChecked) {
+        // If the checkbox was previously checked, ensure it is present and checked now
+        const currChk = despEl.querySelector(`#justificar-pernocta-${id}`);
+        if (currChk && !currChk.checked) { currChk.checked = true; try { currChk.dispatchEvent(new Event('change', { bubbles: true })); } catch(e){} }
+      }
+    } catch(e) {}
 
   // CSS-only tooltip mode: do not move inline tooltips into a JS portal.
   // The user prefers CSS for display/position, so keep inline
