@@ -1,21 +1,28 @@
 // js/calculoDesp.js (fusionado)
-// Este archivo contiene dos responsabilidades claramente separadas:
-// 1) MOTOR de cálculo (anteriormente en el shim legacy): funciones puras que
-//    reciben un objeto con datos de desplazamiento y devuelven un objeto
-//    con los resultados numéricos (manutenciones, noches, irpf, km, etc.).
-//    - Funciones principales: `calculateDesplazamiento(input)` y auxiliares.
-//    - No debería manipular el DOM. Acepta `input.flags` para pequeñas
-//      variaciones solicitadas por la UI (excludeManutencion, excludeAlojamiento,
-//      justificarPernocta).
-// 2) WRAPPER / Orquestador (antes en `js/calculoDesp.js`): recoge datos del DOM
-//    (una ficha `.desplazamiento-grupo`), construye el `calcInput`, pasa flags
-//    derivados del estado UI, llama al MOTOR y finalmente invoca al renderer
-//    (`window.salidaDesp.renderSalida`) con el resultado canónico + contexto.
+// Arquitectura:
+//   - MOTOR: funciones puras de cálculo (no manipulan DOM)
+//   - WRAPPER: orquestador que conecta DOM → Motor → Renderer
+//
+// El motor recibe un input normalizado y devuelve resultados numéricos.
+// Flags soportados: excludeManutencion, excludeAlojamiento, justificarPernocta
 
-// -------------------------
-// Sección 1: MOTOR de cálculo (funciones puras)
-// -------------------------
+// =============================================================================
+// Sección 1: MOTOR DE CÁLCULO (funciones puras)
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// 1.1 Parsers (wrappers de limpiaDatos con fallback)
+// -----------------------------------------------------------------------------
+
+/**
+ * Parsea fecha dd/mm/aa a Date.
+ * Usa limpiaDatos si está disponible.
+ */
 function parseDate(ddmmaa) {
+  if (window.limpiaDatos && window.limpiaDatos.parseDateStrict) {
+    return window.limpiaDatos.parseDateStrict(ddmmaa);
+  }
+  // Fallback
   if (!ddmmaa) return null;
   const parts = String(ddmmaa).split('/').map(p => p.trim());
   if (parts.length < 3) return null;
@@ -26,7 +33,15 @@ function parseDate(ddmmaa) {
   return new Date(y, m, d);
 }
 
+/**
+ * Parsea hora hh:mm a {hh, mm}.
+ * Usa limpiaDatos si está disponible.
+ */
 function parseTime(hhmm) {
+  if (window.limpiaDatos && window.limpiaDatos.parseTimeStrict) {
+    return window.limpiaDatos.parseTimeStrict(hhmm);
+  }
+  // Fallback
   if (!hhmm) return null;
   const parts = String(hhmm).split(':').map(p => p.trim());
   if (parts.length < 2) return null;
@@ -36,538 +51,1042 @@ function parseTime(hhmm) {
   return { hh, mm };
 }
 
+/**
+ * Parsea número con tolerancia a formatos europeos.
+ * Usa limpiaDatos si está disponible.
+ */
+function parseNumber(value) {
+  if (window.limpiaDatos && window.limpiaDatos.parseNumber) {
+    return window.limpiaDatos.parseNumber(value);
+  }
+  // Fallback
+  if (typeof value === 'number') return value;
+  if (!value) return 0;
+  const s = String(value).replace(/[^0-9,.\-]/g, '').replace(/\./g, '').replace(/,/g, '.');
+  return parseFloat(s) || 0;
+}
+
+// -----------------------------------------------------------------------------
+// 1.2 Utilidades de fecha/hora
+// -----------------------------------------------------------------------------
+
+/**
+ * Combina fecha y hora en un DateTime.
+ */
 function toDateTime(dateObj, timeObj) {
   if (!dateObj) return null;
   const d = new Date(dateObj.getTime());
-  if (timeObj) {
-    d.setHours(timeObj.hh);
-    d.setMinutes(timeObj.mm);
-    d.setSeconds(0);
-    d.setMilliseconds(0);
-  } else {
-    d.setHours(0,0,0,0);
-  }
+  d.setHours(timeObj ? timeObj.hh : 0);
+  d.setMinutes(timeObj ? timeObj.mm : 0);
+  d.setSeconds(0);
+  d.setMilliseconds(0);
   return d;
 }
 
-function daysBetweenMidnights(a, b) {
+/**
+ * Calcula días naturales entre dos fechas (medianoche a medianoche).
+ */
+function daysBetween(a, b) {
   if (!a || !b) return 0;
+  const msPerDay = 86400000;
   const am = new Date(a.getFullYear(), a.getMonth(), a.getDate());
   const bm = new Date(b.getFullYear(), b.getMonth(), b.getDate());
-  const diff = Math.round((bm - am) / 86400000);
-  return Math.max(0, diff);
+  return Math.max(0, Math.round((bm - am) / msPerDay));
 }
 
-// calculateDesplazamiento: motor principal.
-// input.flags aceptados: { excludeManutencion, excludeAlojamiento, justificarPernocta }
-function calculateDesplazamiento(input) {
-  const result = Object.assign({}, input);
-  // Leer flags desde propiedades top-level de `input`, manteniendo compatibilidad
-  // con el antiguo `input.flags` si aún se proporciona.
-  const flags = {
-    _segmentMode: (input && typeof input._segmentMode !== 'undefined') ? input._segmentMode : (input && input.flags && typeof input.flags._segmentMode !== 'undefined' ? input.flags._segmentMode : false),
-    excludeManutencion: (input && typeof input.excludeManutencion !== 'undefined') ? input.excludeManutencion : (input && input.flags && typeof input.flags.excludeManutencion !== 'undefined' ? input.flags.excludeManutencion : false),
-    justificarPernocta: (input && typeof input.justificarPernocta !== 'undefined') ? input.justificarPernocta : (input && input.flags && typeof input.flags.justificarPernocta !== 'undefined' ? input.flags.justificarPernocta : false),
-    excludeAlojamiento: (input && typeof input.excludeAlojamiento !== 'undefined') ? input.excludeAlojamiento : (input && input.flags && typeof input.flags.excludeAlojamiento !== 'undefined' ? input.flags.excludeAlojamiento : false)
+/**
+ * Convierte hora {hh, mm} a minutos desde medianoche.
+ */
+function toMinutes(time) {
+  if (!time || typeof time.hh !== 'number') return null;
+  return time.hh * 60 + time.mm;
+}
+
+/**
+ * Verifica si dos fechas son el mismo día.
+ */
+function isSameDay(d1, d2) {
+  if (!d1 || !d2) return false;
+  return d1.getFullYear() === d2.getFullYear() &&
+         d1.getMonth() === d2.getMonth() &&
+         d1.getDate() === d2.getDate();
+}
+
+/**
+ * Formatea Date a string dd/mm/yyyy.
+ */
+function formatDateDMY(d) {
+  if (!d) return '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+/**
+ * Redondea a 2 decimales.
+ */
+function round2(n) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// -----------------------------------------------------------------------------
+// 1.3 Lectura de flags y datos externos
+// -----------------------------------------------------------------------------
+
+/**
+ * Extrae flags del input con compatibilidad hacia atrás.
+ */
+function extractFlags(input) {
+  const get = (name, fallback) => {
+    if (input && input[name] !== undefined) return input[name];
+    if (input && input.flags && input.flags[name] !== undefined) return input.flags[name];
+    return fallback;
   };
 
-  const fechaIdaDate = parseDate(input.fechaIda);
-  const fechaRegresoDate = parseDate(input.fechaRegreso);
+  return {
+    segmentMode: get('_segmentMode', false),
+    excludeManutencion: get('excludeManutencion', false),
+    excludeAlojamiento: get('excludeAlojamiento', false),
+    justificarPernocta: get('justificarPernocta', false)
+  };
+}
+
+/**
+ * Obtiene los datos de configuración (dietas, normativas, etc.).
+ */
+function getDatos() {
+  return (typeof window !== 'undefined' && window.__sgtriDatos) || null;
+}
+
+/**
+ * Determina la normativa aplicable según el tipo de proyecto.
+ */
+function getNormativa(tipoProyecto) {
+  const datos = getDatos();
+  if (!datos || !datos.normativasPorTipoProyecto) return 'decreto';
+  const rdList = datos.normativasPorTipoProyecto.rd || [];
+  return rdList.includes(tipoProyecto) ? 'rd' : 'decreto';
+}
+
+/**
+ * Obtiene precios de manutención y alojamiento según país y normativa.
+ */
+function getPrecios(paisIndex, pais, normativa) {
+  const defaults = { manutencion: 50.55, noche: 98.88 };
+  const datos = getDatos();
+
+  if (!datos || !datos.dietasPorPais || !Array.isArray(datos.dietasPorPais.paises)) {
+    return defaults;
+  }
+
+  const paisesArr = datos.dietasPorPais.paises;
+  let idx = (typeof paisIndex === 'number' && paisIndex >= 0) ? paisIndex : -1;
+  if (idx === -1) idx = paisesArr.indexOf(pais || '');
+  if (idx === -1) idx = Math.max(0, paisesArr.length - 1);
+
+  const tablas = normativa === 'rd'
+    ? datos.dietasPorPais.rd462_2002
+    : datos.dietasPorPais.decreto42_2025;
+
+  if (!tablas) return defaults;
+
+  return {
+    manutencion: Number(tablas.manutencion?.[idx]) || defaults.manutencion,
+    noche: Number(tablas.alojamiento?.[idx]) || defaults.noche
+  };
+}
+
+/**
+ * Obtiene límites IRPF según país.
+ */
+function getLimitesIRPF(paisIndex, pais) {
+  const defaults = [26.67, 53.34];
+  const datos = getDatos();
+
+  if (!datos || !datos.limitesIRPF) return { limites: defaults, source: 'default' };
+
+  // Por índice de país
+  if (typeof paisIndex === 'number' && paisIndex >= 0) {
+    const isSpain = paisIndex === 0;
+    return {
+      limites: isSpain ? datos.limitesIRPF.esp : datos.limitesIRPF.ext,
+      source: isSpain ? 'esp' : 'ext'
+    };
+  }
+
+  // Por nombre de país
+  const paisesArr = datos.dietasPorPais?.paises || [];
+  let idx = paisesArr.indexOf(pais || '');
+  if (idx === -1) {
+    const normalize = s => (s?.normalize?.('NFD') || s || '').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    idx = paisesArr.findIndex(p => normalize(p) === normalize(pais));
+  }
+
+  const isSpain = idx === 0;
+  return {
+    limites: isSpain ? datos.limitesIRPF.esp : datos.limitesIRPF.ext,
+    source: isSpain ? 'esp' : 'ext'
+  };
+}
+
+// -----------------------------------------------------------------------------
+// 1.4 Validación de entrada
+// -----------------------------------------------------------------------------
+
+/**
+ * Valida que el input tenga los datos mínimos necesarios.
+ * @returns {Object} { valid, reason }
+ */
+function validateInput(parsed, flags) {
+  const { fechaIda, fechaRegreso, horaIda, horaRegreso, dtIda, dtRegreso, cruceIda, cruceVuelta, isInternational } = parsed;
+  const { segmentMode } = flags;
+
+  // Fechas obligatorias
+  if (!fechaIda || !fechaRegreso) {
+    return { valid: false, reason: 'missing_dates' };
+  }
+
+  // Horas obligatorias (excepto en modo segmento)
+  if (!segmentMode && (!horaIda || !horaRegreso)) {
+    return { valid: false, reason: 'missing_times' };
+  }
+
+  // Orden lógico: ida <= regreso
+  if (dtIda && dtRegreso && dtIda.getTime() > dtRegreso.getTime()) {
+    return { valid: false, reason: 'invalid_order' };
+  }
+
+  // Validaciones de cruces para viajes internacionales
+  if (isInternational && !segmentMode) {
+    if (!cruceIda || !cruceVuelta) {
+      return { valid: false, reason: 'missing_cruces' };
+    }
+    if (cruceIda.getTime() > cruceVuelta.getTime()) {
+      return { valid: false, reason: 'invalid_cruces_order' };
+    }
+    if (cruceIda.getTime() < fechaIda.getTime() || cruceVuelta.getTime() > fechaRegreso.getTime()) {
+      return { valid: false, reason: 'cruces_out_of_range' };
+    }
+  }
+
+  return { valid: true, reason: null };
+}
+
+/**
+ * Construye resultado vacío (para inputs inválidos).
+ */
+function buildEmptyResult(input, kmAmount, precioKm) {
+  return {
+    ...input,
+    manutenciones: 0,
+    manutencionesAmount: 0,
+    precioManutencion: 0,
+    precioNoche: 0,
+    noches: 0,
+    nochesAmount: 0,
+    nochesBase: 0,
+    nochesIfCounted: 0,
+    nochesIfNotCounted: 0,
+    nochesAmountIfCounted: 0,
+    nochesAmountIfNotCounted: 0,
+    nochesAmbiguous: false,
+    alojamiento: 0,
+    alojamientoMaxAmount: 0,
+    km: parseNumber(input.km),
+    kmAmount: kmAmount,
+    precioKm: precioKm,
+    irpf: { sujeto: 0, breakdown: [], limitesUsed: [26.67, 53.34] }
+  };
+}
+
+// -----------------------------------------------------------------------------
+// 1.5 Cálculo de manutenciones
+// -----------------------------------------------------------------------------
+
+/**
+ * Constantes de tiempo (en minutos).
+ */
+const HORA_COMIDA = 14 * 60;      // 14:00
+const HORA_FIN_COMIDA = 16 * 60;  // 16:00
+const HORA_CENA = 22 * 60;        // 22:00
+const HORA_PERNOCTA_MIN = 1 * 60; // 01:00
+const HORA_PERNOCTA_MAX = 7 * 60; // 07:00
+
+/**
+ * Calcula manutenciones para un viaje de un solo día.
+ */
+function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticketCena) {
+  if (tDep === null || tRet === null) return 0;
+
+  const durationHours = (dtVuelta.getTime() - dtIda.getTime()) / 3600000;
+
+  // Media manutención por cena (depende de normativa y ticket)
+  const cenaCuenta = (normativa === 'rd') ? (tRet >= HORA_CENA && ticketCena) : (tRet >= HORA_CENA);
+  const retHalf = cenaCuenta ? 0.5 : 0;
+
+  // Para RD: si duración < 5h, solo cuenta la cena
+  if (normativa === 'rd' && durationHours < 5) {
+    return retHalf;
+  }
+
+  // Media manutención por comida
+  const comidaCuenta = (tDep < HORA_COMIDA && tRet >= HORA_FIN_COMIDA);
+  const depHalf = comidaCuenta ? 0.5 : 0;
+
+  return depHalf + retHalf;
+}
+
+/**
+ * Calcula manutenciones para un viaje de varios días.
+ */
+function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena) {
+  let total = 0;
+
+  // Día de ida
+  if (tDep !== null) {
+    if (tDep < HORA_COMIDA) {
+      total += 1;
+    } else if (tDep < HORA_CENA) {
+      total += 0.5;
+    }
+  }
+
+  // Días intermedios (1 manutención completa cada uno)
+  total += diasIntermedios;
+
+  // Día de regreso
+  if (tRet !== null) {
+    const cenaCuenta = (normativa === 'rd') ? (tRet >= HORA_CENA && ticketCena) : (tRet >= HORA_CENA);
+    if (cenaCuenta) {
+      total += 1;
+    } else if (tRet >= HORA_COMIDA) {
+      total += 0.5;
+    }
+  }
+
+  return total;
+}
+
+/**
+ * Calcula el número total de manutenciones.
+ */
+function calcManutenciones(parsed, normativa, ticketCena) {
+  const { fechaIda, fechaRegreso, horaIda, horaRegreso, dtIda, dtRegreso } = parsed;
+  const tDep = toMinutes(horaIda);
+  const tRet = toMinutes(horaRegreso);
+
+  if (isSameDay(fechaIda, fechaRegreso)) {
+    return calcManutencionesSameDay(tDep, tRet, dtIda, dtRegreso, normativa, ticketCena);
+  }
+
+  const dias = daysBetween(fechaIda, fechaRegreso);
+  const diasIntermedios = Math.max(0, dias - 1);
+  return calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena);
+}
+
+// -----------------------------------------------------------------------------
+// 1.6 Cálculo de noches
+// -----------------------------------------------------------------------------
+
+/**
+ * Calcula el número de noches y detecta ambigüedad.
+ * @returns {Object} { noches, nochesIfCounted, nochesIfNotCounted, ambiguous }
+ */
+function calcNoches(parsed) {
+  const { fechaIda, fechaRegreso, horaRegreso } = parsed;
+  const baseNP = daysBetween(fechaIda, fechaRegreso);
+
+  if (baseNP <= 0) {
+    return { noches: 0, nochesIfCounted: 0, nochesIfNotCounted: 0, ambiguous: false };
+  }
+
+  const nochesIfCounted = baseNP;
+  const nochesIfNotCounted = Math.max(0, baseNP - 1);
+  const tRet = toMinutes(horaRegreso);
+
+  // Determinar si la última noche cuenta
+  if (tRet === null) {
+    // Sin hora, asumir que sí pernocta
+    return { noches: nochesIfCounted, nochesIfCounted, nochesIfNotCounted, ambiguous: false };
+  }
+
+  if (tRet >= HORA_PERNOCTA_MAX) {
+    // Regresa después de las 7:00 → sí pernocta
+    return { noches: nochesIfCounted, nochesIfCounted, nochesIfNotCounted, ambiguous: false };
+  }
+
+  if (tRet <= HORA_PERNOCTA_MIN) {
+    // Regresa antes de la 1:00 → no pernocta
+    return { noches: nochesIfNotCounted, nochesIfCounted, nochesIfNotCounted, ambiguous: false };
+  }
+
+  // Zona ambigua (entre 1:00 y 7:00)
+  return { noches: nochesIfNotCounted, nochesIfCounted, nochesIfNotCounted, ambiguous: true };
+}
+
+// -----------------------------------------------------------------------------
+// 1.7 Cálculo de IRPF
+// -----------------------------------------------------------------------------
+
+/**
+ * Obtiene las unidades de manutención por día para el cálculo de IRPF.
+ */
+function getPerDayManutencionUnits(parsed, normativa, ticketCena, manutencionesSameDay) {
+  const { fechaIda, fechaRegreso, horaIda, horaRegreso } = parsed;
+  const tDep = toMinutes(horaIda);
+  const tRet = toMinutes(horaRegreso);
+
+  if (isSameDay(fechaIda, fechaRegreso)) {
+    return [manutencionesSameDay];
+  }
+
+  const units = [];
+
+  // Día de ida
+  let depUnits = 0;
+  if (tDep !== null) {
+    if (tDep < HORA_COMIDA) depUnits = 1;
+    else if (tDep < HORA_CENA) depUnits = 0.5;
+  }
+  units.push(depUnits);
+
+  // Días intermedios
+  const dias = daysBetween(fechaIda, fechaRegreso);
+  for (let i = 0; i < dias - 1; i++) {
+    units.push(1);
+  }
+
+  // Día de regreso
+  let retUnits = 0;
+  if (tRet !== null) {
+    const cenaCuenta = (normativa === 'rd') ? (tRet >= HORA_CENA && ticketCena) : (tRet >= HORA_CENA);
+    if (cenaCuenta) retUnits = 1;
+    else if (tRet >= HORA_COMIDA) retUnits = 0.5;
+  }
+  units.push(retUnits);
+
+  return units;
+}
+
+/**
+ * Calcula el IRPF sujeto por día y el total.
+ */
+function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCena, input) {
+  const { limites, source } = getLimitesIRPF(input.paisIndex, input.pais);
+  const residMul = input.residenciaEventual ? 0.8 : 1;
+
+  const perDayUnits = getPerDayManutencionUnits(parsed, normativa, ticketCena, manutenciones);
+
+  let sujetoTotal = 0;
+  const breakdown = perDayUnits.map((units, i) => {
+    const brutoOriginal = round2(units * precioManutencion);
+    const bruto = round2(brutoOriginal * residMul);
+    const isLast = (i === perDayUnits.length - 1);
+    const exento = Number(isLast ? limites[0] : limites[1]);
+    const sujeto = round2(Math.max(0, bruto - exento));
+
+    sujetoTotal += sujeto;
+    return { dayIndex: i + 1, units, brutoOriginal, bruto, exento, sujeto, isLast };
+  });
+
+  return {
+    sujeto: round2(sujetoTotal),
+    breakdown,
+    limitesUsed: limites,
+    source
+  };
+}
+
+// -----------------------------------------------------------------------------
+// 1.8 Aplicación de flags post-cálculo
+// -----------------------------------------------------------------------------
+
+/**
+ * Aplica el flag justificarPernocta (añade una noche extra).
+ */
+function applyJustificarPernocta(result, precioNoche) {
+  result.noches += 1;
+  result.nochesAmount = round2(result.nochesAmount + precioNoche);
+  result.nochesIfCounted += 1;
+  result.nochesAmountIfCounted = round2(result.nochesAmountIfCounted + precioNoche);
+  result.nochesIfNotCounted = Math.max(0, result.nochesIfNotCounted - 1);
+  result.nochesAmountIfNotCounted = Math.max(0, result.nochesAmountIfNotCounted - precioNoche);
+}
+
+/**
+ * Aplica el flag excludeAlojamiento (pone todo a 0).
+ */
+function applyExcludeAlojamiento(result) {
+  result.alojamiento = 0;
+  result.noches = 0;
+  result.nochesAmount = 0;
+  result.nochesIfCounted = 0;
+  result.nochesAmountIfCounted = 0;
+  result.nochesIfNotCounted = 0;
+  result.nochesAmountIfNotCounted = 0;
+  result.alojamientoMaxAmount = 0;
+}
+
+/**
+ * Aplica el flag excludeManutencion al IRPF.
+ */
+function applyExcludeManutencionToIRPF(result) {
+  if (result.irpf) {
+    result.irpf.sujeto = 0;
+    if (Array.isArray(result.irpf.breakdown)) {
+      result.irpf.breakdown.forEach(b => { b.sujeto = 0; });
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 1.9 Función principal del motor
+// -----------------------------------------------------------------------------
+
+/**
+ * Motor de cálculo de desplazamientos.
+ * Recibe un input normalizado y devuelve los resultados del cálculo.
+ */
+function calculateDesplazamiento(input) {
+  if (!input) return null;
+
+  // Extraer flags
+  const flags = extractFlags(input);
+
+  // Parsear fechas y horas
+  const fechaIda = parseDate(input.fechaIda);
+  const fechaRegreso = parseDate(input.fechaRegreso);
   const horaIda = parseTime(input.horaIda);
   const horaRegreso = parseTime(input.horaRegreso);
+  const cruceIda = parseDate(input.cruceIda);
+  const cruceVuelta = parseDate(input.cruceVuelta);
 
-  const dtIda = toDateTime(fechaIdaDate, horaIda);
-  const dtVuelta = toDateTime(fechaRegresoDate, horaRegreso);
+  const dtIda = toDateTime(fechaIda, horaIda);
+  const dtRegreso = toDateTime(fechaRegreso, horaRegreso);
 
-  // VALIDACIÓN PREVIA: comprobar que tenemos los datos mínimos y que son lógicos
-  // Requerimos: fechaIda, fechaRegreso, horaIda, horaRegreso. Además, para
-  // desplazamientos internacionales exigimos cruceIda y cruceVuelta, y que ambas
-  // fechas de cruce estén dentro del rango [fechaIda, fechaRegreso] y que
-  // cruceVuelta >= cruceIda.
-  try {
-    const segmentMode = flags && flags._segmentMode;
-    const missingDatesOrTimes = !fechaIdaDate || !fechaRegresoDate || (!segmentMode && (!horaIda || !horaRegreso));
-    const isInternational = (typeof input.paisIndex === 'number') ? (input.paisIndex > 0) : ((input.pais || '').toString().toLowerCase() !== 'españa' && (input.pais || '').toString() !== '');
+  const isInternational = (typeof input.paisIndex === 'number')
+    ? input.paisIndex > 0
+    : (input.pais || '').toLowerCase() !== 'españa' && input.pais !== '';
 
-    // parsear cruces si vienen
-    const cruceIdaDate = input && input.cruceIda ? parseDate(input.cruceIda) : null;
-    const cruceVueltaDate = input && input.cruceVuelta ? parseDate(input.cruceVuelta) : null;
+  const parsed = {
+    fechaIda, fechaRegreso, horaIda, horaRegreso,
+    dtIda, dtRegreso, cruceIda, cruceVuelta, isInternational
+  };
 
-    const missingCruces = isInternational && (!segmentMode && (!cruceIdaDate || !cruceVueltaDate));
-    const invalidOrder = dtIda && dtVuelta && (dtIda.getTime() > dtVuelta.getTime());
-    const invalidCrucesOrder = (!segmentMode && cruceIdaDate && cruceVueltaDate && (cruceIdaDate.getTime() > cruceVueltaDate.getTime()));
-    const crucesFueraRango = (!segmentMode && cruceIdaDate && cruceVueltaDate && (fechaIdaDate && fechaRegresoDate) && (cruceIdaDate.getTime() < fechaIdaDate.getTime() || cruceVueltaDate.getTime() > fechaRegresoDate.getTime()));
+  // Validar input
+  const precioKm = Number(input.kmTarifa) || 0.26;
+  const kmNum = parseNumber(input.km);
+  const kmAmount = round2(kmNum * precioKm);
 
-    if (missingDatesOrTimes || missingCruces || invalidOrder || invalidCrucesOrder || crucesFueraRango) {
-      // No podemos calcular manutención/noches/retención. Devolver resultado
-      // con esas partidas a cero, pero seguir devolviendo importes independientes
-      // como km para que la UI pueda mostrar totales parciales.
-      const precioKm = (input && input.kmTarifa) ? Number(input.kmTarifa) : 0.26;
-      let kmNum = 0;
-      if (typeof input.km === 'number') kmNum = input.km;
-      else if (typeof input.km === 'string') { const s = input.km.replace(/[^0-9,\.]/g,'').replace(/\./g,'').replace(/,/g,'.'); kmNum = parseFloat(s) || 0; }
-      const kmAmount = Math.round((kmNum * precioKm + Number.EPSILON) * 100) / 100;
-
-      result.manutenciones = 0;
-      result.manutencionesAmount = 0;
-      result.precioManutencion = 0;
-      result.precioNoche = 0;
-      result.noches = 0;
-      result.nochesAmount = 0;
-      result.nochesBase = 0;
-      result.nochesIfCounted = 0;
-      result.nochesIfNotCounted = 0;
-      result.nochesAmountIfCounted = 0;
-      result.nochesAmountIfNotCounted = 0;
-      result.nochesAmbiguous = false;
-      result.alojamiento = 0;
-      result.alojamientoMaxAmount = 0;
-      result.km = kmNum;
-      result.kmAmount = kmAmount;
-      result.precioKm = precioKm;
-      result.irpf = { sujeto: 0, breakdown: [], limitesUsed: [26.67,53.34] };
-      return result;
-    }
-  } catch (e) {
-    // En caso de excepción durante la validación, caemos con seguridad y dejamos
-    // todo a cero (salvo km si se puede calcular más abajo). Continuamos normalmente.
+  const validation = validateInput(parsed, flags);
+  if (!validation.valid) {
+    return buildEmptyResult(input, kmAmount, precioKm);
   }
 
-  // Manutenciones
-  let manutenciones = 0;
-  let normative = 'decreto';
-  try {
-    const datos = (typeof window !== 'undefined' && window.__sgtriDatos) ? window.__sgtriDatos : null;
-    if (datos && datos.normativasPorTipoProyecto && datos.normativasPorTipoProyecto.rd) {
-      const rdList = datos.normativasPorTipoProyecto.rd || [];
-      if (input && input.tipoProyecto && rdList.indexOf(input.tipoProyecto) !== -1) normative = 'rd';
-    }
-  } catch (e) { }
+  // Obtener configuración
+  const normativa = getNormativa(input.tipoProyecto);
+  const precios = getPrecios(input.paisIndex, input.pais, normativa);
+  const ticketCena = input.ticketCena;
 
-  function minutesOf(t) { return (t && typeof t.hh === 'number' && typeof t.mm === 'number') ? (t.hh * 60 + t.mm) : null; }
-  const tDep = minutesOf(horaIda);
-  const tRet = minutesOf(horaRegreso);
-  const isSameDay = fechaIdaDate && fechaRegresoDate && fechaIdaDate.getFullYear() === fechaRegresoDate.getFullYear() && fechaIdaDate.getMonth() === fechaRegresoDate.getMonth() && fechaIdaDate.getDate() === fechaRegresoDate.getDate();
-
-  if (isSameDay) {
-    if (tDep == null || tRet == null) manutenciones = 0;
-    else {
-      const durationHours = (dtVuelta.getTime() - dtIda.getTime()) / 3600000;
-      if (normative === 'rd') {
-        const retHalf = (tRet >= (22 * 60) && input && input.ticketCena) ? 0.5 : 0;
-        if (durationHours < 5) manutenciones = retHalf;
-        else {
-          const depHalf = (tDep < (14 * 60) && tRet >= (16 * 60)) ? 0.5 : 0;
-          manutenciones = depHalf + retHalf;
-        }
-      } else {
-        const depCond = (tDep < (14 * 60) && tRet >= (16 * 60)) ? 0.5 : 0;
-        const retCond = (tRet >= (22 * 60)) ? 0.5 : 0;
-        manutenciones = depCond + retCond;
-      }
-    }
-  } else {
-    if (tDep != null) {
-      if (tDep < (14 * 60)) manutenciones += 1;
-      else if (tDep >= (14 * 60) && tDep < (22 * 60)) manutenciones += 0.5;
-    }
-    if (fechaIdaDate && fechaRegresoDate) {
-      const days = daysBetweenMidnights(fechaIdaDate, fechaRegresoDate);
-      const intermediate = Math.max(0, days - 1);
-      if (intermediate > 0) manutenciones += intermediate;
-    }
-    if (tRet != null) {
-      if (normative === 'rd') {
-        if (tRet >= (22 * 60) && input && input.ticketCena) manutenciones += 1;
-        else if (tRet >= (14 * 60)) manutenciones += 0.5;
-      } else {
-        if (tRet >= (22 * 60)) manutenciones += 1;
-        else if (tRet >= (14 * 60)) manutenciones += 0.5;
-      }
-    }
+  // Calcular manutenciones
+  let manutenciones = calcManutenciones(parsed, normativa, ticketCena);
+  if (flags.excludeManutencion) {
+    manutenciones = 0;
   }
 
-  // aplicar flag excludeManutencion antes de cálculos monetarios
-  try { if (flags && flags.excludeManutencion) manutenciones = 0; } catch (e) {}
+  // Calcular noches
+  const nochesCalc = calcNoches(parsed);
 
-  // Noches
-  let baseNP = 0;
-  if (fechaIdaDate && fechaRegresoDate) baseNP = daysBetweenMidnights(fechaIdaDate, fechaRegresoDate);
-  let noches = 0; let ambiguous = false; let nochesIfCounted = 0; let nochesIfNotCounted = 0;
-  if (baseNP <= 0) { noches = 0; nochesIfCounted = 0; nochesIfNotCounted = 0; }
-  else {
-    nochesIfCounted = baseNP; nochesIfNotCounted = Math.max(0, baseNP - 1);
-    let t = null;
-    if (horaRegreso && typeof horaRegreso.hh === 'number' && typeof horaRegreso.mm === 'number') t = horaRegreso.hh * 60 + horaRegreso.mm;
-    else if (input && input.horaRegreso) {
-      const m = String(input.horaRegreso || '').match(/(\d{1,2})\s*[:h]\s*(\d{2})/);
-      if (m) { const hh = parseInt(m[1],10); const mm = parseInt(m[2],10); if (!isNaN(hh) && !isNaN(mm)) t = hh*60 + mm; }
-    }
-    if (t === null) noches = nochesIfCounted;
-    else {
-      if (t >= (7*60)) noches = nochesIfCounted;
-      else if (t <= (1*60)) noches = nochesIfNotCounted;
-      else { ambiguous = true; noches = nochesIfNotCounted; }
-    }
+  // Calcular importes
+  const manutencionesAmount = round2(manutenciones * precios.manutencion);
+  const nochesAmount = round2(nochesCalc.noches * precios.noche);
+  const nochesAmountIfCounted = round2(nochesCalc.nochesIfCounted * precios.noche);
+  const nochesAmountIfNotCounted = round2(nochesCalc.nochesIfNotCounted * precios.noche);
+
+  // Parsear valores de usuario
+  const alojamientoNum = parseNumber(input.alojamiento);
+
+  // Construir resultado base
+  const result = {
+    ...input,
+    manutenciones,
+    manutencionesAmount,
+    precioManutencion: precios.manutencion,
+    precioNoche: precios.noche,
+    precioKm,
+    noches: nochesCalc.noches,
+    nochesAmount,
+    nochesBase: daysBetween(fechaIda, fechaRegreso),
+    nochesIfCounted: nochesCalc.nochesIfCounted,
+    nochesIfNotCounted: nochesCalc.nochesIfNotCounted,
+    nochesAmountIfCounted,
+    nochesAmountIfNotCounted,
+    nochesAmbiguous: nochesCalc.ambiguous,
+    km: kmNum,
+    kmAmount,
+    alojamiento: alojamientoNum,
+    alojamientoMaxAmount: nochesAmount
+  };
+
+  // Añadir fechas de ambigüedad si aplica
+  if (nochesCalc.ambiguous && fechaRegreso) {
+    const last = new Date(fechaRegreso.getTime());
+    const penult = new Date(last.getTime());
+    penult.setDate(last.getDate() - 1);
+    result.nochesAmbiguousFrom = formatDateDMY(penult);
+    result.nochesAmbiguousTo = formatDateDMY(last);
   }
 
-  // Valores (precios por país)
-  let precioManutencion = 50.55; let precioNoche = 98.88;
-  try {
-    const datos = (typeof window !== 'undefined' && window.__sgtriDatos) ? window.__sgtriDatos : null;
-    if (datos && datos.dietasPorPais && Array.isArray(datos.dietasPorPais.paises)) {
-      const paisesArr = datos.dietasPorPais.paises || [];
-      let idx = -1;
-      if (typeof input.paisIndex === 'number' && input.paisIndex >= 0) idx = input.paisIndex;
-      if (idx === -1) idx = paisesArr.indexOf(input && input.pais ? input.pais : '');
-      if (idx === -1) idx = Math.max(0, paisesArr.length - 1);
-      if (normative === 'rd' && datos.dietasPorPais.rd462_2002) {
-        const mArr = datos.dietasPorPais.rd462_2002.manutencion || [];
-        const aArr = datos.dietasPorPais.rd462_2002.alojamiento || [];
-        if (mArr[idx] != null) precioManutencion = Number(mArr[idx]);
-        if (aArr[idx] != null) precioNoche = Number(aArr[idx]);
-      } else if (normative === 'decreto' && datos.dietasPorPais.decreto42_2025) {
-        const mArr = datos.dietasPorPais.decreto42_2025.manutencion || [];
-        const aArr = datos.dietasPorPais.decreto42_2025.alojamiento || [];
-        if (mArr[idx] != null) precioManutencion = Number(mArr[idx]);
-        if (aArr[idx] != null) precioNoche = Number(aArr[idx]);
-      }
-    }
-  } catch (e) { }
-  const precioKm = (input && input.kmTarifa) ? Number(input.kmTarifa) : 0.26;
+  // Calcular IRPF
+  result.irpf = calcIRPF(parsed, manutenciones, precios.manutencion, normativa, ticketCena, input);
+  result.irpfSource = result.irpf.source;
 
-  // Parse km y alojamiento (robusto)
-  let kmNum = 0; if (typeof input.km === 'number') kmNum = input.km; else if (typeof input.km === 'string') { const s = input.km.replace(/[^0-9,\.]/g,'').replace(/\./g,'').replace(/,/g,'.'); kmNum = parseFloat(s) || 0; }
-  let alojamientoNum = 0; if (typeof input.alojamiento === 'number') alojamientoNum = input.alojamiento; else if (typeof input.alojamiento === 'string') { const s = input.alojamiento.replace(/[^0-9,\.]/g,'').replace(/\./g,'').replace(/,/g,'.'); alojamientoNum = parseFloat(s) || 0; }
-
-  const manutencionesAmount = Math.round((manutenciones * precioManutencion + Number.EPSILON) * 100) / 100;
-  const nochesAmount = Math.round((noches * precioNoche + Number.EPSILON) * 100) / 100;
-  const nochesAmountIfCounted = Math.round((nochesIfCounted * precioNoche + Number.EPSILON) * 100) / 100;
-  const nochesAmountIfNotCounted = Math.round((nochesIfNotCounted * precioNoche + Number.EPSILON) * 100) / 100;
-  const kmAmount = Math.round((kmNum * precioKm + Number.EPSILON) * 100) / 100;
-
-  result.manutenciones = manutenciones;
-  result.manutencionesAmount = manutencionesAmount;
-  result.precioManutencion = precioManutencion;
-  result.precioNoche = precioNoche;
-  result.noches = noches;
-  result.nochesAmount = nochesAmount;
-  result.nochesBase = baseNP;
-  result.nochesIfCounted = nochesIfCounted;
-  result.nochesIfNotCounted = nochesIfNotCounted;
-  result.nochesAmountIfCounted = nochesAmountIfCounted;
-  result.nochesAmountIfNotCounted = nochesAmountIfNotCounted;
-  result.nochesAmbiguous = ambiguous;
-  if (ambiguous && fechaRegresoDate) {
-    const last = new Date(fechaRegresoDate.getTime());
-    const penult = new Date(last.getTime()); penult.setDate(last.getDate() - 1);
-    function fmtDate(d) { const dd = String(d.getDate()).padStart(2,'0'); const mm = String(d.getMonth()+1).padStart(2,'0'); const yyyy = String(d.getFullYear()); return `${dd}/${mm}/${yyyy}`; }
-    result.nochesAmbiguousFrom = fmtDate(penult); result.nochesAmbiguousTo = fmtDate(last);
+  // Aplicar flags post-cálculo
+  if (flags.justificarPernocta) {
+    applyJustificarPernocta(result, precios.noche);
   }
 
-  // Ajustes por flags: justificarPernocta y excludeAlojamiento
-  try {
-    if (flags && flags.justificarPernocta) {
-      const perNight = Number(precioNoche || 0);
-      result.noches = (Number(result.noches) || 0) + 1;
-      result.nochesAmount = Math.round(((Number(result.nochesAmount) || 0) + perNight + Number.EPSILON) * 100) / 100;
-      result.alojamiento = Math.round(((Number(result.alojamiento) || 0) + perNight + Number.EPSILON) * 100) / 100;
-      if (typeof result.nochesIfCounted !== 'undefined') result.nochesIfCounted = (Number(result.nochesIfCounted) || 0) + 1;
-      if (typeof result.nochesAmountIfCounted !== 'undefined') result.nochesAmountIfCounted = Math.round(((Number(result.nochesAmountIfCounted) || 0) + perNight + Number.EPSILON) * 100) / 100;
-      if (typeof result.nochesIfNotCounted !== 'undefined') result.nochesIfNotCounted = Math.max(0, (Number(result.nochesIfNotCounted) || 0) - 1);
-      if (typeof result.nochesAmountIfNotCounted !== 'undefined') result.nochesAmountIfNotCounted = Math.max(0, (Number(result.nochesAmountIfNotCounted) || 0) - perNight);
-    }
-  } catch (e) {}
-  try {
-    if (flags && flags.excludeAlojamiento) {
-      result.alojamiento = 0; result.noches = 0; result.nochesAmount = 0; if (typeof result.nochesIfCounted !== 'undefined') result.nochesIfCounted = 0; if (typeof result.nochesAmountIfCounted !== 'undefined') result.nochesAmountIfCounted = 0; if (typeof result.nochesIfNotCounted !== 'undefined') result.nochesIfNotCounted = 0; if (typeof result.nochesAmountIfNotCounted !== 'undefined') result.nochesAmountIfNotCounted = 0; result.alojamientoMaxAmount = 0;
-    }
-  } catch (e) {}
+  if (flags.excludeAlojamiento) {
+    applyExcludeAlojamiento(result);
+  }
 
-  result.km = kmNum; result.kmAmount = kmAmount; result.alojamiento = alojamientoNum; result.alojamientoMaxAmount = nochesAmount; result.precioKm = precioKm;
-
-  // IRPF
-  try {
-    const datosFallback = (typeof window !== 'undefined' && window.__sgtriDatos) ? window.__sgtriDatos : null;
-    let usedLimits = null;
-    if (datosFallback && datosFallback.limitesIRPF) {
-      if (typeof input.paisIndex === 'number' && input.paisIndex >= 0) { usedLimits = (input.paisIndex === 0) ? datosFallback.limitesIRPF.esp : datosFallback.limitesIRPF.ext; result.irpfSource = (input.paisIndex === 0) ? 'esp' : 'ext'; }
-      else {
-        const paisesArr = (datosFallback.dietasPorPais && Array.isArray(datosFallback.dietasPorPais.paises)) ? datosFallback.dietasPorPais.paises : null;
-        let idx = -1;
-        if (paisesArr && input && input.pais) {
-          idx = paisesArr.indexOf(input.pais);
-          if (idx === -1) {
-            const normalize = s => (s && s.normalize) ? s.normalize('NFD').replace(/[\u0000-\u036f]/g, '') .toLowerCase() : (s || '').toLowerCase();
-            const target = normalize(String(input.pais));
-            idx = paisesArr.findIndex(p => normalize(String(p)) === target);
-          }
-        }
-        if (idx === 0) { usedLimits = datosFallback.limitesIRPF.esp; result.irpfSource = 'esp'; } else { usedLimits = datosFallback.limitesIRPF.ext; result.irpfSource = 'ext'; }
-      }
-    }
-    if (!usedLimits || !Array.isArray(usedLimits) || usedLimits.length < 2) usedLimits = [26.67, 53.34];
-
-    const perDayManutencionUnits = [];
-    if (isSameDay) perDayManutencionUnits.push(manutenciones);
-    else {
-      let depUnits = 0; if (tDep != null) { if (tDep < (14*60)) depUnits = 1; else if (tDep >= (14*60) && tDep < (22*60)) depUnits = 0.5; else depUnits = 0; }
-      perDayManutencionUnits.push(depUnits);
-      if (fechaIdaDate && fechaRegresoDate) { const days = daysBetweenMidnights(fechaIdaDate, fechaRegresoDate); const intermediate = Math.max(0, days - 1); for (let i=0;i<intermediate;i++) perDayManutencionUnits.push(1); }
-      let retUnits = 0; if (tRet != null) { if (normative === 'rd') { if (tRet >= (22*60) && input && input.ticketCena) retUnits = 1; else if (tRet >= (14*60)) retUnits = 0.5; } else { if (tRet >= (22*60)) retUnits = 1; else if (tRet >= (14*60)) retUnits = 0.5; } }
-      perDayManutencionUnits.push(retUnits);
-    }
-
-    const perDayDetails = []; let irpfSujetoTotal = 0; const residMul = (input && input.residenciaEventual) ? 0.8 : 1;
-    for (let i=0;i<perDayManutencionUnits.length;i++) {
-      const units = perDayManutencionUnits[i] || 0;
-      const brutoOriginal = Math.round((units * precioManutencion + Number.EPSILON) * 100) / 100;
-      const brutoToUse = Math.round((brutoOriginal * residMul + Number.EPSILON) * 100) / 100;
-      const isLast = (i === perDayManutencionUnits.length - 1);
-      const exento = isLast ? Number(usedLimits[0]) : Number(usedLimits[1]);
-      let sujeto = brutoToUse - exento; if (sujeto < 0) sujeto = 0; sujeto = Math.round((sujeto + Number.EPSILON) * 100) / 100;
-      perDayDetails.push({ dayIndex: i+1, units, brutoOriginal, bruto: brutoToUse, exento, sujeto, isLast });
-      irpfSujetoTotal += sujeto;
-    }
-    irpfSujetoTotal = Math.round((irpfSujetoTotal + Number.EPSILON) * 100) / 100;
-    result.irpf = { sujeto: irpfSujetoTotal, breakdown: perDayDetails, limitesUsed: usedLimits };
-  } catch (e) { result.irpf = { sujeto: 0, breakdown: [], limitesUsed: [26.67,53.34] }; }
-
-  // Si se pide excluir manutención, asegurar que IRPF sujeto sea 0
-  try { if (flags && flags.excludeManutencion && result && result.irpf) { result.irpf.sujeto = 0; if (Array.isArray(result.irpf.breakdown)) result.irpf.breakdown.forEach(b => { try{ b.sujeto = 0;}catch(e){} }); } } catch (e) {}
+  if (flags.excludeManutencion) {
+    applyExcludeManutencionToIRPF(result);
+  }
 
   return result;
 }
 
-// Exponer la API del motor para compatibilidad hacia atrás
-// Exponer el motor en el namespace moderno `calculoDesp`.
+// Exponer la API del motor
 window.calculoDesp = window.calculoDesp || {};
 window.calculoDesp.calculateDesplazamiento = calculateDesplazamiento;
 
-// -------------------------
-// Sección 2: WRAPPER / Orquestador (recolecta DOM, añade flags y renderiza)
-// -------------------------
+// Exponer utilidades del motor para testing
+window.calculoDesp._parseDate = parseDate;
+window.calculoDesp._parseTime = parseTime;
+window.calculoDesp._parseNumber = parseNumber;
+window.calculoDesp._daysBetween = daysBetween;
+
+// =============================================================================
+// Sección 2: WRAPPER / ORQUESTADOR
+// =============================================================================
+// Conecta: DOM → cogeDatosDesp → Motor → salidaDesp
+
 (function () {
-  // Las funciones que recolectan datos del DOM y parsean números se han movido
-  // a `js/cogeDatosDesp.js` y quedan disponibles en `window.cogeDatosDesp`.
-  // Para evitar dependencia del orden de carga de los scripts, no capturamos
-  // las referencias en el momento de la carga; en su lugar, definimos
-  // respaldos y resolveremos las funciones reales en tiempo de ejecución
-  // cuando se invoque `calculaDesplazamientoFicha`.
-  function _fallbackCollect(d) { return null; }
-  function _fallbackParse(v) { const n = parseFloat(String(v || '').replace(/[^0-9,\.\-]/g,'').replace(/,/g,'.')); return isNaN(n) ? 0 : n; }
+  'use strict';
 
+  // ---------------------------------------------------------------------------
+  // 2.1 Helpers del Wrapper
+  // ---------------------------------------------------------------------------
 
-  
-
-  function calculaDesplazamientoFicha(despEl) {
-    const collectFn = (window.cogeDatosDesp && typeof window.cogeDatosDesp.collectDataFromFicha === 'function') ? window.cogeDatosDesp.collectDataFromFicha : _fallbackCollect;
-    const parseNumFn = (window.cogeDatosDesp && typeof window.cogeDatosDesp.parseNumber === 'function') ? window.cogeDatosDesp.parseNumber : _fallbackParse;
-    const data = collectFn(despEl);
-    if (!data) return null;
-    const otrosSum = (Array.isArray(data.otrosGastos) ? data.otrosGastos.reduce((acc, v) => acc + parseNumFn(v), 0) : 0);
-    const kmNum = parseNumFn(data.km);
-    const alojNum = parseNumFn(data.alojamiento);
-
-    // determinar tarifa km
-    let kmTarifa = 0.26;
-    try {
-      const veh = document.querySelector('input[name="vehiculo-tipo"]:checked');
-      const tipoVeh = veh && veh.value ? veh.value : 'coche';
-      if (window && window.__sgtriDatos && window.__sgtriDatos.kmTarifas && window.__sgtriDatos.kmTarifas[tipoVeh]) kmTarifa = window.__sgtriDatos.kmTarifas[tipoVeh];
-    } catch (e) {}
-
-    const calcInput = {
-      fechaIda: data.fechaIda,
-      horaIda: data.horaIda,
-      fechaRegreso: data.fechaRegreso,
-      horaRegreso: data.horaRegreso,
-      cruceIda: data.cruceIda,
-      cruceVuelta: data.cruceVuelta,
-      pais: data.pais,
-      paisIndex: data.paisIndex,
-      km: kmNum,
-      alojamiento: alojNum,
-      ticketCena: data.ticketCena,
-      tipoProyecto: data.tipoProyecto,
-      kmTarifa: kmTarifa,
-      // Booleanos top-level (anteriormente en `flags`):
-      excludeManutencion: !!data.noManutencion,
-      justificarPernocta: !!data.justificarPernocta,
-      excludeAlojamiento: !!data.dtInvalid
-    };
-    // Flags derived from collected `data` (collectDataFromFicha) —
-    // evitar leer `despEl.dataset` en varios sitios para mantener la fuente de la verdad en `collectDataFromFicha`.
-
-    let canonical = null;
-    try { canonical = calculateDesplazamiento(calcInput); } catch(e) { canonical = null; }
-
-    // Si la UI marcó la ficha como inválida (clase .field-error) o dataset.dtInvalid,
-    // forzamos a cero manutenciones, alojamiento e IRPF para no mostrar importes.
-    const fechasInvalidas = !!(despEl && despEl.dataset && despEl.dataset.dtInvalid === '1') || (despEl && despEl.querySelector && despEl.querySelector('.field-error') !== null);
-    if (fechasInvalidas) {
-      try {
-        if (!canonical) canonical = {};
-        canonical.manutenciones = 0; canonical.manutencionesAmount = 0; canonical.precioManutencion = 0;
-        canonical.alojamiento = 0; canonical.alojamientoMaxAmount = 0; canonical.noches = 0; canonical.nochesAmount = 0;
-        if (!canonical.irpf) canonical.irpf = { sujeto: 0, breakdown: [], limitesUsed: [26.67,53.34] };
-        canonical.irpf.sujeto = 0; if (Array.isArray(canonical.irpf.breakdown)) canonical.irpf.breakdown.forEach(b => { try{ b.sujeto = 0; } catch(e){} });
-        // marcar dataset para la UI si no estaba marcado
-        try { if (despEl && despEl.dataset && despEl.dataset.dtInvalid !== '1') despEl.dataset.dtInvalid = '1'; } catch(e) {}
-      } catch (e) {}
-    }
-
-    // Si es internacional y tenemos cruces, generar segmentos (A: ida->cruceIda, B: cruceIda->cruceVuelta, C: cruceVuelta->vuelta)
-    try {
-      const isInternational = (typeof calcInput.paisIndex === 'number') ? (calcInput.paisIndex > 0) : ((calcInput.pais || '').toString().toLowerCase() !== 'españa' && (calcInput.pais || '').toString() !== '');
-      const cruceIdaDateRaw = data.cruceIda;
-      const cruceVueltaDateRaw = data.cruceVuelta;
-      if (isInternational && cruceIdaDateRaw && cruceVueltaDateRaw) {
-        const segments = [];
-
-        // Construir tramos según reglas del usuario:
-        // Tramo 1: fechaIda@horaIda -> cruceIda@08:00 (solo si fechaIda != cruceIda)
-        // Tramo 2: cruceIda@08:00 -> cruceVuelta@00:00
-        // Tramo 3: cruceVuelta@00:00 -> fechaRegreso@horaRegreso (solo si cruceVuelta != fechaRegreso)
-        const fechaIdaRaw = data.fechaIda;
-        const fechaRegresoRaw = data.fechaRegreso;
-        const cruceIdaRaw = data.cruceIda;
-        const cruceVueltaRaw = data.cruceVuelta;
-
-        const pushIfValid = (segInp) => { if (segInp) segments.push(segInp); };
-
-        // Helper que monta input con horas concretas
-        const makeSegInputWithTimes = (startDate, startTime, endDate, endTime, segPais, segPaisIndex, segTicketCena) => {
-          if (!startDate || !endDate) return null;
-          const copy = Object.assign({}, calcInput);
-          copy.fechaIda = startDate;
-          copy.horaIda = startTime || '';
-          copy.fechaRegreso = endDate;
-          copy.horaRegreso = endTime || '';
-          copy.cruceIda = '';
-          copy.cruceVuelta = '';
-          copy.pais = segPais;
-          copy.paisIndex = (typeof segPaisIndex === 'number') ? segPaisIndex : copy.paisIndex;
-          copy.km = 0;
-          copy.alojamiento = 0;
-          // For segment sub-calculations we only set `ticketCena` when the
-          // caller explicitly requests it (pass `segTicketCena` true for the
-          // final segment). This lets the motor compute correctly (including
-          // IRPF) for the last segment while leaving earlier segments unaffected.
-          copy.ticketCena = !!segTicketCena;
-          copy._segmentMode = true;
-          return copy;
-        };
-
-        // Determinar normativa para tramos (coincide con la lógica del motor)
-        let normativeWrapper = 'decreto';
-        try {
-          const rdList = (typeof window !== 'undefined' && window.__sgtriDatos && window.__sgtriDatos.normativasPorTipoProyecto && window.__sgtriDatos.normativasPorTipoProyecto.rd) ? window.__sgtriDatos.normativasPorTipoProyecto.rd : null;
-          if (rdList && calcInput && calcInput.tipoProyecto && rdList.indexOf(calcInput.tipoProyecto) !== -1) normativeWrapper = 'rd';
-        } catch (e) {}
-
-        // Para la normativa 'decreto' se debe comprobar el checkbox de ticket-cena
-        // SOLO en el último tramo; en los tramos intermedios se asume que ha cenado.
-        const nonFinalAssumeCena = (normativeWrapper === 'decreto');
-
-        // Tramo 1
-        try {
-          if (fechaIdaRaw && cruceIdaRaw && String(fechaIdaRaw).trim() !== String(cruceIdaRaw).trim()) {
-            pushIfValid(makeSegInputWithTimes(fechaIdaRaw, data.horaIda || '', cruceIdaRaw, '08:00', 'España', 0, nonFinalAssumeCena));
-          }
-        } catch(e) {}
-
-        // Tramo 2 (central) — siempre si hay ambos cruces
-        try {
-          if (cruceIdaRaw && cruceVueltaRaw) {
-            // Usar 23:59 como hora de fin en el tramo central para que
-            // un cruce a las 00:00 no reste la noche anterior (00:00 se
-            // interpreta como inicio de día y podría reducir el conteo).
-            pushIfValid(makeSegInputWithTimes(cruceIdaRaw, '08:00', cruceVueltaRaw, '23:59', data.pais || calcInput.pais, calcInput.paisIndex, nonFinalAssumeCena));
-          }
-        } catch(e) {}
-
-        // Tramo 3: tramo final siempre calculado con importes de España
-        try {
-          if (cruceVueltaRaw && fechaRegresoRaw) {
-            // For the final segment, pass through the original ticketCena flag
-            // so the motor can compute the correct effect (including IRPF).
-            pushIfValid(makeSegInputWithTimes(cruceVueltaRaw, '00:00', fechaRegresoRaw, data.horaRegreso || '', 'España', 0, !!data.ticketCena));
-          }
-        } catch(e) {}
-
-        // Compute raw segment results via motor
-        const segResultsRaw = segments.map(sin => {
-          try { return calculateDesplazamiento(sin); } catch(e) { return null; }
-        }).filter(r => r !== null);
-
-        // DEBUG logging: if this tipoProyecto uses RD (462/2002), print segment inputs and outputs
-        try {
-          const rdList = (typeof window !== 'undefined' && window.__sgtriDatos && window.__sgtriDatos.normativasPorTipoProyecto && window.__sgtriDatos.normativasPorTipoProyecto.rd) ? window.__sgtriDatos.normativasPorTipoProyecto.rd : null;
-          const isRd = rdList && calcInput && calcInput.tipoProyecto && rdList.indexOf(calcInput.tipoProyecto) !== -1;
-          if (isRd) {
-            try { console.debug('[calculoDesp] RD DEBUG - segments inputs:', JSON.parse(JSON.stringify(segments))); } catch(e) { console.debug('[calculoDesp] RD DEBUG - segments inputs (unserializable)'); }
-            try { console.debug('[calculoDesp] RD DEBUG - segResultsRaw:', JSON.parse(JSON.stringify(segResultsRaw))); } catch(e) { console.debug('[calculoDesp] RD DEBUG - segResultsRaw (unserializable)'); }
-          }
-        } catch(e) {}
-
-        // Filtrar tramos vacíos, pero asegurarnos de que el tramo final
-        // (último generado) siempre se incluya aunque sus importes sean 0.
-        const segResultsFiltered = segResultsRaw.filter(r => r && ( (r.noches && r.noches>0) || (r.manutenciones && r.manutenciones>0) || (r.km && r.km>0) || (r.nochesAmbiguous) ));
-        if (segResultsRaw.length > 0) {
-          const finalRaw = segResultsRaw[segResultsRaw.length - 1];
-          // si el final no está en el filtrado, añadirlo
-          if (finalRaw && !segResultsFiltered.includes(finalRaw)) segResultsFiltered.push(finalRaw);
-        }
-
-        // nota: ticket-cena ahora se pasa solo al último segmento para que
-        // el motor lo compute correctamente; no hacemos ajustes manuales aquí.
-
-        if (Array.isArray(segResultsFiltered) && segResultsFiltered.length>0) {
-          canonical = canonical || {};
-          canonical.segmentsResults = segResultsFiltered;
-        }
-        // Si la validación global de fechas falló, asegurarnos de que los tramos
-        // también tengan manutención/alojamiento/irpf a 0 para no mostrar importes.
-        if (fechasInvalidas && canonical && Array.isArray(canonical.segmentsResults)) {
-          canonical.segmentsResults.forEach(s => {
-            try {
-              if (!s) return;
-              s.manutenciones = 0; s.manutencionesAmount = 0; s.precioManutencion = 0;
-              s.alojamiento = 0; s.alojamientoMaxAmount = 0; s.noches = 0; s.nochesAmount = 0;
-              if (!s.irpf) s.irpf = { sujeto: 0, breakdown: [], limitesUsed: [26.67,53.34] };
-              s.irpf.sujeto = 0; if (Array.isArray(s.irpf.breakdown)) s.irpf.breakdown.forEach(b => { try{ b.sujeto = 0; }catch(e){} });
-            } catch(e) {}
-          });
-        }
-      }
-    } catch(e) { /* no bloquear render si falla segmentación */ }
-
-    const displayContext = {
-      otrosSum,
-      kmNum,
-      alojNum,
-      excludeManutencion: !!calcInput.excludeManutencion,
-      justificarPernocta: !!calcInput.justificarPernocta,
-      excludeAlojamiento: !!calcInput.excludeAlojamiento,
-      id: data.id
-    };
-
-    try { if (window && window.salidaDesp && typeof window.salidaDesp.renderSalida === 'function') window.salidaDesp.renderSalida(despEl, canonical, displayContext); } catch (e) {}
-
-    return { canonical, displayContext, calcInput };
+  /**
+   * Formatea fecha Date a string dd/mm/aaaa.
+   */
+  function formatDateStr(d) {
+    if (!d) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
   }
 
-  // API pública de `calculoDesp` (export):
-  // - `calculaDesplazamientoFicha(despEl)`: recoge datos de la ficha DOM y calcula.
-  // - `collectDataFromFicha(despEl)`: devuelve un objeto con campos raw de la ficha.
-  // - `parseNumber(v)`: parser robusto para importes numéricos (nuevo nombre).
-  // Se mantiene `parseNumericLoose` como alias por compatibilidad hacia atrás.
-  // Exportar API pública. Reexportar las utilidades de `cogeDatosDesp` si están
-  // disponibles para mantener compatibilidad con código que las consume.
+  /**
+   * Formatea hora {hh, mm} a string hh:mm.
+   */
+  function formatTimeStr(t) {
+    if (!t) return '';
+    return `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`;
+  }
+
+  /**
+   * Obtiene la tarifa de km según el tipo de vehículo seleccionado.
+   */
+  function getKmTarifa() {
+    const veh = document.querySelector('input[name="vehiculo-tipo"]:checked');
+    const tipoVeh = veh?.value || 'coche';
+    const datos = window.__sgtriDatos;
+    return datos?.kmTarifas?.[tipoVeh] || 0.26;
+  }
+
+  /**
+   * Determina la normativa a aplicar según el tipo de proyecto.
+   */
+  function getWrapperNormativa(tipoProyecto) {
+    const datos = window.__sgtriDatos;
+    const rdList = datos?.normativasPorTipoProyecto?.rd || [];
+    return rdList.includes(tipoProyecto) ? 'rd' : 'decreto';
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2.2 Construcción de segmentos internacionales
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Crea un input de segmento para el motor de cálculo.
+   */
+  function createSegmentInput(opts) {
+    const { fechaIda, horaIda, fechaRegreso, horaRegreso, pais, paisIndex, ticketCena, tipoProyecto, kmTarifa, excludeManutencion, excludeAlojamiento } = opts;
+
+    return {
+      fechaIda: formatDateStr(fechaIda),
+      horaIda,
+      fechaRegreso: formatDateStr(fechaRegreso),
+      horaRegreso,
+      cruceIda: '',
+      cruceVuelta: '',
+      pais,
+      paisIndex,
+      km: 0,
+      alojamiento: 0,
+      ticketCena,
+      tipoProyecto,
+      kmTarifa,
+      excludeManutencion,
+      justificarPernocta: false,
+      excludeAlojamiento,
+      _segmentMode: true
+    };
+  }
+
+  /**
+   * Construye los inputs para calcular segmentos de un viaje internacional.
+   */
+  function buildSegmentInputs(data, baseInput) {
+    const segments = [];
+    const normativa = getWrapperNormativa(data.tipoProyecto);
+    const nonFinalAssumeCena = (normativa === 'decreto');
+
+    const baseOpts = {
+      tipoProyecto: data.tipoProyecto,
+      kmTarifa: baseInput.kmTarifa,
+      excludeManutencion: baseInput.excludeManutencion,
+      excludeAlojamiento: baseInput.excludeAlojamiento
+    };
+
+    // Tramo 1: España (ida → cruce ida)
+    if (data.fechaIda && data.cruceIda && data.fechaIda.getTime() !== data.cruceIda.getTime()) {
+      segments.push({
+        input: createSegmentInput({
+          ...baseOpts,
+          fechaIda: data.fechaIda,
+          horaIda: formatTimeStr(data.horaIda),
+          fechaRegreso: data.cruceIda,
+          horaRegreso: '08:00',
+          pais: 'España',
+          paisIndex: 0,
+          ticketCena: nonFinalAssumeCena
+        }),
+        titulo: 'España (ida)',
+        pais: 'España'
+      });
+    }
+
+    // Tramo 2: País destino (cruce ida → cruce vuelta)
+    if (data.cruceIda && data.cruceVuelta) {
+      segments.push({
+        input: createSegmentInput({
+          ...baseOpts,
+          fechaIda: data.cruceIda,
+          horaIda: '08:00',
+          fechaRegreso: data.cruceVuelta,
+          horaRegreso: '23:59',
+          pais: data.pais,
+          paisIndex: data.paisIndex,
+          ticketCena: nonFinalAssumeCena
+        }),
+        titulo: data.pais || 'Extranjero',
+        pais: data.pais
+      });
+    }
+
+    // Tramo 3: España (cruce vuelta → regreso)
+    if (data.cruceVuelta && data.fechaRegreso) {
+      segments.push({
+        input: createSegmentInput({
+          ...baseOpts,
+          fechaIda: data.cruceVuelta,
+          horaIda: '00:00',
+          fechaRegreso: data.fechaRegreso,
+          horaRegreso: formatTimeStr(data.horaRegreso),
+          pais: 'España',
+          paisIndex: 0,
+          ticketCena: !!data.ticketCena
+        }),
+        titulo: 'España (vuelta)',
+        pais: 'España'
+      });
+    }
+
+    return segments;
+  }
+
+  /**
+   * Calcula los resultados de cada segmento.
+   */
+  function calculateSegments(segmentDefs) {
+    const results = segmentDefs
+      .map(seg => {
+        const result = calculateDesplazamiento(seg.input);
+        if (result) {
+          result.segTitle = seg.titulo;
+          result.segPais = seg.pais;
+        }
+        return result;
+      })
+      .filter(Boolean);
+
+    // Filtrar segmentos vacíos pero mantener el último
+    return results.filter((r, idx, arr) => {
+      const hasContent = r.noches > 0 || r.manutenciones > 0 || r.km > 0 || r.nochesAmbiguous;
+      const isLast = idx === arr.length - 1;
+      return hasContent || isLast;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2.3 Construcción de estructura unificada para salidaDesp
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Suma totales desde segmentos o canonical.
+   */
+  function sumTotals(canonical, segmentos) {
+    const esInternacional = segmentos && segmentos.length > 0;
+
+    if (!esInternacional) {
+      return {
+        manutencion: Number(canonical.manutencionesAmount) || 0,
+        alojamientoMax: Number(canonical.nochesAmount) || 0,
+        noches: Number(canonical.noches) || 0,
+        irpfSujeto: canonical.irpf?.sujeto || 0,
+        hayNochesAmbiguas: !!canonical.nochesAmbiguous,
+        nochesAmbiguasRango: canonical.nochesAmbiguousFrom && canonical.nochesAmbiguousTo
+          ? { desde: canonical.nochesAmbiguousFrom, hasta: canonical.nochesAmbiguousTo }
+          : null
+      };
+    }
+
+    let manutencion = 0, alojamientoMax = 0, noches = 0, irpfSujeto = 0;
+    let hayNochesAmbiguas = false, nochesAmbiguasRango = null;
+
+    for (const seg of segmentos) {
+      manutencion += Number(seg.manutencionesAmount) || 0;
+      alojamientoMax += Number(seg.nochesAmount) || 0;
+      noches += Number(seg.noches) || 0;
+      irpfSujeto += seg.irpf?.sujeto || 0;
+
+      if (seg.nochesAmbiguous) {
+        hayNochesAmbiguas = true;
+        if (seg.nochesAmbiguousFrom && seg.nochesAmbiguousTo) {
+          nochesAmbiguasRango = { desde: seg.nochesAmbiguousFrom, hasta: seg.nochesAmbiguousTo };
+        }
+      }
+    }
+
+    return { manutencion, alojamientoMax, noches, irpfSujeto, hayNochesAmbiguas, nochesAmbiguasRango };
+  }
+
+  /**
+   * Construye la estructura de datos unificada para salidaDesp.
+   */
+  function buildSalidaData(data, canonical, segmentos) {
+    const esInternacional = segmentos && segmentos.length > 0;
+    const totals = sumTotals(canonical, segmentos);
+
+    const alojamientoUser = Number(data.alojamiento) || 0;
+    const kmAmount = Number(canonical.kmAmount) || 0;
+    const otrosGastosTotal = Number(data.otrosGastosTotal) || 0;
+    const total = round2(totals.manutencion + alojamientoUser + kmAmount + otrosGastosTotal);
+
+    return {
+      id: data.id,
+
+      // Totales precalculados
+      totales: {
+        manutencion: round2(totals.manutencion),
+        alojamientoMax: round2(totals.alojamientoMax),
+        alojamientoUser: round2(alojamientoUser),
+        km: round2(kmAmount),
+        otrosGastos: round2(otrosGastosTotal),
+        total,
+        irpfSujeto: round2(totals.irpfSujeto),
+        noches: totals.noches
+      },
+
+      // Detalles para desglose (solo nacional)
+      detalles: esInternacional ? null : {
+        manutenciones: canonical.manutenciones || 0,
+        precioManutencion: canonical.precioManutencion || 0,
+        noches: canonical.noches || 0,
+        precioNoche: canonical.precioNoche || 0,
+        km: Number(data.km) || 0,
+        precioKm: canonical.precioKm || 0.26
+      },
+
+      // Segmentos (solo internacional)
+      segmentos: esInternacional ? segmentos.map(seg => ({
+        titulo: seg.segTitle || 'Tramo',
+        pais: seg.segPais || '',
+        manutenciones: seg.manutenciones || 0,
+        manutencionAmount: round2(seg.manutencionesAmount || 0),
+        precioManutencion: seg.precioManutencion || 0,
+        noches: seg.noches || 0,
+        nochesAmount: round2(seg.nochesAmount || 0),
+        precioNoche: seg.precioNoche || 0,
+        nochesAmbiguous: !!seg.nochesAmbiguous
+      })) : null,
+
+      // Flags de UI
+      ui: {
+        esInternacional,
+        alojamientoExcedeMax: alojamientoUser > totals.alojamientoMax,
+        nochesAmbiguas: totals.hayNochesAmbiguas,
+        nochesAmbiguasRango: totals.nochesAmbiguasRango,
+        precioNocheMedio: totals.noches > 0 ? round2(totals.alojamientoMax / totals.noches) : 0
+      },
+
+      // Estado de exclusiones
+      exclusiones: {
+        manutencion: !!data.noManutencion,
+        alojamiento: !!data.dtInvalid
+      },
+
+      // Datos crudos para compatibilidad
+      _canonical: canonical,
+      _data: data
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2.4 Función principal del wrapper
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Calcula los importes de un desplazamiento a partir de su ficha DOM.
+   */
+  function calculaDesplazamientoFicha(despEl) {
+    // 1. Recolectar datos normalizados del DOM
+    const collectFn = window.cogeDatosDesp?.collectDataFromFicha;
+    if (!collectFn) {
+      console.warn('[calculoDesp] cogeDatosDesp.collectDataFromFicha no disponible');
+      return null;
+    }
+
+    const data = collectFn(despEl);
+    if (!data) return null;
+
+    // 2. Construir input para el motor
+    const kmTarifa = getKmTarifa();
+    const calcInput = {
+      fechaIda: data.raw.fechaIda,
+      horaIda: data.raw.horaIda,
+      fechaRegreso: data.raw.fechaRegreso,
+      horaRegreso: data.raw.horaRegreso,
+      cruceIda: data.raw.cruceIda,
+      cruceVuelta: data.raw.cruceVuelta,
+      pais: data.pais,
+      paisIndex: data.paisIndex,
+      km: data.km,
+      alojamiento: data.alojamiento,
+      ticketCena: data.ticketCena,
+      tipoProyecto: data.tipoProyecto,
+      kmTarifa,
+      excludeManutencion: data.noManutencion,
+      justificarPernocta: data.justificarPernocta,
+      excludeAlojamiento: data.dtInvalid
+    };
+
+    // 3. Ejecutar motor de cálculo
+    let canonical = calculateDesplazamiento(calcInput);
+    if (!canonical) {
+      canonical = {
+        manutenciones: 0,
+        manutencionesAmount: 0,
+        noches: 0,
+        nochesAmount: 0,
+        km: data.km,
+        kmAmount: round2(data.km * kmTarifa),
+        irpf: { sujeto: 0, breakdown: [], limitesUsed: [26.67, 53.34] }
+      };
+    }
+
+    // 4. Verificar fechas inválidas
+    const fechasInvalidas = data.dtInvalid || !data.esValido ||
+      despEl?.querySelector?.('.field-error') !== null;
+
+    if (fechasInvalidas) {
+      canonical.manutenciones = 0;
+      canonical.manutencionesAmount = 0;
+      canonical.precioManutencion = 0;
+      canonical.alojamiento = 0;
+      canonical.alojamientoMaxAmount = 0;
+      canonical.noches = 0;
+      canonical.nochesAmount = 0;
+      canonical.irpf && (canonical.irpf.sujeto = 0);
+      despEl?.dataset && (despEl.dataset.dtInvalid = '1');
+    }
+
+    // 5. Calcular segmentos si es internacional
+    let segmentos = null;
+    if (data.esInternacional && data.cruceIda && data.cruceVuelta && !fechasInvalidas) {
+      const segmentDefs = buildSegmentInputs(data, calcInput);
+      segmentos = calculateSegments(segmentDefs);
+
+      if (fechasInvalidas && segmentos) {
+        segmentos.forEach(seg => {
+          seg.manutenciones = 0;
+          seg.manutencionesAmount = 0;
+          seg.noches = 0;
+          seg.nochesAmount = 0;
+          seg.irpf && (seg.irpf.sujeto = 0);
+        });
+      }
+    }
+
+    // 6. Construir estructura unificada
+    const salidaData = buildSalidaData(data, canonical, segmentos);
+
+    // 7. Renderizar salida
+    window.salidaDesp?.renderSalida?.(despEl, salidaData);
+
+    // 8. Devolver resultado
+    return {
+      salidaData,
+      canonical,
+      data,
+      displayContext: {
+        otrosSum: data.otrosGastosTotal,
+        kmNum: data.km,
+        alojNum: data.alojamiento,
+        excludeManutencion: data.noManutencion,
+        justificarPernocta: data.justificarPernocta,
+        excludeAlojamiento: data.dtInvalid,
+        id: data.id
+      },
+      calcInput
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2.5 Exportación API del Wrapper
+  // ---------------------------------------------------------------------------
+
   window.calculoDesp = window.calculoDesp || {};
   window.calculoDesp.calculaDesplazamientoFicha = calculaDesplazamientoFicha;
-  window.calculoDesp.collectDataFromFicha = function() { return (window.cogeDatosDesp && typeof window.cogeDatosDesp.collectDataFromFicha === 'function') ? window.cogeDatosDesp.collectDataFromFicha.apply(null, arguments) : _fallbackCollect.apply(null, arguments); };
-  window.calculoDesp.parseNumber = function() { return (window.cogeDatosDesp && typeof window.cogeDatosDesp.parseNumber === 'function') ? window.cogeDatosDesp.parseNumber.apply(null, arguments) : _fallbackParse.apply(null, arguments); };
+
+  // Reexportar utilidades para compatibilidad
+  window.calculoDesp.collectDataFromFicha = function(...args) {
+    return window.cogeDatosDesp?.collectDataFromFicha?.(...args) || null;
+  };
+
+  window.calculoDesp.parseNumber = function(v) {
+    return window.cogeDatosDesp?.parseNumber?.(v) ||
+           window.limpiaDatos?.parseNumber?.(v) ||
+           parseNumber(v);
+  };
+
   window.calculoDesp.parseNumericLoose = window.calculoDesp.parseNumber;
+
+  // Exponer helpers para testing
+  window.calculoDesp._buildSalidaData = buildSalidaData;
+  window.calculoDesp._buildSegmentInputs = buildSegmentInputs;
 })();
