@@ -291,17 +291,18 @@ select:focus {
 
 /* Tres columnas fijas: 25% | 50% | 25% (uso específico para Pago en + IBAN + SWIFT) */
 .form-row.three-cols-25-50-25 {
-  grid-template-columns: 25% 25% 50%;
+  grid-template-columns: calc(25% - 0.4rem) 1fr calc(25% - 0.4rem);
+  gap: 0.6rem;
 }
 
 /* Ensure children can shrink and inputs don't overflow their grid cell in the three-column layout */
 .form-row.three-cols-25-50-25>.form-group {
   min-width: 0;
+  overflow: hidden;
 }
 
 .form-row.three-cols-25-50-25 input,
 .form-row.three-cols-25-50-25 select {
-  /* fill cell but never force the grid to grow; allow wrapping inside */
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -373,8 +374,9 @@ input[type="number"] {
 
 #infoDecreto {
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   color: var(--color-text-muted);
+  margin-top: 0.6rem;
 }
 
 /* Utilidades de grid de columna fija */
