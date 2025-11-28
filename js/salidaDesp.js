@@ -41,7 +41,18 @@
     },
 
     /**
-     * Línea de alojamiento con máximo y posible warning.
+     * Línea de kilometraje: km × precio = total
+     */
+    lineaKilometraje(km, precioKm, totalKm) {
+      return `<div class="calc-line">
+        <span class="label">Km: ${km} × ${fmt(precioKm)} €</span>
+        <span class="leader" aria-hidden="true"></span>
+        <span class="amount km">${fmt(totalKm)} €</span>
+      </div>`;
+    },
+
+    /**
+     * Línea de alojamiento nacional con máximo (noches × precio) y posible warning.
      */
     lineaAlojamiento({ noches, precioNoche, maxAmount, userAmount, excedeMax }) {
       const errorCls = excedeMax ? ' error-line' : '';
@@ -52,6 +63,23 @@
 
       return `<div class="calc-line aloj-line${errorCls}">
         <span class="label">Alojamiento: <em>[ Máximo: ${noches} × ${fmt(precioNoche)} = ${fmt(maxAmount)} € ]</em></span>
+        <span class="leader" aria-hidden="true"></span>
+        <span class="aloj-user">${warning}<span class="amount aloj-user${amountErrorCls}">${fmt(userAmount)} €</span></span>
+      </div>`;
+    },
+
+    /**
+     * Línea de alojamiento internacional (totales): solo muestra máximo sumado.
+     */
+    lineaAlojamientoInternacional({ maxAmount, userAmount, excedeMax }) {
+      const errorCls = excedeMax ? ' error-line' : '';
+      const amountErrorCls = excedeMax ? ' error-amount' : '';
+      const warning = excedeMax
+        ? templates.warning('¡Atención! El importe del alojamiento supera el máximo permitido.')
+        : '';
+
+      return `<div class="calc-line aloj-line${errorCls}">
+        <span class="label">Alojamiento: <em>[ Máximo: ${fmt(maxAmount)} € ]</em></span>
         <span class="leader" aria-hidden="true"></span>
         <span class="aloj-user">${warning}<span class="amount aloj-user${amountErrorCls}">${fmt(userAmount)} €</span></span>
       </div>`;
@@ -122,50 +150,114 @@
 
   /**
    * Genera HTML para desplazamiento nacional (sin segmentos).
+   * Solo muestra líneas con importe > 0.
    */
   function renderSimple(data) {
     const { totales, detalles, ui } = data;
+    const lines = [];
 
-    const manutLabel = `Manutención: ${detalles.manutenciones} × ${fmt(detalles.precioManutencion)} €`;
+    // Manutención (solo si > 0)
+    if (totales.manutencion > 0) {
+      const manutLabel = `Manutención: ${detalles.manutenciones} × ${fmt(detalles.precioManutencion)} €`;
+      lines.push(templates.lineaConcepto(manutLabel, totales.manutencion, 'manut'));
+    }
 
-    return `<div class="calc-result" aria-live="polite" data-desp-id="${data.id}">
-      ${templates.lineaConcepto(manutLabel, totales.manutencion, 'manut')}
-      ${templates.lineaAlojamiento({
+    // Alojamiento (solo si usuario introdujo algo > 0)
+    if (totales.alojamientoUser > 0) {
+      lines.push(templates.lineaAlojamiento({
         noches: totales.noches,
         precioNoche: ui.precioNocheMedio,
         maxAmount: totales.alojamientoMax,
         userAmount: totales.alojamientoUser,
         excedeMax: ui.alojamientoExcedeMax
-      })}
-      ${templates.lineaConcepto('Km:', totales.km, 'km')}
-      ${templates.lineaConcepto('Total otros gastos', totales.otrosGastos, 'otros-gastos-total')}
+      }));
+    }
+
+    // Kilometraje (solo si > 0)
+    if (totales.km > 0) {
+      lines.push(templates.lineaKilometraje(detalles.km, detalles.precioKm, totales.km));
+    }
+
+    // Otros gastos (solo si > 0)
+    if (totales.otrosGastos > 0) {
+      lines.push(templates.lineaConcepto('Total otros gastos', totales.otrosGastos, 'otros-gastos-total'));
+    }
+
+    // Si no hay líneas, no mostrar nada
+    if (lines.length === 0) return '';
+
+    return `<div class="calc-result" aria-live="polite" data-desp-id="${data.id}">
+      ${lines.join('\n      ')}
       ${templates.total(totales.total)}
     </div>`;
   }
 
   /**
    * Genera HTML para desplazamiento internacional (con segmentos).
+   * Solo muestra segmentos y totales si las fechas están validadas.
+   * Solo muestra líneas de totales con importe > 0.
    */
   function renderSegmentado(data) {
-    const { totales, segmentos, ui } = data;
+    const { totales, segmentos, ui, exclusiones } = data;
 
-    const segmentosHtml = segmentos.map(seg => templates.segmento(seg)).join('');
+    // Verificar si hay datos válidos de segmentos (fechas validadas)
+    const segmentosValidos = segmentos && segmentos.length > 0 &&
+      segmentos.some(seg => seg.manutenciones > 0 || seg.noches > 0);
 
-    return `<div class="calc-result composite" data-desp-id="${data.id}">
-      ${segmentosHtml}
-      ${templates.tituloSeccion('TOTALES:')}
-      ${templates.lineaConcepto('Total manutención', totales.manutencion, 'manut')}
-      ${templates.lineaAlojamiento({
-        noches: totales.noches,
-        precioNoche: ui.precioNocheMedio,
+    // Generar HTML de segmentos solo si hay datos válidos
+    let segmentosHtml = '';
+    if (segmentosValidos) {
+      segmentosHtml = segmentos.map(seg => templates.segmento(seg)).join('');
+    }
+
+    // Líneas de totales (solo las que tienen importe > 0)
+    const totalLines = [];
+
+    // Manutención total (solo si > 0 y segmentos válidos)
+    if (totales.manutencion > 0 && segmentosValidos) {
+      totalLines.push(templates.lineaConcepto('Total manutención', totales.manutencion, 'manut'));
+    }
+
+    // Alojamiento (solo si usuario introdujo algo > 0 y segmentos válidos)
+    if (totales.alojamientoUser > 0 && segmentosValidos) {
+      totalLines.push(templates.lineaAlojamientoInternacional({
         maxAmount: totales.alojamientoMax,
         userAmount: totales.alojamientoUser,
         excedeMax: ui.alojamientoExcedeMax
-      })}
-      ${templates.lineaConcepto('Km.', totales.km, 'km')}
-      ${templates.lineaConcepto('Total otros gastos', totales.otrosGastos, 'otros-gastos-total')}
-      ${templates.total(totales.total)}
-    </div>`;
+      }));
+    }
+
+    // Kilometraje (solo si > 0) - siempre se muestra si hay km, incluso sin fechas válidas
+    if (totales.km > 0 && data.detalles) {
+      totalLines.push(templates.lineaKilometraje(data.detalles.km, data.detalles.precioKm, totales.km));
+    } else if (totales.km > 0) {
+      // Fallback si no hay detalles (usar datos de _data si existen)
+      const kmNum = data._data?.km || 0;
+      const precioKm = data._canonical?.precioKm || 0.26;
+      totalLines.push(templates.lineaKilometraje(kmNum, precioKm, totales.km));
+    }
+
+    // Otros gastos (solo si > 0) - siempre se muestra si hay otros gastos
+    if (totales.otrosGastos > 0) {
+      totalLines.push(templates.lineaConcepto('Total otros gastos', totales.otrosGastos, 'otros-gastos-total'));
+    }
+
+    // Si no hay nada que mostrar, devolver vacío
+    if (!segmentosHtml && totalLines.length === 0) return '';
+
+    // Construir HTML
+    let html = `<div class="calc-result composite" data-desp-id="${data.id}">`;
+
+    if (segmentosHtml) {
+      html += segmentosHtml;
+      html += templates.tituloSeccion('TOTALES:');
+    }
+
+    html += totalLines.join('\n      ');
+    html += templates.total(totales.total);
+    html += '</div>';
+
+    return html;
   }
 
   /**
