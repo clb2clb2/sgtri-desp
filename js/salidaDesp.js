@@ -1,207 +1,415 @@
 // js/salidaDesp.js
-// Renderizador: separación entre lógica pura (HTML/DocumentFragment) y montaje DOM
-// Provee funciones puras que no leen ni escriben el DOM, y una pequeña capa `mount`.
+// Renderizador de resultados de cálculo de desplazamientos.
+//
+// Arquitectura:
+//   - Templates: funciones puras que generan fragmentos HTML
+//   - Render: funciones puras que componen el HTML completo
+//   - Mount: funciones que interactúan con el DOM (insertar, eventos)
 
 (function () {
+  'use strict';
+
+  // =========================================================================
+  // UTILIDADES DE FORMATEO
+  // =========================================================================
+
+  /**
+   * Formatea número a string con 2 decimales y separador de miles alemán.
+   */
   function fmt(n) {
-    return (Number(n) || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (Number(n) || 0).toLocaleString('de-DE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   }
 
-  // Crea una copia 'display' del objeto canonical aplicando overlays según ctx.
-  // Esta función es pura: no accede al DOM.
-  function buildDisplay(canonical, ctx) {
-    if (!canonical) return null;
-    const display = JSON.parse(JSON.stringify(canonical));
-    const excludeMan = ctx && typeof ctx.excludeManutencion !== 'undefined' ? ctx.excludeManutencion : (ctx && ctx.flags && ctx.flags.excludeManutencion);
-    const isDtInvalid = ctx && ctx.dtInvalid === true;
-    const justified = ctx && ctx.justificarPernocta === true;
+  // =========================================================================
+  // TEMPLATES (funciones puras → HTML string)
+  // =========================================================================
 
-    if (excludeMan) {
-      if (Array.isArray(display.segmentsResults)) {
-        display.segmentsResults.forEach(s => { if (s) { s.manutencionesAmount = 0; s.manutenciones = 0; if (s.irpf && typeof s.irpf === 'object') s.irpf.sujeto = 0; } });
-      } else {
-        try { display.manutencionesAmount = 0; display.manutenciones = 0; if (display.irpf && typeof display.irpf === 'object') display.irpf.sujeto = 0; } catch (e) {}
-      }
-    }
+  const templates = {
+    /**
+     * Línea de concepto con líder de puntos.
+     */
+    lineaConcepto(label, amount, amountClass = '') {
+      const cls = amountClass ? ` ${amountClass}` : '';
+      return `<div class="calc-line">
+        <span class="label">${label}</span>
+        <span class="leader" aria-hidden="true"></span>
+        <span class="amount${cls}">${fmt(amount)} €</span>
+      </div>`;
+    },
 
-    if (isDtInvalid) {
-      if (Array.isArray(display.segmentsResults)) {
-        display.segmentsResults.forEach(s => { if (s) { s.manutencionesAmount = 0; s.manutenciones = 0; s.nochesAmount = 0; s.noches = 0; } });
-        display.alojamientoUser = 0;
-      } else {
-        display.manutencionesAmount = 0; display.manutenciones = 0; display.alojamiento = 0; display.nochesAmount = 0; display.noches = 0;
-      }
-    }
+    /**
+     * Línea de alojamiento con máximo y posible warning.
+     */
+    lineaAlojamiento({ noches, precioNoche, maxAmount, userAmount, excedeMax }) {
+      const errorCls = excedeMax ? ' error-line' : '';
+      const amountErrorCls = excedeMax ? ' error-amount' : '';
+      const warning = excedeMax
+        ? templates.warning('¡Atención! El importe del alojamiento supera el máximo permitido.')
+        : '';
 
-    if (justified) {
-      if (Array.isArray(display.segmentsResults) && display.segmentsResults.length > 0) {
-        const seg = display.segmentsResults.find(s => s && s.nochesAmbiguous) || display.segmentsResults[display.segmentsResults.length - 1];
-        if (seg) {
-          const price = (typeof seg.precioNoche !== 'undefined') ? Number(seg.precioNoche || 0) : (typeof display.precioNoche !== 'undefined' ? Number(display.precioNoche || 0) : 0);
-          seg.noches = (Number(seg.noches) || 0) + 1;
-          seg.nochesAmount = (Number(seg.nochesAmount) || 0) + price;
-          if (typeof seg.nochesIfCounted !== 'undefined') seg.nochesIfCounted = (Number(seg.nochesIfCounted) || 0) + 1;
-          if (typeof seg.nochesAmountIfCounted !== 'undefined') seg.nochesAmountIfCounted = (Number(seg.nochesAmountIfCounted) || 0) + price;
-          if (typeof display.alojamientoMaxAmount !== 'undefined') display.alojamientoMaxAmount = Math.round(((Number(display.alojamientoMaxAmount) || 0) + price + Number.EPSILON) * 100) / 100;
-        }
-      } else {
-        const price = (typeof display.precioNoche !== 'undefined') ? Number(display.precioNoche || 0) : 0;
-        display.noches = (Number(display.noches) || 0) + 1;
-        display.nochesAmount = (Number(display.nochesAmount) || 0) + price;
-        if (typeof display.alojamientoMaxAmount !== 'undefined') display.alojamientoMaxAmount = Math.round(((Number(display.alojamientoMaxAmount) || 0) + price + Number.EPSILON) * 100) / 100;
-      }
-    }
+      return `<div class="calc-line aloj-line${errorCls}">
+        <span class="label">Alojamiento: <em>[ Máximo: ${noches} × ${fmt(precioNoche)} = ${fmt(maxAmount)} € ]</em></span>
+        <span class="leader" aria-hidden="true"></span>
+        <span class="aloj-user">${warning}<span class="amount aloj-user${amountErrorCls}">${fmt(userAmount)} €</span></span>
+      </div>`;
+    },
 
-    return display;
-  }
+    /**
+     * Icono de warning con tooltip.
+     */
+    warning(mensaje) {
+      return `<span class="warn-wrapper" tabindex="0" aria-live="polite">
+        <span class="warn-icon" aria-hidden="true">⚠️</span>
+        <span class="warn-tooltip" role="tooltip">${mensaje}</span>
+      </span>`;
+    },
 
-  // Genera el HTML (string) a partir de 'display' y ctx. Pura — no accede al DOM.
-  function renderSalidaHtml(canonical, ctx) {
-    if (!canonical) return '';
-    const display = buildDisplay(canonical, ctx);
-    if (!display) return '';
-    const otros = (ctx && ctx.otrosSum) ? Number(ctx.otrosSum) : 0;
-    const kmAmount = typeof display.kmAmount !== 'undefined' ? Number(display.kmAmount || 0) : 0;
-    const manutTotal = (Array.isArray(display.segmentsResults) ? display.segmentsResults.reduce((a,s)=>a+(s && s.manutencionesAmount?Number(s.manutencionesAmount||0):0),0) : Number(display.manutencionesAmount || 0));
-    const ctxAlojNum = (ctx && typeof ctx.alojNum !== 'undefined') ? Number(ctx.alojNum || 0) : 0;
-    const alojTotal = Array.isArray(display.segmentsResults) ? (ctxAlojNum > 0 ? ctxAlojNum : Number(display.alojamientoUser || 0)) : (ctxAlojNum > 0 ? ctxAlojNum : Number(display.alojamiento || 0));
-    const anyPositive = (otros > 0) || (kmAmount > 0) || (manutTotal > 0) || (alojTotal > 0);
-    if (!anyPositive) return '';
+    /**
+     * Línea de total final.
+     */
+    total(amount) {
+      return `<div class="calc-total">
+        <span class="label">Total:</span>
+        <span class="amount"><strong class="slight total-val">${fmt(amount)} €</strong></span>
+      </div>`;
+    },
 
-    const id = (ctx && ctx.id) ? ctx.id : (Math.random().toString(36).slice(2,8));
+    /**
+     * Título de sección/segmento.
+     */
+    tituloSeccion(titulo) {
+      return `<div class="calc-seg-title">${titulo}</div>`;
+    },
 
-    let html = '';
-    if (Array.isArray(display.segmentsResults) && display.segmentsResults.length > 0) {
-      const segHtml = display.segmentsResults.map((r, idx) => {
-        const segTitle = r && r.segTitle ? r.segTitle : `Tramo ${idx+1}`;
-        const precioManUnitSeg = (r && r.precioManutencion) ? Number(r.precioManutencion) : 0;
-        const manutAmountSeg = (r && r.manutencionesAmount) ? Number(r.manutencionesAmount) : 0;
-        const alojamientoSegAmt = (r && r.nochesAmount) ? Number(r.nochesAmount) : 0;
-        const nochesTxt = (r && typeof r.noches !== 'undefined') ? String(r.noches) : '0';
-        return `
-          <div class="calc-result-segment">
-            <div class="calc-seg-title">${segTitle}</div>
-            <div class="calc-line"><span class="label">Manutención: ${ (r && r.manutenciones) ? r.manutenciones : 0 } × ${ (precioManUnitSeg).toLocaleString('de-DE', { minimumFractionDigits: 2 }) } €</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${fmt(manutAmountSeg)} €</span></div>
-            <div class="calc-line aloj-line"><span class="label">Alojamiento máx: ${nochesTxt} noches = ${fmt(alojamientoSegAmt)} €</span></div>
-          </div>
-        `;
-      }).join('');
-
-      const totalManutStr = fmt(manutTotal);
-      const totalAlojStr = fmt(alojTotal);
-      const kmStr = fmt(kmAmount);
-      const otrosStr = fmt(otros);
-      const totalVal = manutTotal + kmAmount + alojTotal + otros;
-      const totalValStr = fmt(totalVal);
-
-      const totalAlojMax = display.segmentsResults.reduce((acc,s)=>acc+((s && typeof s.nochesAmount !== 'undefined')?Number(s.nochesAmount||0):0),0);
-      const totalNoches = display.segmentsResults.reduce((acc,s)=>acc+((s && typeof s.noches !== 'undefined')?Number(s.noches||0):0),0);
-      const alojamientoWarn = Number(alojTotal) > Number(totalAlojMax);
-      const avgPrecioNoche = (totalNoches > 0) ? (totalAlojMax / totalNoches) : 0;
-
-      html = `
-        <div class="calc-result composite" data-desp-id="${id}">
-          ${segHtml}
-          <div class="calc-seg-title">TOTALES:</div>
-          <div class="calc-line"><span class="label">Total manutención</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${totalManutStr} €</span></div>
-          <div class="calc-line aloj-aggregated${alojamientoWarn? ' error-line':''}"><span class="label">Alojamiento: <em>[ Máximo: ${totalNoches} × ${fmt(avgPrecioNoche)} = ${fmt(totalAlojMax)} € ]</em></span><span class="leader" aria-hidden="true"></span><span class="aloj-user">${alojamientoWarn ? `<span class="warn-wrapper" tabindex="0" aria-live="polite"><span class="warn-icon" aria-hidden="true">⚠️</span><span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido.</span></span>` : ''}<span class="amount aloj-user${alojamientoWarn? ' error-amount':''}">${totalAlojStr} €</span></span></div>
-          <div class="calc-line"><span class="label">Km.</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmStr} €</span></div>
-          <div class="calc-line"><span class="label">Total otros gastos</span><span class="leader" aria-hidden="true"></span><span class="amount otros-gastos-total">${otrosStr} €</span></div>
-          <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalValStr} €</strong></span></div>
+    /**
+     * Segmento de viaje internacional.
+     */
+    segmento(seg) {
+      return `<div class="calc-result-segment">
+        ${templates.tituloSeccion(seg.titulo)}
+        <div class="calc-line">
+          <span class="label">Manutención: ${seg.manutenciones} × ${fmt(seg.precioManutencion)} €</span>
+          <span class="leader" aria-hidden="true"></span>
+          <span class="amount manut">${fmt(seg.manutencionAmount)} €</span>
         </div>
-      `;
-    } else {
-      const manutLabel = `Manutención: ${display.manutenciones || 0} × ${ (display.precioManutencion || 0).toLocaleString('de-DE', { minimumFractionDigits: 2 }) } €`;
-      const manutAmount = fmt(display.manutencionesAmount || 0);
-      const kmAmountFmt = fmt(kmAmount);
-      const otrosFmt = fmt(otros);
-      const alojMaxRaw = Number(typeof display.alojamientoMaxAmount !== 'undefined' ? display.alojamientoMaxAmount : display.nochesAmount || 0);
-      const nochesCnt = Number(display.noches || 0);
-      const precioNoche = (nochesCnt > 0) ? (alojMaxRaw / nochesCnt) : (typeof display.precioNoche !== 'undefined' ? Number(display.precioNoche || 0) : 0);
-      const alojUserNum = Number(typeof display.alojamientoUser !== 'undefined' ? display.alojamientoUser : 0);
-      const alojBracket = `<em>[ Máximo: ${nochesCnt} × ${fmt(precioNoche)} = ${fmt(alojMaxRaw)} € ]</em>`;
-      const ctxAlojNumSingle = (ctx && typeof ctx.alojNum !== 'undefined') ? Number(ctx.alojNum || 0) : 0;
-      const alojUserNumFinal = ctxAlojNumSingle > 0 ? ctxAlojNumSingle : alojUserNum;
-      const alojamientoExceedsMax = alojUserNumFinal > alojMaxRaw;
-      const alojUserHtml = (alojUserNumFinal > 0) ? `${alojamientoExceedsMax ? `<span class="warn-wrapper" tabindex="0" aria-live="polite"><span class="warn-icon" aria-hidden="true">⚠️</span><span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido.</span></span>` : ''}<span class="amount aloj-user${alojamientoExceedsMax ? ' error-amount' : ''}">${fmt(alojUserNumFinal)} €</span>` : `<span class="amount aloj-user">${fmt(0)} €</span>`;
-      const totalWithUser = (Number(display.manutencionesAmount || 0) + Number(kmAmount) + Number(alojUserNumFinal || 0) + Number(otros || 0));
-      const totalWithUserFmt = fmt(totalWithUser);
-      html = `
-        <div class="calc-result" aria-live="polite" data-desp-id="${id}">
-          <div class="calc-line"><span class="label">${manutLabel}</span><span class="leader" aria-hidden="true"></span><span class="amount manut">${manutAmount} €</span></div>
-          <div class="calc-line aloj-line${alojamientoExceedsMax ? ' error-line' : ''}"><span class="label">Alojamiento: ${alojBracket}</span><span class="leader" aria-hidden="true"></span>${alojUserHtml}</div>
-          <div class="calc-line"><span class="label">Km:</span><span class="leader" aria-hidden="true"></span><span class="amount km">${kmAmountFmt} €</span></div>
-          <div class="calc-line"><span class="label">Total otros gastos</span><span class="leader" aria-hidden="true"></span><span class="amount otros-gastos-total">${otrosFmt} €</span></div>
-          <div class="calc-total"><span class="label">Total:</span><span class="amount"><strong class="slight total-val">${totalWithUserFmt} €</strong></span></div>
-        </div>`;
-    }
+        <div class="calc-line aloj-line">
+          <span class="label">Alojamiento máx: ${seg.noches} noches = ${fmt(seg.nochesAmount)} €</span>
+        </div>
+      </div>`;
+    },
 
-    return html;
+    /**
+     * Checkbox para justificar pernocta en zona ambigua.
+     */
+    justificarPernocta(id, desde, hasta) {
+      return `<div class="ticket-cena-field conditional-row justificar-pernocta-field" id="justificar-container-${id}">
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="justificar-pernocta-${id}" />
+            Justifica haber pernoctado la noche del ${desde} al ${hasta}.
+          </label>
+        </div>
+      </div>`;
+    }
+  };
+
+  // =========================================================================
+  // FUNCIONES DE RENDER (puras → HTML string completo)
+  // =========================================================================
+
+  /**
+   * Genera HTML para desplazamiento nacional (sin segmentos).
+   */
+  function renderSimple(data) {
+    const { totales, detalles, ui } = data;
+
+    const manutLabel = `Manutención: ${detalles.manutenciones} × ${fmt(detalles.precioManutencion)} €`;
+
+    return `<div class="calc-result" aria-live="polite" data-desp-id="${data.id}">
+      ${templates.lineaConcepto(manutLabel, totales.manutencion, 'manut')}
+      ${templates.lineaAlojamiento({
+        noches: totales.noches,
+        precioNoche: ui.precioNocheMedio,
+        maxAmount: totales.alojamientoMax,
+        userAmount: totales.alojamientoUser,
+        excedeMax: ui.alojamientoExcedeMax
+      })}
+      ${templates.lineaConcepto('Km:', totales.km, 'km')}
+      ${templates.lineaConcepto('Total otros gastos', totales.otrosGastos, 'otros-gastos-total')}
+      ${templates.total(totales.total)}
+    </div>`;
   }
 
-  // Monta el HTML en el elemento `despEl` y maneja los elementos interactivos (checkbox justificar).
-  // Esta función es DOM-dependiente.
-  function mountSalida(despEl, html, canonical, ctx) {
+  /**
+   * Genera HTML para desplazamiento internacional (con segmentos).
+   */
+  function renderSegmentado(data) {
+    const { totales, segmentos, ui } = data;
+
+    const segmentosHtml = segmentos.map(seg => templates.segmento(seg)).join('');
+
+    return `<div class="calc-result composite" data-desp-id="${data.id}">
+      ${segmentosHtml}
+      ${templates.tituloSeccion('TOTALES:')}
+      ${templates.lineaConcepto('Total manutención', totales.manutencion, 'manut')}
+      ${templates.lineaAlojamiento({
+        noches: totales.noches,
+        precioNoche: ui.precioNocheMedio,
+        maxAmount: totales.alojamientoMax,
+        userAmount: totales.alojamientoUser,
+        excedeMax: ui.alojamientoExcedeMax
+      })}
+      ${templates.lineaConcepto('Km.', totales.km, 'km')}
+      ${templates.lineaConcepto('Total otros gastos', totales.otrosGastos, 'otros-gastos-total')}
+      ${templates.total(totales.total)}
+    </div>`;
+  }
+
+  /**
+   * Genera el HTML completo para el resultado del cálculo.
+   */
+  function renderSalidaHtml(salidaData) {
+    if (!salidaData) return '';
+
+    const { totales, ui, segmentos } = salidaData;
+
+    // Verificar si hay algo que mostrar
+    const hayContenido = totales.manutencion > 0 ||
+                         totales.alojamientoUser > 0 ||
+                         totales.km > 0 ||
+                         totales.otrosGastos > 0;
+
+    if (!hayContenido) return '';
+
+    // Elegir render según tipo
+    return (ui.esInternacional && segmentos?.length > 0)
+      ? renderSegmentado(salidaData)
+      : renderSimple(salidaData);
+  }
+
+  // =========================================================================
+  // FUNCIONES DE MONTAJE DOM
+  // =========================================================================
+
+  /**
+   * Monta el HTML en el elemento DOM.
+   */
+  function mountSalida(despEl, html, salidaData) {
     if (!despEl) return;
+
+    const existing = despEl.querySelector('.calc-result');
+
     if (!html) {
-      const existing = despEl.querySelector('.calc-result'); if (existing) existing.remove();
+      existing?.remove();
       return;
     }
-    const out = despEl.querySelector('.calc-result');
-    if (out) out.outerHTML = html; else despEl.insertAdjacentHTML('beforeend', html);
 
-    // Wire justificar-pernocta if needed (uses display computed from canonical+ctx)
-    try {
-      const display = buildDisplay(canonical, ctx);
-      const ambiguous = (display && display.nochesAmbiguous) || (Array.isArray(display.segmentsResults) && display.segmentsResults.some(s => s && s.nochesAmbiguous));
-      const id = (ctx && ctx.id) ? ctx.id : (despEl.dataset && despEl.dataset.desplazamientoId ? despEl.dataset.desplazamientoId : Math.random().toString(36).slice(2,8));
-      const existingJust = despEl.querySelector('.justificar-pernocta-field');
-      if (ambiguous) {
-        const ticketField = despEl.querySelector(`#ticket-cena-field-${id}`);
-        const firstAmb = Array.isArray(display.segmentsResults) ? display.segmentsResults.find(s=>s&&s.nochesAmbiguous) : null;
-        const nochesFrom = (display && display.nochesAmbiguousFrom) ? display.nochesAmbiguousFrom : (firstAmb && firstAmb.nochesAmbiguousFrom) || '';
-        const nochesTo = (display && display.nochesAmbiguousTo) ? display.nochesAmbiguousTo : (firstAmb && firstAmb.nochesAmbiguousTo) || '';
-        const justHtml = `<div class="ticket-cena-field conditional-row justificar-pernocta-field" id="justificar-container-${id}"><div class="form-group"><label><input type="checkbox" id="justificar-pernocta-${id}" /> Justifica haber pernoctado la noche del ${nochesFrom} al ${nochesTo}.</label></div></div>`;
-        if (!existingJust) {
-          if (ticketField && typeof ticketField.insertAdjacentHTML === 'function') ticketField.insertAdjacentHTML('afterend', justHtml);
-          else despEl.insertAdjacentHTML('beforeend', justHtml);
-        }
-        const chk = despEl.querySelector(`#justificar-pernocta-${id}`);
-        if (chk) {
-          try { if (despEl.dataset && despEl.dataset.justificarPernocta === '1') chk.checked = true; else chk.checked = false; } catch (e) {}
-          chk.removeEventListener('change', chk._justHandler);
-          chk._justHandler = function () {
-            try {
-              if (chk.checked) despEl.dataset.justificarPernocta = '1'; else delete despEl.dataset.justificarPernocta;
-              if (window.calculoDesp && typeof window.calculoDesp.calculaDesplazamientoFicha === 'function') {
-                const res = window.calculoDesp.calculaDesplazamientoFicha(despEl);
-                if (res && res.canonical) {
-                  window.salidaDesp.renderSalida(despEl, res.canonical, res.displayContext);
-                }
-              }
-            } catch (e) {}
-          };
-          chk.addEventListener('change', chk._justHandler);
-        }
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      despEl.insertAdjacentHTML('beforeend', html);
+    }
+
+    setupJustificarPernocta(despEl, salidaData);
+  }
+
+  /**
+   * Configura el checkbox de justificar pernocta.
+   */
+  function setupJustificarPernocta(despEl, salidaData) {
+    if (!salidaData?.ui) return;
+
+    const { id, ui } = salidaData;
+    const existingField = despEl.querySelector('.justificar-pernocta-field');
+
+    // Sin noches ambiguas → eliminar campo si existe
+    if (!ui.nochesAmbiguas || !ui.nochesAmbiguasRango) {
+      existingField?.remove();
+      return;
+    }
+
+    const { desde, hasta } = ui.nochesAmbiguasRango;
+
+    // Crear campo si no existe
+    if (!existingField) {
+      const justHtml = templates.justificarPernocta(id, desde, hasta);
+      const ticketField = despEl.querySelector(`#ticket-cena-field-${id}`);
+
+      if (ticketField) {
+        ticketField.insertAdjacentHTML('afterend', justHtml);
       } else {
-        if (existingJust && existingJust.parentNode) existingJust.parentNode.removeChild(existingJust);
+        despEl.insertAdjacentHTML('beforeend', justHtml);
       }
-    } catch (e) { /* ignore */ }
+    }
+
+    // Configurar evento del checkbox
+    const chk = despEl.querySelector(`#justificar-pernocta-${id}`);
+    if (!chk) return;
+
+    // Sincronizar estado
+    if (despEl.dataset?.justificarPernocta === '1') {
+      chk.checked = true;
+    }
+
+    // Handler de cambio
+    if (chk._justHandler) {
+      chk.removeEventListener('change', chk._justHandler);
+    }
+
+    chk._justHandler = () => {
+      if (chk.checked) {
+        despEl.dataset.justificarPernocta = '1';
+      } else {
+        delete despEl.dataset.justificarPernocta;
+      }
+
+      // Recalcular
+      window.calculoDesp?.calculaDesplazamientoFicha?.(despEl);
+    };
+
+    chk.addEventListener('change', chk._justHandler);
   }
 
-  // Compat wrapper: mantiene la API existente pero delega en las funciones puras.
-  function renderSalida(despEl, canonical, ctx) {
-    // normalize ctx
-    const _ctx = Object.assign({}, ctx || {});
-    // allow caller to pass id via dataset or ctx
-    if (!(_ctx.id) && despEl && despEl.dataset && despEl.dataset.desplazamientoId) _ctx.id = despEl.dataset.desplazamientoId;
-    const html = renderSalidaHtml(canonical, _ctx);
-    mountSalida(despEl, html, canonical, _ctx);
+  // =========================================================================
+  // CONVERSIÓN LEGACY
+  // =========================================================================
+
+  /**
+   * Suma totales desde segmentos o canonical.
+   */
+  function sumLegacyTotals(canonical) {
+    const segResults = canonical.segmentsResults;
+    const esInternacional = Array.isArray(segResults) && segResults.length > 0;
+
+    if (!esInternacional) {
+      return {
+        manutencion: Number(canonical.manutencionesAmount) || 0,
+        alojamientoMax: Number(canonical.nochesAmount) || 0,
+        noches: Number(canonical.noches) || 0,
+        hayNochesAmbiguas: !!canonical.nochesAmbiguous,
+        nochesAmbiguasRango: canonical.nochesAmbiguousFrom && canonical.nochesAmbiguousTo
+          ? { desde: canonical.nochesAmbiguousFrom, hasta: canonical.nochesAmbiguousTo }
+          : null
+      };
+    }
+
+    let manutencion = 0, alojamientoMax = 0, noches = 0;
+    let hayNochesAmbiguas = false, nochesAmbiguasRango = null;
+
+    for (const seg of segResults) {
+      manutencion += Number(seg.manutencionesAmount) || 0;
+      alojamientoMax += Number(seg.nochesAmount) || 0;
+      noches += Number(seg.noches) || 0;
+
+      if (seg.nochesAmbiguous) {
+        hayNochesAmbiguas = true;
+        if (seg.nochesAmbiguousFrom && seg.nochesAmbiguousTo) {
+          nochesAmbiguasRango = { desde: seg.nochesAmbiguousFrom, hasta: seg.nochesAmbiguousTo };
+        }
+      }
+    }
+
+    return { manutencion, alojamientoMax, noches, hayNochesAmbiguas, nochesAmbiguasRango };
   }
+
+  /**
+   * Convierte formato legacy a estructura unificada.
+   */
+  function convertLegacyToUnified(canonical, ctx, despEl) {
+    const id = ctx?.id || despEl?.dataset?.desplazamientoId || '';
+    const segResults = canonical.segmentsResults;
+    const esInternacional = Array.isArray(segResults) && segResults.length > 0;
+
+    const totals = sumLegacyTotals(canonical);
+    const alojamientoUser = (typeof ctx?.alojNum !== 'undefined')
+      ? Number(ctx.alojNum)
+      : Number(canonical.alojamiento || 0);
+    const kmAmount = Number(canonical.kmAmount) || 0;
+    const otrosGastos = Number(ctx?.otrosSum) || 0;
+
+    return {
+      id,
+      totales: {
+        manutencion: totals.manutencion,
+        alojamientoMax: totals.alojamientoMax,
+        alojamientoUser,
+        km: kmAmount,
+        otrosGastos,
+        total: totals.manutencion + alojamientoUser + kmAmount + otrosGastos,
+        noches: totals.noches
+      },
+      detalles: esInternacional ? null : {
+        manutenciones: canonical.manutenciones || 0,
+        precioManutencion: canonical.precioManutencion || 0,
+        noches: canonical.noches || 0,
+        precioNoche: canonical.precioNoche || 0,
+        km: Number(canonical.km) || 0,
+        precioKm: canonical.precioKm || 0.26
+      },
+      segmentos: esInternacional ? segResults.map(seg => ({
+        titulo: seg.segTitle || 'Tramo',
+        pais: seg.segPais || '',
+        manutenciones: seg.manutenciones || 0,
+        manutencionAmount: Number(seg.manutencionesAmount) || 0,
+        precioManutencion: seg.precioManutencion || 0,
+        noches: seg.noches || 0,
+        nochesAmount: Number(seg.nochesAmount) || 0,
+        precioNoche: seg.precioNoche || 0,
+        nochesAmbiguous: !!seg.nochesAmbiguous
+      })) : null,
+      ui: {
+        esInternacional,
+        alojamientoExcedeMax: alojamientoUser > totals.alojamientoMax,
+        nochesAmbiguas: totals.hayNochesAmbiguas,
+        nochesAmbiguasRango: totals.nochesAmbiguasRango,
+        precioNocheMedio: totals.noches > 0
+          ? totals.alojamientoMax / totals.noches
+          : (canonical.precioNoche || 0)
+      },
+      exclusiones: {
+        manutencion: !!(ctx?.excludeManutencion),
+        alojamiento: !!(ctx?.excludeAlojamiento)
+      }
+    };
+  }
+
+  // =========================================================================
+  // API PÚBLICA
+  // =========================================================================
+
+  /**
+   * Renderiza el resultado de un cálculo de desplazamiento.
+   * Acepta nueva estructura unificada o formato legacy.
+   */
+  function renderSalida(despEl, salidaData, legacyCtx) {
+    // Detectar formato legacy
+    if (salidaData && !salidaData.totales && legacyCtx) {
+      salidaData = convertLegacyToUnified(salidaData, legacyCtx, despEl);
+    }
+
+    // Normalizar id
+    if (!salidaData.id && despEl?.dataset?.desplazamientoId) {
+      salidaData.id = despEl.dataset.desplazamientoId;
+    }
+
+    const html = renderSalidaHtml(salidaData);
+    mountSalida(despEl, html, salidaData);
+  }
+
+  // =========================================================================
+  // EXPORTACIÓN
+  // =========================================================================
 
   window.salidaDesp = {
+    renderSalida,
     renderSalidaHtml,
     mountSalida,
-    renderSalida // compat
+    templates,
+    fmt,
+    convertLegacyToUnified
   };
+
 })();
