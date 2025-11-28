@@ -188,18 +188,22 @@
   }
 
   /**
-   * Parsea una fecha en formato dd/mm/aa estricto.
-   * @param {string} ddmmaa - Fecha en formato dd/mm/aa
+   * Parsea una fecha en formato dd/mm/aa o d/m/aa (permisivo).
+   * @param {string} ddmmaa - Fecha en formato dd/mm/aa o variantes
    * @returns {Date|null} Objeto Date o null si inválida
    */
   function parseDateStrict(ddmmaa) {
     if (!ddmmaa) return null;
     const parts = String(ddmmaa).split('/').map(p => p.trim());
     if (parts.length !== 3) return null;
-    if (parts[0].length !== 2 || parts[1].length !== 2 || parts[2].length !== 2) return null;
+    // Permitir 1 o 2 dígitos para día/mes, 2 o 4 para año
+    if (parts[0].length < 1 || parts[0].length > 2) return null;
+    if (parts[1].length < 1 || parts[1].length > 2) return null;
+    if (parts[2].length < 2 || parts[2].length > 4) return null;
     const d = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10);
-    const y = 2000 + parseInt(parts[2], 10);
+    let y = parseInt(parts[2], 10);
+    if (y < 100) y = 2000 + y;
     if (!isValidDate(d, m, y)) return null;
     return new Date(y, m - 1, d, 0, 0, 0, 0);
   }
