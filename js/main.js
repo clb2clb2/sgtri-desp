@@ -1,142 +1,154 @@
 // js/main.js
+// ============================================
+// Inicialización principal de la aplicación
+// ============================================
+
 document.addEventListener("DOMContentLoaded", () => {
-    // Helper: abrir una sección (establece max-height según el contenido)
+
+    // ========================================
+    // Helpers para acordeón de secciones
+    // ========================================
+
+    /**
+     * Abre una sección del acordeón
+     * @param {HTMLElement} wrapper - El contenedor .section-content-wrapper
+     * @param {HTMLElement} icon - El icono .toggle-section
+     * @param {HTMLElement} titleEl - El elemento .section-title
+     */
     function openSection(wrapper, icon, titleEl) {
         const content = wrapper.querySelector('.section-content');
-        // Forzar cálculo de altura actual
         const height = content.scrollHeight;
         wrapper.style.maxHeight = height + 'px';
         wrapper.classList.remove('collapsed');
-        // mark icon as open (CSS rotates caret)
         icon.classList.add('open');
-        icon.classList.add('toggle-section');
         if (titleEl) titleEl.setAttribute('aria-expanded', 'true');
     }
 
-    // Helper: cerrar una sección
+    /**
+     * Cierra una sección del acordeón
+     * @param {HTMLElement} wrapper - El contenedor .section-content-wrapper
+     * @param {HTMLElement} icon - El icono .toggle-section
+     * @param {HTMLElement} titleEl - El elemento .section-title
+     */
     function closeSection(wrapper, icon, titleEl) {
         wrapper.style.maxHeight = '0px';
         wrapper.classList.add('collapsed');
-        // mark icon as closed
         icon.classList.remove('open');
-        icon.classList.add('toggle-section');
         if (titleEl) titleEl.setAttribute('aria-expanded', 'false');
     }
 
-        // Inicializar acordeón para cada sección
-        document.querySelectorAll('.section-title').forEach((title, index) => {
-            const icon = title.querySelector('.toggle-section');
-            const wrapper = title.nextElementSibling; // section-content-wrapper
-            const content = wrapper.querySelector('.section-content');
+    // ========================================
+    // Inicialización del acordeón
+    // ========================================
 
-            // Ensure elements have ids for aria attributes
-            if (!title.id) title.id = `section-title-${index + 1}`;
-            if (!content.id) content.id = `section-content-${index + 1}`;
-            if (!wrapper.id) wrapper.id = `section-wrapper-${index + 1}`;
+    document.querySelectorAll('.section-title').forEach((title, index) => {
+        const icon = title.querySelector('.toggle-section');
+        const wrapper = title.nextElementSibling; // section-content-wrapper
+        const content = wrapper.querySelector('.section-content');
 
-            // Accessibility: make title focusable and set aria attributes
-            title.setAttribute('role', 'button');
-            title.setAttribute('tabindex', '0');
-            title.setAttribute('aria-controls', content.id);
-            title.setAttribute('aria-expanded', 'true');
+        // Asegurar IDs para atributos ARIA
+        if (!title.id) title.id = `section-title-${index + 1}`;
+        if (!content.id) content.id = `section-content-${index + 1}`;
+        if (!wrapper.id) wrapper.id = `section-wrapper-${index + 1}`;
 
-            // Mark content region for assistive tech
-            wrapper.setAttribute('role', 'region');
-            wrapper.setAttribute('aria-labelledby', title.id);
+        // Accesibilidad: hacer título focusable y configurar ARIA
+        title.setAttribute('role', 'button');
+        title.setAttribute('tabindex', '0');
+        title.setAttribute('aria-controls', content.id);
+        title.setAttribute('aria-expanded', 'true');
+
+        // Marcar región de contenido para tecnologías asistivas
+        wrapper.setAttribute('role', 'region');
+        wrapper.setAttribute('aria-labelledby', title.id);
+        wrapper.setAttribute('aria-hidden', 'false');
+
+        // Estado inicial: abierto o colapsado según data-attribute
+        const startCollapsed = title.dataset?.startCollapsed === 'true' || 
+                               title.classList.contains('start-collapsed');
+        
+        if (startCollapsed) {
+            closeSection(wrapper, icon, title);
+            wrapper.setAttribute('aria-hidden', 'true');
+        } else {
+            openSection(wrapper, icon, title);
             wrapper.setAttribute('aria-hidden', 'false');
+        }
 
-            // Ensure initial state: open or collapsed based on data attribute/class
-            const startCollapsed = (title.dataset && title.dataset.startCollapsed === 'true') || title.classList.contains('start-collapsed');
-            if (startCollapsed) {
-                // Start collapsed
-                closeSection(wrapper, icon, title);
-                wrapper.setAttribute('aria-hidden', 'true');
-            } else {
-                // Start open
+        // Handler de toggle
+        function toggle() {
+            const isCollapsed = wrapper.classList.contains('collapsed') || 
+                               wrapper.style.maxHeight === '0px';
+            if (isCollapsed) {
                 openSection(wrapper, icon, title);
                 wrapper.setAttribute('aria-hidden', 'false');
+            } else {
+                closeSection(wrapper, icon, title);
+                wrapper.setAttribute('aria-hidden', 'true');
             }
+        }
 
-            // Toggle handler
-            function toggle() {
-                const isCollapsed = wrapper.classList.contains('collapsed') || wrapper.style.maxHeight === '0px';
-                if (isCollapsed) {
-                    openSection(wrapper, icon, title);
-                    wrapper.setAttribute('aria-hidden', 'false');
-                } else {
+        // Soporte para click y teclado
+        title.addEventListener('click', toggle);
+        title.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                toggle();
+            } else if (e.key === 'Escape' || e.key === 'Esc') {
+                if (!wrapper.classList.contains('collapsed')) {
                     closeSection(wrapper, icon, title);
                     wrapper.setAttribute('aria-hidden', 'true');
                 }
             }
+        });
 
-            // Click and keyboard support (Enter, Space to toggle; Escape to close)
-            title.addEventListener('click', toggle);
-            title.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-                    e.preventDefault();
-                    toggle();
-                } else if (e.key === 'Escape' || e.key === 'Esc') {
-                    // Close the section on Escape
-                    if (!wrapper.classList.contains('collapsed')) {
-                        closeSection(wrapper, icon, title);
-                        wrapper.setAttribute('aria-hidden', 'true');
-                    }
+        // Observar cambios de tamaño del contenido (útil con campos dinámicos)
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(() => {
+                if (!wrapper.classList.contains('collapsed')) {
+                    wrapper.style.maxHeight = content.scrollHeight + 'px';
                 }
             });
+            ro.observe(content);
+        } else {
+            // Fallback: MutationObserver
+            const mo = new MutationObserver(() => {
+                if (!wrapper.classList.contains('collapsed')) {
+                    wrapper.style.maxHeight = content.scrollHeight + 'px';
+                }
+            });
+            mo.observe(content, { childList: true, subtree: true, characterData: true });
+        }
+    });
 
-            // Observe content size changes (useful when adding/removing dynamic fields)
-            if (window.ResizeObserver) {
-                const ro = new ResizeObserver(() => {
-                    // If open, update maxHeight to match new content height
-                    if (!wrapper.classList.contains('collapsed')) {
-                        wrapper.style.maxHeight = content.scrollHeight + 'px';
-                    }
-                });
-                ro.observe(content);
-            } else {
-                // Fallback: MutationObserver
-                const mo = new MutationObserver(() => {
-                    if (!wrapper.classList.contains('collapsed')) {
-                        wrapper.style.maxHeight = content.scrollHeight + 'px';
-                    }
-                });
-                mo.observe(content, { childList: true, subtree: true, characterData: true });
-            }
-        });
+    // ========================================
+    // Inicialización de módulos externos
+    // ========================================
 
-    // Asegurar que todas las etiquetas de formulario terminen con ':'
+    // Inicializar logicaDesp
     try {
-        document.querySelectorAll('label').forEach(lbl => {
-            // No modificar labels que contienen HTML complejo (por ejemplo, inputs dentro)
-            if (lbl.querySelector('*')) return;
-            const text = lbl.textContent || '';
-            // Trim y comprobar último carácter visible (ignorar espacios)
-            const trimmed = text.replace(/\s+$/,'');
-            if (trimmed.length === 0) return;
-            if (!trimmed.endsWith(':')) {
-                lbl.textContent = trimmed + ':';
-            }
-        });
-    } catch (e) {
-        // Silenciar fallos aquí para no romper el resto del script
-        console.warn('No se pudo normalizar labels:', e);
+        if (window.logicaDesp?.init) {
+            window.logicaDesp.init();
+        }
+    } catch (e) { 
+        console.warn('Error al inicializar logicaDesp:', e); 
     }
 
-    // Inicializar logicaDesp y hacer un primer render de calculos para cada ficha
-    try {
-        if (window.logicaDesp && typeof window.logicaDesp.init === 'function') window.logicaDesp.init();
-    } catch (e) { console.warn('No se pudo inicializar logicaDesp', e); }
-
-    // Ejecutar cálculo inicial por cada desplazamiento presente en la página
+    // Ejecutar cálculo inicial por cada desplazamiento
     try {
         const grupos = document.querySelectorAll('.desplazamiento-grupo');
         grupos.forEach(desp => {
-            try {
-                if (window.calculoDesp && typeof window.calculoDesp.calculaDesplazamientoFicha === 'function') {
-                    // small timeout to allow other initializers to finish
-                    setTimeout(() => { try { window.calculoDesp.calculaDesplazamientoFicha(desp); } catch(e){} }, 50);
-                }
-            } catch (e) {}
+            if (window.calculoDesp?.calculaDesplazamientoFicha) {
+                // Usar requestAnimationFrame para esperar al siguiente frame de renderizado
+                requestAnimationFrame(() => {
+                    try { 
+                        window.calculoDesp.calculaDesplazamientoFicha(desp); 
+                    } catch (e) {
+                        console.warn('Error en cálculo inicial de desplazamiento:', e);
+                    }
+                });
+            }
         });
-    } catch (e) {}
+    } catch (e) {
+        console.warn('Error al procesar desplazamientos iniciales:', e);
+    }
 });
