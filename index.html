@@ -5,36 +5,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UEx - SGTRI - Liquidación de Dietas y Desplazamientos</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap" rel="stylesheet">
 
+  <!-- Preconnect para optimizar carga de fuentes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- Fuentes -->
+  <link href="https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,100..900;1,100..900&display=swap"
+    rel="stylesheet">
+
+  <!-- Estilos -->
   <link rel="stylesheet" href="css/style-page.css" />
   <link rel="stylesheet" href="css/style-form.css" />
 
+  <!-- Scripts: Módulos base (sin dependencias) -->
+  <script src="js/limpiaDatos.js" defer></script>
+  <script src="js/confirmDialog.js" defer></script>
+  <script src="js/validaciones.js" defer></script>
+  
+  <!-- Scripts: Módulos de UI -->
+  <script src="js/uiPagos.js" defer></script>
+  <script src="js/uiProyectos.js" defer></script>
+  <script src="js/uiDesplazamientos.js" defer></script>
+  
+  <!-- Scripts: Motor de cálculo y lógica -->
+  <script src="js/cogeDatosDesp.js" defer></script>
+  <script src="js/calculoDesp.js" defer></script>
+  <script src="js/logicaDesp.js" defer></script>
+  <script src="js/salidaDesp.js" defer></script>
+  
+  <!-- Scripts: Orquestadores principales -->
   <script src="js/main.js" defer></script>
-  <script src="js/dietasCalc.js" defer></script>
   <script src="js/formLogic.js" defer></script>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,100..900;1,100..900&display=swap"
-    rel="stylesheet">
 </head>
 
 <body>
-  <!-- SVG sprite: reusable caret symbol (hidden visually, available via <use>) -->
-  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"
-    xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <!-- SVG sprite: símbolos reutilizables (ocultos visualmente, disponibles via <use>) -->
+  <svg aria-hidden="true" focusable="false" class="svg-sprite-hidden"
+    xmlns="http://www.w3.org/2000/svg">
     <symbol id="icon-caret" viewBox="0 0 7 3">
       <path d="M3.4662 2.1802l1.9746-2.176h1.3576L3.6496 3.4228h-.3894L.1152.0042h1.3576L3.4662 2.1802z"></path>
     </symbol>
   </svg>
-  <!-- 🔹 Encabezado principal -->
+
+  <!-- Encabezado principal -->
   <header class="Encabezado">
     <img src="assets/img/logo-uex-blanco.png" alt="Logo UEx" class="logo" />
     <h1>SGTRI - Liquidación de Dietas y Desplazamientos</h1>
   </header>
 
-  <!-- 🔹 Contenedor único para todas las secciones -->
+  <!-- Contenedor único para todas las secciones -->
   <div class="form-sections-wrapper">
 
     <!-- Sección 1: Datos del beneficiario -->
@@ -43,7 +63,7 @@
         Datos del beneficiario
         <span class="toggle-section open" aria-hidden="true">
           <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
-            <use href="#icon-caret" xlink:href="#icon-caret"></use>
+            <use href="#icon-caret"></use>
           </svg>
         </span>
       </div>
@@ -52,27 +72,27 @@
           <form id="form-beneficiario">
             <div class="form-row two-cols-75-25">
               <div class="form-group">
-                <label for="nombre-benef">Nombre del beneficiario</label>
+                <label for="nombre-benef">Nombre del beneficiario:</label>
                 <input type="text" id="nombre-benef" name="nombre-benef" maxlength="70" required />
               </div>
               <div class="form-group">
-                <label for="dni">DNI / Pasaporte</label>
+                <label for="dni">DNI / Pasaporte:</label>
                 <input type="text" id="dni" name="dni" maxlength="20" required />
               </div>
             </div>
             <div class="form-row two-cols-50-50">
               <div class="form-group">
-                <label for="entidad">Entidad contratante</label>
+                <label for="entidad">Entidad contratante:</label>
                 <input type="text" id="entidad" name="entidad" maxlength="50" value="Universidad de Extremadura" />
               </div>
               <div class="form-group">
-                <label for="categoria">En calidad de</label>
+                <label for="categoria">En calidad de:</label>
                 <select id="categoria" name="categoria" required></select>
               </div>
             </div>
             <div class="form-row three-cols-25-50-25">
               <div class="form-group">
-                <label for="tipo-pago">Pago en</label>
+                <label for="tipo-pago">Pago en:</label>
                 <select id="tipo-pago" name="tipo-pago" required></select>
               </div>
               <div id="pago-iban-container" class="form-group">
@@ -82,7 +102,6 @@
                 <!-- El contenido SWIFT se renderiza dinámicamente aquí para Cuenta Extranjera -->
               </div>
             </div>
-            <!-- (el campo de descuento por comidas se renderiza al final de la sección de congresos) -->
           </form>
         </div>
       </div>
@@ -94,7 +113,7 @@
         Datos del proyecto
         <span class="toggle-section open" aria-hidden="true">
           <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
-            <use href="#icon-caret" xlink:href="#icon-caret"></use>
+            <use href="#icon-caret"></use>
           </svg>
         </span>
       </div>
@@ -105,7 +124,7 @@
               <select id="tipoProyecto" name="tipoProyecto"></select>
 
               <!-- Texto informativo -->
-              <p id="infoDecreto" style="margin-top:10px; font-size:0.95em; color:#444;">
+              <p id="infoDecreto">
                 Los cálculos se efectuarán en base al Decreto 42/2005 (Junta de Extremadura).
                 <a href="https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o"
                   target="_blank" rel="noopener noreferrer">
@@ -158,7 +177,7 @@
         Desplazamientos
         <span class="toggle-section open" aria-hidden="true">
           <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
-            <use href="#icon-caret" xlink:href="#icon-caret"></use>
+            <use href="#icon-caret"></use>
           </svg>
         </span>
       </div>
@@ -206,15 +225,15 @@
 
                 <div class="form-row three-cols-33">
                   <div class="form-group">
-                    <label for="origen-1">Origen</label>
+                    <label for="origen-1">Origen:</label>
                     <input type="text" id="origen-1" name="origen-1" class="general-text" required />
                   </div>
                   <div class="form-group">
-                    <label for="destino-1">Destino</label>
+                    <label for="destino-1">Destino:</label>
                     <input type="text" id="destino-1" name="destino-1" class="general-text" required />
                   </div>
                   <div class="form-group">
-                    <label for="pais-destino-1">País de Destino</label>
+                    <label for="pais-destino-1">País de Destino:</label>
                     <select id="pais-destino-1" name="pais-destino-1" required>
                     </select>
                   </div>
@@ -235,8 +254,6 @@
                     </div>
                     </div>
 
-                        <!-- tercera fila eliminada: redundante con la fila superior -->
-
                 <div class="form-group">
                   <label for="motivo-1">Motivo del desplazamiento:</label>
                   <input type="text" id="motivo-1" name="motivo-1" class="general-text" maxlength="90" required />
@@ -254,9 +271,7 @@
                   </div>
                 </div>
 
-                <!-- (duplicado eliminado) -->
-
-                <!-- Otros gastos: botón y contenedor (las nuevas líneas irán debajo del botón) -->
+                <!-- Otros gastos: botón y contenedor -->
                 <div class="otros-gastos-wrapper">
                   <div class="otros-gastos-row">
                     <div class="otros-gastos-left">
@@ -303,7 +318,7 @@
         Asistencia a congresos u otros eventos
         <span class="toggle-section" aria-hidden="true">
           <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
-            <use href="#icon-caret" xlink:href="#icon-caret"></use>
+            <use href="#icon-caret"></use>
           </svg>
         </span>
       </div>
@@ -313,7 +328,7 @@
             <!-- Línea 1: Nombre del evento (100%) -->
             <div class="form-row">
               <div class="form-group">
-                <label for="evento-nombre">Nombre del evento</label>
+                <label for="evento-nombre">Nombre del evento:</label>
                 <input type="text" id="evento-nombre" name="evento-nombre" class="general-text" maxlength="120" />
               </div>
             </div>
@@ -321,23 +336,23 @@
             <!-- Línea 2: Celebrado en (50%) + Del día (25%) + Al día (25%) -->
             <div class="form-row two-cols-50-25">
               <div class="form-group">
-                <label for="evento-lugar">Celebrado en</label>
+                <label for="evento-lugar">Celebrado en:</label>
                 <input type="text" id="evento-lugar" name="evento-lugar" class="general-text" />
               </div>
               <div class="form-group">
-                <label for="evento-del">Del día</label>
+                <label for="evento-del">Del día:</label>
                 <input type="text" id="evento-del" name="evento-del" class="input-fecha" placeholder="dd/mm/aa" />
               </div>
               <div class="form-group">
-                <label for="evento-al">Al día</label>
+                <label for="evento-al">Al día:</label>
                 <input type="text" id="evento-al" name="evento-al" class="input-fecha" placeholder="dd/mm/aa" />
               </div>
             </div>
 
-            <!-- Línea 3: Gastos de inscripción (25%) | Nº comidas (25%) | Evento asociado al desplazamiento (50%) -->
+            <!-- Línea 3: Gastos de inscripción (25%) | Nº comidas (25%) | Evento asociado (50%) -->
             <div class="form-row three-cols-25-50-25">
               <div class="form-group">
-                <label for="evento-gastos">Gastos de inscripción</label>
+                <label for="evento-gastos">Gastos de inscripción:</label>
                 <input type="text" id="evento-gastos" name="evento-gastos" class="format-alojamiento"
                   placeholder="0,00 €" />
               </div>
