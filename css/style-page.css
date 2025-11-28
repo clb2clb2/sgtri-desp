@@ -1,6 +1,16 @@
 /* css/style-page.css */
 /* Este archivo usa las variables CSS definidas en style-form.css */
 
+/* ============================================
+   Utilidades globales
+   ============================================ */
+.svg-sprite-hidden {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
 body {
     font-family: "Segoe UI", Roboto, Arial, sans-serif;
     background-color: #f8f8f8;
