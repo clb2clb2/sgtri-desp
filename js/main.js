@@ -121,4 +121,22 @@ document.addEventListener("DOMContentLoaded", () => {
         // Silenciar fallos aquí para no romper el resto del script
         console.warn('No se pudo normalizar labels:', e);
     }
+
+    // Inicializar logicaDesp y hacer un primer render de calculos para cada ficha
+    try {
+        if (window.logicaDesp && typeof window.logicaDesp.init === 'function') window.logicaDesp.init();
+    } catch (e) { console.warn('No se pudo inicializar logicaDesp', e); }
+
+    // Ejecutar cálculo inicial por cada desplazamiento presente en la página
+    try {
+        const grupos = document.querySelectorAll('.desplazamiento-grupo');
+        grupos.forEach(desp => {
+            try {
+                if (window.calculoDesp && typeof window.calculoDesp.calculaDesplazamientoFicha === 'function') {
+                    // small timeout to allow other initializers to finish
+                    setTimeout(() => { try { window.calculoDesp.calculaDesplazamientoFicha(desp); } catch(e){} }, 50);
+                }
+            } catch (e) {}
+        });
+    } catch (e) {}
 });

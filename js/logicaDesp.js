@@ -3,6 +3,34 @@
 // Funciones expuestas en window.logicaDesp
 
 (function () {
+  // Timers para debounce global y por-id
+  const perIdTimers = Object.create(null);
+  let fullTimer = null;
+
+  // Schedule per-id with debounce
+  function scheduleRecalcForId(id, ms = 120) {
+    try {
+      if (!id) return;
+      if (perIdTimers[id]) clearTimeout(perIdTimers[id]);
+      perIdTimers[id] = setTimeout(() => { try { handleFichaChange(id); } catch (e) {} ; delete perIdTimers[id]; }, ms);
+    } catch (e) {}
+  }
+
+  // Schedule full recalculation (debounced). Calls scheduleRecalcForId for each ficha.
+  function scheduleFullRecalc(ms = 120) {
+    try {
+      if (fullTimer) clearTimeout(fullTimer);
+      fullTimer = setTimeout(() => {
+        try {
+          const groups = document.querySelectorAll('.desplazamiento-grupo');
+          groups.forEach(g => {
+            const id = g && g.dataset && g.dataset.desplazamientoId ? g.dataset.desplazamientoId : null;
+            if (id) scheduleRecalcForId(id, 20);
+          });
+        } catch (e) {}
+      }, ms);
+    } catch (e) {}
+  }
   function init() {
     // Inicialización: wiring de listeners delegados para fichas de desplazamiento.
     // Este init actúa por delegación y usa debounce por-id para evitar recálculos innecesarios.
@@ -10,12 +38,7 @@
       const container = document.getElementById('desplazamientos-container');
       if (!container) return;
 
-      const perIdTimers = Object.create(null);
-      function scheduleForId(id, fn, ms = 120) {
-        if (!id) return;
-        if (perIdTimers[id]) clearTimeout(perIdTimers[id]);
-        perIdTimers[id] = setTimeout(() => { try { fn(); } catch (e) {} ; delete perIdTimers[id]; }, ms);
-      }
+      // use shared scheduleRecalcForId defined in outer scope
 
       // Delegación: manejar blur en fechas/horas y change en selects/checkboxes
       container.addEventListener('blur', (e) => {
@@ -25,7 +48,7 @@
         if (el.classList && (el.classList.contains('input-fecha') || el.classList.contains('input-hora') || el.classList.contains('format-km') || el.classList.contains('format-alojamiento') )) {
           const m = (el.id || '').match(/-(\d+)$/);
           const id = m ? m[1] : (el.closest && el.closest('.desplazamiento-grupo') && el.closest('.desplazamiento-grupo').dataset && el.closest('.desplazamiento-grupo').dataset.desplazamientoId);
-          if (id) scheduleForId(id, () => handleFichaChange(id));
+          if (id) scheduleRecalcForId(id);
         }
       }, true);
 
@@ -35,7 +58,7 @@
         // selects, checkboxes, botones otros gastos
         const grp = el.closest && el.closest('.desplazamiento-grupo');
         const id = grp && grp.dataset && grp.dataset.desplazamientoId ? grp.dataset.desplazamientoId : null;
-        if (id) scheduleForId(id, () => handleFichaChange(id));
+        if (id) scheduleRecalcForId(id);
       });
 
       // clicks para añadir/eliminar 'otros gastos' ya manejados por formLogic, pero
@@ -45,10 +68,9 @@
         const remove = e.target.closest && e.target.closest('.btn-remove-otros-gasto');
         const grp = e.target.closest && e.target.closest('.desplazamiento-grupo');
         const id = grp && grp.dataset && grp.dataset.desplazamientoId ? grp.dataset.desplazamientoId : null;
-        if ((add || remove) && id) scheduleForId(id, () => handleFichaChange(id));
+        if ((add || remove) && id) scheduleRecalcForId(id);
       });
 
-      console.log('logicaDesp initialized');
     } catch (e) { console.error('logicaDesp.init error', e); }
   }
 
@@ -84,16 +106,135 @@
         if (desp && desp.dataset && desp.dataset.dtInvalid) delete desp.dataset.dtInvalid;
       }
 
-      // Call calculoDesp and render
+      // Validate cruces too and update UI state accordingly
+      try { validateCrucesForFicha(id); } catch (e) { /* ignore */ }
+
+      // Call calculoDesp; the calculator is responsible for invoking the renderer.
       try {
         if (window.calculoDesp && typeof window.calculoDesp.calculaDesplazamientoFicha === 'function') {
-          const res = window.calculoDesp.calculaDesplazamientoFicha(desp);
-          if (window.salidaDesp && typeof window.salidaDesp.renderSalida === 'function') {
-            window.salidaDesp.renderSalida(desp, res && res.canonical, res && res.displayContext);
-          }
+          // calculaDesplazamientoFicha will call salidaDesp.renderSalida internally
+          window.calculoDesp.calculaDesplazamientoFicha(desp);
         }
-      } catch (e) { /* ignore render errors */ }
+      } catch (e) { /* ignore calculation/render errors */ }
     } catch (e) { console.error('handleFichaChange error', e); }
+  }
+
+  // Validate cruces (ida/vuelta) for a ficha and update UI similarly to formLogic.validateCrucesAndUpdateUI
+  function validateCrucesForFicha(id) {
+    try {
+      const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+      if (!desp) return true;
+      const fechaIdEl = desp.querySelector(`#fecha-ida-${id}`);
+      const fechaRegEl = desp.querySelector(`#fecha-regreso-${id}`);
+      const cruceIdEl = desp.querySelector(`#cruce-ida-${id}`);
+      const cruceVueltaEl = desp.querySelector(`#cruce-vuelta-${id}`);
+      const calc = desp.querySelector('.calc-result');
+      const paisEl = desp.querySelector(`#pais-destino-${id}`);
+      const isInternational = paisEl && paisEl.value && String(paisEl.value).trim() !== '' && String(paisEl.value).trim() !== 'España';
+
+      // small helper: sum presence of non-manutencion amounts (km, alojamiento, otros)
+      function hasOtherAmounts(d) {
+        try {
+          if (!d) return false;
+          const kmEl = d.querySelector('.format-km');
+          const alojEl = d.querySelector('.format-alojamiento');
+          const otrosEls = Array.from(d.querySelectorAll('.otros-gasto-importe'));
+          const vals = [];
+          if (kmEl && String(kmEl.value || '').trim() !== '') vals.push(kmEl.value);
+          if (alojEl && String(alojEl.value || '').trim() !== '') vals.push(alojEl.value);
+          otrosEls.forEach(i => { if (String(i.value || '').trim() !== '') vals.push(i.value); });
+          return vals.length > 0;
+        } catch (e) { return false; }
+      }
+
+      // If cruce inputs missing
+      if (!cruceIdEl || !cruceVueltaEl) {
+        if (!isInternational) return true;
+        if (desp) { desp.dataset.dtInvalid = '1'; }
+        if (hasOtherAmounts(desp)) {
+          if (calc) calc.style.display = '';
+        } else {
+          if (calc) calc.style.display = 'none';
+        }
+        return false;
+      }
+
+      // If international and cruces empty
+      if (isInternational && (String(cruceIdEl.value || '').trim() === '' || String(cruceVueltaEl.value || '').trim() === '')) {
+        if (desp) { desp.dataset.dtInvalid = '1'; }
+        if (hasOtherAmounts(desp)) {
+          if (calc) calc.style.display = '';
+        } else {
+          if (calc) calc.style.display = 'none';
+        }
+        return false;
+      }
+
+      // parse strict dd/mm/aa using simple parse function
+      function parseDateStrict(v) {
+        try {
+          if (!v) return null;
+          const parts = String(v).split('/');
+          if (parts.length !== 3) return null;
+          const d = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const y = 2000 + parseInt(parts[2], 10);
+          const dt = new Date(y, m, d);
+          if (isNaN(dt.getTime())) return null;
+          return dt;
+        } catch (e) { return null; }
+      }
+
+      const fId = parseDateStrict(fechaIdEl && fechaIdEl.value);
+      const fReg = parseDateStrict(fechaRegEl && fechaRegEl.value);
+      const cId = parseDateStrict(cruceIdEl && cruceIdEl.value);
+      const cV = parseDateStrict(cruceVueltaEl && cruceVueltaEl.value);
+
+      const anyInvalidFormat = ((!cId && cruceIdEl.value) || (!cV && cruceVueltaEl.value));
+      if (anyInvalidFormat) {
+        if (desp) { desp.dataset.dtInvalid = '1'; }
+        if (hasOtherAmounts(desp)) {
+          if (calc) calc.style.display = '';
+        } else {
+          if (calc) calc.style.display = 'none';
+        }
+        return false;
+      }
+
+      if (!cId || !cV) {
+        if (desp && desp.dataset && desp.dataset.dtInvalid === '1') {
+          if (hasOtherAmounts(desp)) {
+            if (calc) calc.style.display = '';
+            return false;
+          }
+          if (calc) calc.style.display = 'none';
+          return false;
+        }
+        [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.remove('field-error'));
+        return true;
+      }
+
+      // ordering: fechaId <= cId <= cV <= fechaReg
+      let orderingOk = true;
+      if (fId && cId && cId < fId) orderingOk = false;
+      if (fReg && cV && cV > fReg) orderingOk = false;
+      if (cId && cV && cV < cId) orderingOk = false;
+
+      if (!orderingOk) {
+        [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.add('field-error'));
+        if (hasOtherAmounts(desp)) {
+          if (calc) calc.style.display = '';
+        } else {
+          if (calc) calc.style.display = 'none';
+        }
+        return false;
+      }
+
+      // OK
+      [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.remove('field-error'));
+      if (desp && desp.dataset && desp.dataset.dtInvalid) delete desp.dataset.dtInvalid;
+      return true;
+    } catch (e) { return true; }
   }
 
   function shouldShowTicketCena(tipoProyecto, horaRegreso) {
@@ -157,6 +298,8 @@
     shouldShowTicketCena,
     shouldShowJustificarPernocta,
     isInternationalCountry,
-    validateFechaOrden
+    validateFechaOrden,
+    scheduleFullRecalc,
+    scheduleRecalcForId
   };
 })();
