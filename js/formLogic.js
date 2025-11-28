@@ -17,51 +17,36 @@ document.addEventListener("DOMContentLoaded", () => {
   // We keep the same function names to avoid changing call sites in this file.
   function sanitizeGeneralText(value, maxLen) {
     try {
-      const s = (window.sanitizers || sanitizers);
-      return s.sanitizeGeneralText(value, maxLen);
-    } catch (err) {
       return String(value || '').replace(/[^0-9A-Za-z\u00C0-\u017F\u0180-\u024F .,\-()&']/g, '').slice(0, maxLen || undefined);
-    }
+    } catch (err) { return String(value || '').slice(0, maxLen || undefined); }
   }
 
   function sanitizeReferencia(value, maxLen) {
     try {
-      const s = (window.sanitizers || sanitizers);
-      return s.sanitizeReferencia(value, maxLen);
-    } catch (err) {
       return String(value || '').replace(/[^0-9A-Za-z\u00C0-\u017F\u0180-\u024F\/ .,\-()&']/g, '').slice(0, maxLen || undefined);
-    }
+    } catch (err) { return String(value || '').slice(0, maxLen || undefined); }
   }
 
   function sanitizeIBAN(value, maxLen) {
     try {
-      const s = (window.sanitizers || sanitizers);
-      return s.sanitizeIBAN(value, maxLen);
-    } catch (err) {
       const raw = String(value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, maxLen || 24);
       const parts = raw.match(/.{1,4}/g) || [];
       return parts.join(' ');
-    }
+    } catch (err) { return String(value || '').slice(0, maxLen || undefined).toUpperCase(); }
   }
 
   function sanitizeDNI(value, maxLen) {
     try {
-      const s = (window.sanitizers || sanitizers);
-      return s.sanitizeDNI(value, maxLen);
-    } catch (err) {
       return String(value || '').replace(/[^A-Za-z0-9.-]/g, '').slice(0, maxLen || 20).toUpperCase();
-    }
+    } catch (err) { return String(value || '').slice(0, maxLen || 20).toUpperCase(); }
   }
 
   function formatOrganica(value) {
     try {
-      const s = (window.sanitizers || sanitizers);
-      return s.formatOrganica(value);
-    } catch (err) {
       const only = String(value || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toUpperCase();
       const parts = only.match(/.{1,2}/g) || [];
       return parts.join('.');
-    }
+    } catch (err) { return String(value || '').slice(0, 14).toUpperCase(); }
   }
 
   // Delegación para sanear entradas en tiempo real
@@ -381,9 +366,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const newRaw = (rawAll || '').slice(0, maxRawLen || rawAll.length);
       const finalRaw = transformRaw ? transformRaw(newRaw) : newRaw;
 
-  // Formatear. Si el usuario acaba de completar un bloque y no ha llegado al max, incluimos separador final
-  const justCompletedGroup = (finalRaw.length > 0) && (finalRaw.length % groupSize === 0) && (finalRaw.length < (maxRawLen || Infinity));
-  const formatted = formatGroupedRaw(finalRaw, groupSize, sep, justCompletedGroup, maxRawLen);
+      // Formatear. Si el usuario acaba de completar un bloque y no ha llegado al max, incluimos separador final
+      const justCompletedGroup = (finalRaw.length > 0) && (finalRaw.length % groupSize === 0) && (finalRaw.length < (maxRawLen || Infinity));
+      const formatted = formatGroupedRaw(finalRaw, groupSize, sep, justCompletedGroup, maxRawLen);
 
       // Determinar si fue una inserción (raw más largo que antes)
       const oldRawAll = (inputEl._lastRawValue) || '';
@@ -2119,4 +2104,5 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
   // (Paises ya se cargan en la petición principal arriba)
+
 });
