@@ -82,7 +82,7 @@
       // show/hide fronteras based on country
       const paisSel = desp.querySelector(`#pais-destino-${id}`);
       const fronteras = document.getElementById(`fronteras-fields-${id}`);
-      const isIntl = paisSel && shouldShowTicketCena && isInternationalCountry(paisSel.value) ? true : (paisSel && isInternationalCountry(paisSel.value));
+      const isIntl = paisSel && isInternationalCountry(paisSel.value);
       if (fronteras) fronteras.style.display = isIntl ? 'block' : 'none';
 
       // show/hide ticket-cena according to tipoProyecto and hour
@@ -119,55 +119,23 @@
     } catch (e) { console.error('handleFichaChange error', e); }
   }
 
-  // Validate cruces (ida/vuelta) for a ficha and update UI similarly to formLogic.validateCrucesAndUpdateUI
+  // Validate cruces (ida/vuelta) for a ficha - SOLO actualiza UI visual (clases CSS)
+  // NO marca dtInvalid - eso se deja al motor de cálculo (cogeDatosDesp + calculoDesp)
   function validateCrucesForFicha(id) {
     try {
       const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
       if (!desp) return true;
-      const fechaIdEl = desp.querySelector(`#fecha-ida-${id}`);
-      const fechaRegEl = desp.querySelector(`#fecha-regreso-${id}`);
+
       const cruceIdEl = desp.querySelector(`#cruce-ida-${id}`);
       const cruceVueltaEl = desp.querySelector(`#cruce-vuelta-${id}`);
-      const calc = desp.querySelector('.calc-result');
       const paisEl = desp.querySelector(`#pais-destino-${id}`);
       const isInternational = paisEl && paisEl.value && String(paisEl.value).trim() !== '' && String(paisEl.value).trim() !== 'España';
 
-      // small helper: sum presence of non-manutencion amounts (km, alojamiento, otros)
-      function hasOtherAmounts(d) {
-        try {
-          if (!d) return false;
-          const kmEl = d.querySelector('.format-km');
-          const alojEl = d.querySelector('.format-alojamiento');
-          const otrosEls = Array.from(d.querySelectorAll('.otros-gasto-importe'));
-          const vals = [];
-          if (kmEl && String(kmEl.value || '').trim() !== '') vals.push(kmEl.value);
-          if (alojEl && String(alojEl.value || '').trim() !== '') vals.push(alojEl.value);
-          otrosEls.forEach(i => { if (String(i.value || '').trim() !== '') vals.push(i.value); });
-          return vals.length > 0;
-        } catch (e) { return false; }
-      }
-
-      // If cruce inputs missing
-      if (!cruceIdEl || !cruceVueltaEl) {
-        if (!isInternational) return true;
-        if (desp) { desp.dataset.dtInvalid = '1'; }
-        if (hasOtherAmounts(desp)) {
-          if (calc) calc.style.display = '';
-        } else {
-          if (calc) calc.style.display = 'none';
-        }
-        return false;
-      }
-
-      // If international and cruces empty
-      if (isInternational && (String(cruceIdEl.value || '').trim() === '' || String(cruceVueltaEl.value || '').trim() === '')) {
-        if (desp) { desp.dataset.dtInvalid = '1'; }
-        if (hasOtherAmounts(desp)) {
-          if (calc) calc.style.display = '';
-        } else {
-          if (calc) calc.style.display = 'none';
-        }
-        return false;
+      // Si no es internacional o no hay elementos de cruce, limpiar errores visuales y salir
+      if (!isInternational || !cruceIdEl || !cruceVueltaEl) {
+        if (cruceIdEl) cruceIdEl.classList.remove('field-error');
+        if (cruceVueltaEl) cruceVueltaEl.classList.remove('field-error');
+        return true;
       }
 
       // parse strict dd/mm/aa using simple parse function
@@ -185,54 +153,36 @@
         } catch (e) { return null; }
       }
 
+      const fechaIdEl = desp.querySelector(`#fecha-ida-${id}`);
+      const fechaRegEl = desp.querySelector(`#fecha-regreso-${id}`);
       const fId = parseDateStrict(fechaIdEl && fechaIdEl.value);
       const fReg = parseDateStrict(fechaRegEl && fechaRegEl.value);
-      const cId = parseDateStrict(cruceIdEl && cruceIdEl.value);
-      const cV = parseDateStrict(cruceVueltaEl && cruceVueltaEl.value);
+      const cId = parseDateStrict(cruceIdEl.value);
+      const cV = parseDateStrict(cruceVueltaEl.value);
 
-      const anyInvalidFormat = ((!cId && cruceIdEl.value) || (!cV && cruceVueltaEl.value));
-      if (anyInvalidFormat) {
-        if (desp) { desp.dataset.dtInvalid = '1'; }
-        if (hasOtherAmounts(desp)) {
-          if (calc) calc.style.display = '';
-        } else {
-          if (calc) calc.style.display = 'none';
-        }
-        return false;
+      // Validar formato y orden
+      let hasError = false;
+
+      // Formato incorrecto (valor introducido pero no parseable)
+      if ((cruceIdEl.value && !cId) || (cruceVueltaEl.value && !cV)) {
+        hasError = true;
       }
 
-      if (!cId || !cV) {
-        if (desp && desp.dataset && desp.dataset.dtInvalid === '1') {
-          if (hasOtherAmounts(desp)) {
-            if (calc) calc.style.display = '';
-            return false;
-          }
-          if (calc) calc.style.display = 'none';
-          return false;
-        }
-        [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.remove('field-error'));
-        return true;
+      // Orden: fechaIda <= cruceIda <= cruceVuelta <= fechaRegreso
+      if (cId && cV) {
+        if (fId && cId < fId) hasError = true;
+        if (fReg && cV > fReg) hasError = true;
+        if (cV < cId) hasError = true;
       }
 
-      // ordering: fechaId <= cId <= cV <= fechaReg
-      let orderingOk = true;
-      if (fId && cId && cId < fId) orderingOk = false;
-      if (fReg && cV && cV > fReg) orderingOk = false;
-      if (cId && cV && cV < cId) orderingOk = false;
-
-      if (!orderingOk) {
-        [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.add('field-error'));
-        if (hasOtherAmounts(desp)) {
-          if (calc) calc.style.display = '';
-        } else {
-          if (calc) calc.style.display = 'none';
-        }
-        return false;
+      // Actualizar clases visuales
+      if (hasError) {
+        cruceIdEl.classList.add('field-error');
+        cruceVueltaEl.classList.add('field-error');
+      } else {
+        cruceIdEl.classList.remove('field-error');
+        cruceVueltaEl.classList.remove('field-error');
       }
-
-      // OK
-      [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.remove('field-error'));
-      if (desp && desp.dataset && desp.dataset.dtInvalid) delete desp.dataset.dtInvalid;
       return true;
     } catch (e) { return true; }
   }
@@ -266,7 +216,10 @@
   }
 
   function validateFechaOrden(fechaIda, horaIda, fechaReg, horaReg) {
-    // Simple validation: requiere que regreso > salida when both provided (returns boolean)
+    // Valida que la fecha/hora de regreso sea posterior a la de ida.
+    // Devuelve:
+    //   true  - si los datos son válidos O si aún no hay suficientes datos para validar
+    //   false - SOLO si ambas fechas están presentes pero el orden es incorrecto
     try {
       // parse dd/mm/aa
       function parse(d, h) {
@@ -287,9 +240,13 @@
       }
       const s = parse(fechaIda, horaIda);
       const e = parse(fechaReg, horaReg);
-      if (!s || !e) return false;
+      
+      // Si faltan datos, no podemos validar el orden → asumimos OK (no marcar error)
+      if (!s || !e) return true;
+      
+      // Si ambos existen, verificar orden: regreso debe ser posterior a ida
       return e > s;
-    } catch (e) { return false; }
+    } catch (e) { return true; }
   }
 
   // Expose API
