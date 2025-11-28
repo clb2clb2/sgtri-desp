@@ -1,3 +1,16 @@
+/* css/style-page.css */
+/* Este archivo usa las variables CSS definidas en style-form.css */
+
+/* ============================================
+   Utilidades globales
+   ============================================ */
+.svg-sprite-hidden {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
 body {
     font-family: "Segoe UI", Roboto, Arial, sans-serif;
     background-color: #f8f8f8;
@@ -6,16 +19,18 @@ body {
     padding: 0;
 }
 
-/* Encabezado */
+/* ============================================
+   Encabezado
+   ============================================ */
 .Encabezado {
-    background-color: #53868b;
+    background-color: var(--color-primary, #53868b);
     color: white;
     display: flex;
-    justify-content: center; /* center the title */
-    align-items: center; /* vertical centering */
+    justify-content: center;
+    align-items: center;
     position: relative;
     padding: 0 24px;
-    min-height: 120px; /* keep a consistent header band height */
+    min-height: 120px;
     margin-bottom: 1rem;
 }
 
@@ -24,14 +39,14 @@ body {
     width: auto;
     margin: 0 8px;
     position: absolute;
-    left: 24px; /* match header padding */
+    left: 24px;
     top: 50%;
     transform: translateY(-50%);
     z-index: 2;
 }
 
 .Encabezado h1 {
-    font-family: "Saira", Arial, sans-serif;
+    font-family: var(--font-family-title, "Saira", Arial, sans-serif);
     font-weight: 400;
     font-size: 2rem;
     margin: 0;
@@ -40,17 +55,21 @@ body {
     pointer-events: none;
 }
 
-/* Contenedor único para secciones */
+/* ============================================
+   Contenedor de secciones
+   ============================================ */
 .form-sections-wrapper {
     background-color: white;
     margin: 0 auto 2rem auto;
     width: min(90%, 800px);
-    border-radius: 0; /* esquinas cuadradas */
+    border-radius: 0;
 }
 
-/* Títulos de sección */
+/* ============================================
+   Títulos de sección (acordeón)
+   ============================================ */
 .section-title {
-    background-color: #53868b;
+    background-color: var(--color-primary, #53868b);
     color: white;
     padding: 0.6rem 1rem;
     font-size: 1.2rem;
@@ -58,18 +77,16 @@ body {
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
-    font-family: "Saira", Arial, sans-serif;
+    font-family: var(--font-family-title, "Saira", Arial, sans-serif);
     font-weight: 400;
     margin: 0 0 5px 0;
 }
 
-/* Icono de desplegar/plegar */
 .toggle-section {
     user-select: none;
     font-size: 1.2rem;
 }
 
-/* SVG caret inside .toggle-section */
 .toggle-section .caret {
     display: inline-block;
     width: 14px;
@@ -78,22 +95,18 @@ body {
     fill: currentColor;
 }
 
-/* When open, rotate caret 180deg (pointing up) */
 .toggle-section.open .caret {
     transform: rotate(180deg);
 }
 
-/* Contenido de cada sección */
+/* ============================================
+   Contenido de secciones
+   ============================================ */
 .section-content-wrapper {
-    /* No usamos un max-height fijo aquí: el JS establece inline max-height
-       dinámicamente (en px) para permitir transiciones suaves con contenido
-       dinámico. Mantener overflow hidden para que el colapso oculte el contenido. */
     overflow: hidden;
     transition: max-height 0.28s ease-out;
 }
 
-/* Cuando la sección está desplegada (no collapsed), permitir overflow visible
-   para que los tooltips puedan escapar del contenedor durante el hover. */
 .section-content-wrapper:not(.collapsed) {
     overflow: visible;
 }
@@ -107,9 +120,10 @@ body {
     background-color: white;
 }
 
-/* Formularios */
-/* .form-group spacing centralized in css/style-form.css */
-
+/* ============================================
+   Estilos base de formulario
+   (complementarios a style-form.css)
+   ============================================ */
 label {
     display: block;
     margin-bottom: 0.25rem;
