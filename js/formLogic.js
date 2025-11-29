@@ -532,8 +532,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.classList && el.classList.contains('format-km')) {
       const raw = (el.value || '').toString();
       if (!raw) { el.value = ''; return; }
-      const cleaned = raw.replace(/[^0-9,\.]/g, '').replace(/\./g, ',');
-      const num = parseFloat(cleaned.replace(/,/g, '.'));
+      // Eliminar separadores de miles (puntos) y convertir coma decimal a punto
+      let cleaned = raw.replace(/[^0-9,]/g, '').replace(/,/g, '.');
+      if (!cleaned) { el.value = ''; return; }
+      const num = parseFloat(cleaned);
       if (isNaN(num)) { el.value = ''; return; }
       const rounded = Math.round(num);
       el.value = Number(rounded).toLocaleString('de-DE') + ' km';
