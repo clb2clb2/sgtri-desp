@@ -23,6 +23,52 @@
     });
   }
 
+  /**
+   * Obtiene el descuento por comidas de congreso para un desplazamiento específico.
+   * Solo devuelve el descuento si el desplazamiento es el asociado al congreso.
+   * @param {string|number} despId - ID del desplazamiento
+   * @returns {number} Descuento en euros (0 si no aplica a este desplazamiento)
+   */
+  function getDescuentoCongreso(despId) {
+    const hidden = document.getElementById('descuento-manut-congreso');
+    if (!hidden) return 0;
+    
+    const descuento = Number(hidden.value) || 0;
+    if (descuento <= 0) return 0;
+    
+    // Determinar a qué desplazamiento aplica el descuento
+    const desplazamientos = document.querySelectorAll('.desplazamiento-grupo');
+    
+    if (desplazamientos.length === 1) {
+      // Si solo hay un desplazamiento, el descuento aplica a ese
+      return descuento;
+    }
+    
+    // Si hay varios, verificar cuál está seleccionado en evento-asociado
+    const eventoAsociado = document.getElementById('evento-asociado');
+    if (!eventoAsociado) return 0;
+    
+    const valSel = eventoAsociado.value || '';
+    const match = valSel.match(/^desp(\d+)$/);
+    if (!match) return 0;
+    
+    const despAsociado = match[1];
+    // Solo aplicar el descuento si coincide con el desplazamiento actual
+    return String(despId) === String(despAsociado) ? descuento : 0;
+  }
+
+  /**
+   * Calcula el IRPF ajustado restando el descuento por congreso.
+   * El resultado nunca será negativo.
+   * @param {number} irpfBase - IRPF calculado sin ajustes
+   * @param {string|number} despId - ID del desplazamiento
+   * @returns {number} IRPF ajustado (>= 0)
+   */
+  function calcIrpfAjustado(irpfBase, despId) {
+    const descuento = getDescuentoCongreso(despId);
+    return Math.max(0, (irpfBase || 0) - descuento);
+  }
+
   // =========================================================================
   // TEMPLATES (funciones puras → HTML string)
   // =========================================================================
@@ -233,8 +279,9 @@
       ? `<div class="calc-titulo-ResEvent">[ Residencia Eventual ]</div>\n      ` 
       : '';
 
-    // Línea de IRPF (solo si > 0)
-    const irpfLine = templates.lineaIRPF(totales.irpfSujeto);
+    // Línea de IRPF (ajustada por descuento de congreso, solo si > 0)
+    const irpfAjustado = calcIrpfAjustado(totales.irpfSujeto, data.id);
+    const irpfLine = templates.lineaIRPF(irpfAjustado);
 
     return `<div class="calc-result" aria-live="polite" data-desp-id="${data.id}">
       ${badgeResEvent}${lines.join('\n      ')}
@@ -316,7 +363,9 @@
 
     html += totalLines.join('\n      ');
     html += templates.total(totales.total);
-    html += templates.lineaIRPF(totales.irpfSujeto);
+    // IRPF ajustado por descuento de congreso
+    const irpfAjustado = calcIrpfAjustado(totales.irpfSujeto, data.id);
+    html += templates.lineaIRPF(irpfAjustado);
     html += '</div>';
 
     return html;
