@@ -128,6 +128,17 @@
     },
 
     /**
+     * Línea de IRPF sujeto a retención (solo si > 0).
+     */
+    lineaIRPF(amount) {
+      if (!amount || amount <= 0) return '';
+      return `<div class="calc-irpf">
+        <span class="label">Sujeto a retención por IRPF:</span>
+        <span class="amount">${fmt(amount)} €</span>
+      </div>`;
+    },
+
+    /**
      * Título de sección/segmento.
      */
     tituloSeccion(titulo) {
@@ -222,9 +233,13 @@
       ? `<div class="calc-titulo-ResEvent">[ Residencia Eventual ]</div>\n      ` 
       : '';
 
+    // Línea de IRPF (solo si > 0)
+    const irpfLine = templates.lineaIRPF(totales.irpfSujeto);
+
     return `<div class="calc-result" aria-live="polite" data-desp-id="${data.id}">
       ${badgeResEvent}${lines.join('\n      ')}
       ${templates.total(totales.total)}
+      ${irpfLine}
     </div>`;
   }
 
@@ -301,6 +316,7 @@
 
     html += totalLines.join('\n      ');
     html += templates.total(totales.total);
+    html += templates.lineaIRPF(totales.irpfSujeto);
     html += '</div>';
 
     return html;
