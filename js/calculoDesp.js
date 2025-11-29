@@ -1265,14 +1265,15 @@ window.calculoDesp._daysBetween = daysBetween;
       },
 
       // Segmentos (solo internacional)
+      // Aplicar factor de residencia eventual a cada segmento
       segmentos: esInternacional ? segmentos.map(seg => ({
         titulo: seg.segTitle || 'Tramo',
         pais: seg.segPais || '',
         manutenciones: seg.manutenciones || 0,
-        manutencionAmount: round2(seg.manutencionesAmount || 0),
+        manutencionAmount: round2((seg.manutencionesAmount || 0) * factorResidencia),
         precioManutencion: seg.precioManutencion || 0,
         noches: seg.noches || 0,
-        nochesAmount: round2(seg.nochesAmount || 0),
+        nochesAmount: round2((seg.nochesAmount || 0) * factorResidencia),
         precioNoche: seg.precioNoche || 0,
         nochesAmbiguous: !!seg.nochesAmbiguous
       })) : null,
