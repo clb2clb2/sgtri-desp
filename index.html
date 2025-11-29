@@ -40,6 +40,62 @@
 </head>
 
 <body>
+  <!-- Botón de debug: captura datos del primer desplazamiento -->
+  <button id="btn-debug-desp" style="position: fixed; top: 10px; right: 10px; z-index: 9999; padding: 8px 12px; background: #ff6b6b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    📋 Debug Desp 1
+  </button>
+  <script>
+    document.getElementById('btn-debug-desp').addEventListener('click', function() {
+      const despEl = document.querySelector('.desplazamiento-grupo[data-desplazamiento-id="1"]');
+      if (!despEl) {
+        console.warn('No se encontró el desplazamiento 1');
+        return;
+      }
+      
+      // Recoger datos usando cogeDatosDesp si está disponible
+      let data = null;
+      if (window.cogeDatosDesp && window.cogeDatosDesp.collectDataFromFicha) {
+        data = window.cogeDatosDesp.collectDataFromFicha(despEl);
+      }
+      
+      // Construir el objeto calcInput similar al de calculoDesp
+      const getKmTarifa = () => {
+        const veh = document.querySelector('input[name="vehiculo-tipo"]:checked');
+        const tipoVeh = veh?.value || 'coche';
+        const datos = window.__sgtriDatos;
+        return datos?.kmTarifas?.[tipoVeh] || 0.26;
+      };
+      
+      const kmTarifa = getKmTarifa();
+      
+      const calcInput = data ? {
+        fechaIda: data.raw?.fechaIda,
+        horaIda: data.raw?.horaIda,
+        fechaRegreso: data.raw?.fechaRegreso,
+        horaRegreso: data.raw?.horaRegreso,
+        cruceIda: data.raw?.cruceIda,
+        cruceVuelta: data.raw?.cruceVuelta,
+        pais: data.pais,
+        paisIndex: data.paisIndex,
+        km: data.km,
+        alojamiento: data.alojamiento,
+        ticketCena: data.ticketCena,
+        tipoProyecto: data.tipoProyecto,
+        kmTarifa,
+        excludeManutencion: data.noManutencion,
+        justificarPernocta: data.justificarPernocta,
+        excludeAlojamiento: data.dtInvalid
+      } : null;
+      
+      console.group('🔍 DEBUG - Desplazamiento 1');
+      console.log('📦 Data completa (cogeDatosDesp):', data);
+      console.log('📤 calcInput (para calculoDesp):', calcInput);
+      console.log('📋 JSON para copiar:');
+      console.log(JSON.stringify({ data, calcInput }, null, 2));
+      console.groupEnd();
+    });
+  </script>
+
   <!-- SVG sprite: símbolos reutilizables (ocultos visualmente, disponibles via <use>) -->
   <svg aria-hidden="true" focusable="false" class="svg-sprite-hidden"
     xmlns="http://www.w3.org/2000/svg">
