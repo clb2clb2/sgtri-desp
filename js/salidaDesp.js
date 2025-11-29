@@ -41,6 +41,20 @@
     },
 
     /**
+     * Línea de manutención con posible factor de residencia eventual.
+     * Formato: "Manutención: 64 × 53,34 € × 80% ................ 2.731,01 €"
+     */
+    lineaManutencion({ manutenciones, precioManutencion, amount, residenciaEventual = false }) {
+      const factorStr = residenciaEventual ? ' × 80%' : '';
+      const label = `Manutención: ${manutenciones} × ${fmt(precioManutencion)} €${factorStr}`;
+      return `<div class="calc-line">
+        <span class="label">${label}</span>
+        <span class="leader" aria-hidden="true"></span>
+        <span class="amount manut">${fmt(amount)} €</span>
+      </div>`;
+    },
+
+    /**
      * Línea de kilometraje: km × precio = total
      */
     lineaKilometraje(km, precioKm, totalKm) {
@@ -52,34 +66,42 @@
     },
 
     /**
-     * Línea de alojamiento nacional con máximo (noches × precio) y posible warning.
+     * Línea de alojamiento nacional con máximo (noches × precio × factor) y posible warning.
+     * Formato: "Alojamiento: [ Máximo: 63 × 102,56 × 80% = 5.169,02 € ] ................ 1250,00 €"
      */
-    lineaAlojamiento({ noches, precioNoche, maxAmount, userAmount, excedeMax }) {
+    lineaAlojamiento({ noches, precioNoche, maxAmount, userAmount, excedeMax, residenciaEventual = false }) {
       const errorCls = excedeMax ? ' error-line' : '';
       const amountErrorCls = excedeMax ? ' error-amount' : '';
       const warning = excedeMax
         ? templates.warning('¡Atención! El importe del alojamiento supera el máximo permitido.')
         : '';
+      const factorStr = residenciaEventual ? ' × 80%' : '';
 
       return `<div class="calc-line aloj-line${errorCls}">
-        <span class="label">Alojamiento: <em>[ Máximo: ${noches} × ${fmt(precioNoche)} = ${fmt(maxAmount)} € ]</em></span>
+        <span class="label">Alojamiento: <em>[ Máximo: ${noches} × ${fmt(precioNoche)}${factorStr} = ${fmt(maxAmount)} € ]</em></span>
         <span class="leader" aria-hidden="true"></span>
         <span class="aloj-user">${warning}<span class="amount aloj-user${amountErrorCls}">${fmt(userAmount)} €</span></span>
       </div>`;
     },
 
     /**
-     * Línea de alojamiento internacional (totales): solo muestra máximo sumado.
+     * Línea de alojamiento internacional (totales): solo muestra máximo sumado con factor.
+     * Formato: "Alojamiento: [ Máximo: 7.308,00 € × 80% = 5.846,40 € ] ................ 1250,00 €"
      */
-    lineaAlojamientoInternacional({ maxAmount, userAmount, excedeMax }) {
+    lineaAlojamientoInternacional({ maxAmount, maxAmountBase, userAmount, excedeMax, residenciaEventual = false }) {
       const errorCls = excedeMax ? ' error-line' : '';
       const amountErrorCls = excedeMax ? ' error-amount' : '';
       const warning = excedeMax
         ? templates.warning('¡Atención! El importe del alojamiento supera el máximo permitido.')
         : '';
+      
+      // Si hay residencia eventual, mostrar: "Máximo: BASE × 80% = FINAL"
+      const maxLabel = residenciaEventual
+        ? `Máximo: ${fmt(maxAmountBase)} € × 80% = ${fmt(maxAmount)} €`
+        : `Máximo: ${fmt(maxAmount)} €`;
 
       return `<div class="calc-line aloj-line${errorCls}">
-        <span class="label">Alojamiento: <em>[ Máximo: ${fmt(maxAmount)} € ]</em></span>
+        <span class="label">Alojamiento: <em>[ ${maxLabel} ]</em></span>
         <span class="leader" aria-hidden="true"></span>
         <span class="aloj-user">${warning}<span class="amount aloj-user${amountErrorCls}">${fmt(userAmount)} €</span></span>
       </div>`;
@@ -155,11 +177,16 @@
   function renderSimple(data) {
     const { totales, detalles, ui } = data;
     const lines = [];
+    const residenciaEventual = ui?.residenciaEventual || false;
 
     // Manutención (solo si > 0)
     if (totales.manutencion > 0) {
-      const manutLabel = `Manutención: ${detalles.manutenciones} × ${fmt(detalles.precioManutencion)} €`;
-      lines.push(templates.lineaConcepto(manutLabel, totales.manutencion, 'manut'));
+      lines.push(templates.lineaManutencion({
+        manutenciones: detalles.manutenciones,
+        precioManutencion: detalles.precioManutencion,
+        amount: totales.manutencion,
+        residenciaEventual
+      }));
     }
 
     // Alojamiento (solo si usuario introdujo algo > 0)
@@ -169,7 +196,8 @@
         precioNoche: ui.precioNocheMedio,
         maxAmount: totales.alojamientoMax,
         userAmount: totales.alojamientoUser,
-        excedeMax: ui.alojamientoExcedeMax
+        excedeMax: ui.alojamientoExcedeMax,
+        residenciaEventual
       }));
     }
 
@@ -199,6 +227,7 @@
    */
   function renderSegmentado(data) {
     const { totales, segmentos, ui, exclusiones } = data;
+    const residenciaEventual = ui?.residenciaEventual || false;
 
     // Verificar si hay datos válidos de segmentos (fechas validadas)
     const segmentosValidos = segmentos && segmentos.length > 0 &&
@@ -214,16 +243,24 @@
     const totalLines = [];
 
     // Manutención total (solo si > 0 y segmentos válidos)
+    // Para internacional con residencia eventual: "Total manutención: BASE × 80% = FINAL"
     if (totales.manutencion > 0 && segmentosValidos) {
-      totalLines.push(templates.lineaConcepto('Total manutención', totales.manutencion, 'manut'));
+      if (residenciaEventual) {
+        const label = `Total manutención: ${fmt(totales.manutencionBase)} € × 80%`;
+        totalLines.push(templates.lineaConcepto(label, totales.manutencion, 'manut'));
+      } else {
+        totalLines.push(templates.lineaConcepto('Total manutención', totales.manutencion, 'manut'));
+      }
     }
 
     // Alojamiento (solo si usuario introdujo algo > 0 y segmentos válidos)
     if (totales.alojamientoUser > 0 && segmentosValidos) {
       totalLines.push(templates.lineaAlojamientoInternacional({
         maxAmount: totales.alojamientoMax,
+        maxAmountBase: totales.alojamientoMaxBase,
         userAmount: totales.alojamientoUser,
-        excedeMax: ui.alojamientoExcedeMax
+        excedeMax: ui.alojamientoExcedeMax,
+        residenciaEventual
       }));
     }
 

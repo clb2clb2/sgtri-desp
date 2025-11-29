@@ -129,6 +129,59 @@ function round2(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * Calcula meses naturales entre dos fechas.
+ * Ej: 24/02 → 24/03 = 1 mes exacto, 24/02 → 25/03 = 1 mes + 1 día (> 1 mes)
+ * 
+ * @param {Date} fechaIda - Fecha de inicio
+ * @param {Date} fechaRegreso - Fecha de fin
+ * @returns {number} Meses naturales (con decimales si hay días extra)
+ */
+function monthsBetween(fechaIda, fechaRegreso) {
+  if (!fechaIda || !fechaRegreso) return 0;
+  
+  const yearDiff = fechaRegreso.getFullYear() - fechaIda.getFullYear();
+  const monthDiff = fechaRegreso.getMonth() - fechaIda.getMonth();
+  const dayDiff = fechaRegreso.getDate() - fechaIda.getDate();
+  
+  // Meses completos
+  let months = yearDiff * 12 + monthDiff;
+  
+  // Si el día de regreso es menor que el día de salida, no ha completado el mes
+  if (dayDiff < 0) {
+    months -= 1;
+    // Calcular fracción de mes (días extra / días del mes anterior)
+    const prevMonth = new Date(fechaRegreso.getFullYear(), fechaRegreso.getMonth(), 0);
+    const daysInPrevMonth = prevMonth.getDate();
+    const daysExtra = daysInPrevMonth + dayDiff;
+    return months + (daysExtra / daysInPrevMonth);
+  }
+  
+  // Si hay días extra después de completar meses enteros
+  if (dayDiff > 0) {
+    const daysInMonth = new Date(fechaRegreso.getFullYear(), fechaRegreso.getMonth() + 1, 0).getDate();
+    return months + (dayDiff / daysInMonth);
+  }
+  
+  return months;
+}
+
+/**
+ * Determina si un desplazamiento es residencia eventual.
+ * - España: > 1 mes
+ * - Extranjero: > 3 meses
+ * 
+ * @param {Date} fechaIda - Fecha de salida
+ * @param {Date} fechaRegreso - Fecha de regreso
+ * @param {boolean} esEspana - true si el destino es España
+ * @returns {boolean}
+ */
+function isResidenciaEventual(fechaIda, fechaRegreso, esEspana) {
+  const meses = monthsBetween(fechaIda, fechaRegreso);
+  const umbral = esEspana ? 1 : 3;
+  return meses > umbral;
+}
+
 // -----------------------------------------------------------------------------
 // 1.3 Lectura de flags y datos externos
 // -----------------------------------------------------------------------------
@@ -736,11 +789,23 @@ function calculateDesplazamiento(input) {
     lastNightJustified: flags.lastNightJustified
   });
 
-  // Calcular importes
-  const manutencionesAmount = round2(manutenciones * precios.manutencion);
-  const nochesAmount = round2(nochesCalc.noches * precios.noche);
-  const nochesAmountIfCounted = round2(nochesCalc.nochesIfCounted * precios.noche);
-  const nochesAmountIfNotCounted = round2(nochesCalc.nochesIfNotCounted * precios.noche);
+  // Calcular importes base (sin factor de residencia eventual)
+  const manutencionesAmountBase = round2(manutenciones * precios.manutencion);
+  const nochesAmountBase = round2(nochesCalc.noches * precios.noche);
+  const nochesAmountIfCountedBase = round2(nochesCalc.nochesIfCounted * precios.noche);
+  const nochesAmountIfNotCountedBase = round2(nochesCalc.nochesIfNotCounted * precios.noche);
+
+  // Detectar residencia eventual (solo para desplazamientos no segmentados)
+  // En desplazamientos segmentados, el flag se calcula en el wrapper
+  const esEspana = !isInternational;
+  const residenciaEventual = !flags.segmentMode && isResidenciaEventual(fechaIda, fechaRegreso, esEspana);
+  const factorResidencia = residenciaEventual ? 0.8 : 1;
+
+  // Aplicar factor de residencia eventual
+  const manutencionesAmount = round2(manutencionesAmountBase * factorResidencia);
+  const nochesAmount = round2(nochesAmountBase * factorResidencia);
+  const nochesAmountIfCounted = round2(nochesAmountIfCountedBase * factorResidencia);
+  const nochesAmountIfNotCounted = round2(nochesAmountIfNotCountedBase * factorResidencia);
 
   // Parsear valores de usuario
   const alojamientoNum = parseNumber(input.alojamiento);
@@ -750,11 +815,13 @@ function calculateDesplazamiento(input) {
     ...input,
     manutenciones,
     manutencionesAmount,
+    manutencionesAmountBase,  // Importe sin factor (para mostrar en UI)
     precioManutencion: precios.manutencion,
     precioNoche: precios.noche,
     precioKm,
     noches: nochesCalc.noches,
     nochesAmount,
+    nochesAmountBase,  // Importe sin factor (para mostrar en UI)
     nochesBase: daysBetween(fechaIda, fechaRegreso),
     nochesIfCounted: nochesCalc.nochesIfCounted,
     nochesIfNotCounted: nochesCalc.nochesIfNotCounted,
@@ -764,7 +831,9 @@ function calculateDesplazamiento(input) {
     km: kmNum,
     kmAmount,
     alojamiento: alojamientoNum,
-    alojamientoMaxAmount: nochesAmount
+    alojamientoMaxAmount: nochesAmount,
+    residenciaEventual,  // Flag para indicar si aplica reducción del 80%
+    factorResidencia     // Factor aplicado (0.8 o 1)
   };
 
   // Añadir fechas de ambigüedad si aplica
@@ -1095,14 +1164,19 @@ window.calculoDesp._daysBetween = daysBetween;
 
   /**
    * Suma totales desde segmentos o canonical.
+   * Si aplica residencia eventual, aplica el factor 0.8 a los importes.
    */
-  function sumTotals(canonical, segmentos) {
+  function sumTotals(canonical, segmentos, residenciaEventual = false) {
     const esInternacional = segmentos && segmentos.length > 0;
+    const factor = residenciaEventual ? 0.8 : 1;
 
     if (!esInternacional) {
+      // Para nacionales, el factor ya se aplicó en calculateDesplazamiento
       return {
         manutencion: Number(canonical.manutencionesAmount) || 0,
+        manutencionBase: Number(canonical.manutencionesAmountBase) || Number(canonical.manutencionesAmount) || 0,
         alojamientoMax: Number(canonical.nochesAmount) || 0,
+        alojamientoMaxBase: Number(canonical.nochesAmountBase) || Number(canonical.nochesAmount) || 0,
         noches: Number(canonical.noches) || 0,
         irpfSujeto: canonical.irpf?.sujeto || 0,
         hayNochesAmbiguas: !!canonical.nochesAmbiguous,
@@ -1112,13 +1186,13 @@ window.calculoDesp._daysBetween = daysBetween;
       };
     }
 
-    // Para internacionales, sumar de todos los segmentos
-    let manutencion = 0, alojamientoMax = 0, noches = 0, irpfSujeto = 0;
+    // Para internacionales, sumar de todos los segmentos y aplicar factor
+    let manutencionBase = 0, alojamientoMaxBase = 0, noches = 0, irpfSujeto = 0;
     let hayNochesAmbiguas = false, nochesAmbiguasRango = null;
 
     for (const seg of segmentos) {
-      manutencion += Number(seg.manutencionesAmount) || 0;
-      alojamientoMax += Number(seg.nochesAmount) || 0;
+      manutencionBase += Number(seg.manutencionesAmount) || 0;
+      alojamientoMaxBase += Number(seg.nochesAmount) || 0;
       noches += Number(seg.noches) || 0;
       irpfSujeto += seg.irpf?.sujeto || 0;
 
@@ -1130,15 +1204,33 @@ window.calculoDesp._daysBetween = daysBetween;
       }
     }
 
-    return { manutencion, alojamientoMax, noches, irpfSujeto, hayNochesAmbiguas, nochesAmbiguasRango };
+    // Aplicar factor de residencia eventual a los totales
+    const manutencion = round2(manutencionBase * factor);
+    const alojamientoMax = round2(alojamientoMaxBase * factor);
+
+    return { 
+      manutencion, 
+      manutencionBase,
+      alojamientoMax, 
+      alojamientoMaxBase,
+      noches, 
+      irpfSujeto, 
+      hayNochesAmbiguas, 
+      nochesAmbiguasRango 
+    };
   }
 
   /**
    * Construye la estructura de datos unificada para salidaDesp.
    */
-  function buildSalidaData(data, canonical, segmentos) {
+  function buildSalidaData(data, canonical, segmentos, residenciaEventual = false) {
     const esInternacional = segmentos && segmentos.length > 0;
-    const totals = sumTotals(canonical, segmentos);
+    
+    // Para internacionales, usar el flag pasado; para nacionales, usar el del canonical
+    const esResidenciaEventual = esInternacional ? residenciaEventual : !!canonical.residenciaEventual;
+    const factorResidencia = esResidenciaEventual ? 0.8 : 1;
+    
+    const totals = sumTotals(canonical, segmentos, esResidenciaEventual);
 
     const alojamientoUser = Number(data.alojamiento) || 0;
     const kmAmount = Number(canonical.kmAmount) || 0;
@@ -1151,7 +1243,9 @@ window.calculoDesp._daysBetween = daysBetween;
       // Totales precalculados
       totales: {
         manutencion: round2(totals.manutencion),
+        manutencionBase: round2(totals.manutencionBase || totals.manutencion),
         alojamientoMax: round2(totals.alojamientoMax),
+        alojamientoMaxBase: round2(totals.alojamientoMaxBase || totals.alojamientoMax),
         alojamientoUser: round2(alojamientoUser),
         km: round2(kmAmount),
         otrosGastos: round2(otrosGastosTotal),
@@ -1189,7 +1283,9 @@ window.calculoDesp._daysBetween = daysBetween;
         alojamientoExcedeMax: alojamientoUser > totals.alojamientoMax,
         nochesAmbiguas: totals.hayNochesAmbiguas,
         nochesAmbiguasRango: totals.nochesAmbiguasRango,
-        precioNocheMedio: totals.noches > 0 ? round2(totals.alojamientoMax / totals.noches) : 0
+        precioNocheMedio: totals.noches > 0 ? round2(totals.alojamientoMax / totals.noches) : 0,
+        residenciaEventual: esResidenciaEventual,
+        factorResidencia
       },
 
       // Estado de exclusiones
@@ -1290,10 +1386,18 @@ window.calculoDesp._daysBetween = daysBetween;
       }
     }
 
-    // 6. Construir estructura unificada
-    const salidaData = buildSalidaData(data, canonical, segmentos);
+    // 6. Calcular residencia eventual para internacionales
+    // Para internacionales: > 3 meses desde fechaIda hasta fechaRegreso
+    // (el país destino es extranjero, así que siempre umbral = 3 meses)
+    let residenciaEventualIntl = false;
+    if (data.esInternacional && data.fechaIda && data.fechaRegreso && !fechasInvalidas) {
+      residenciaEventualIntl = isResidenciaEventual(data.fechaIda, data.fechaRegreso, false);
+    }
 
-    // 7. Renderizar salida
+    // 7. Construir estructura unificada
+    const salidaData = buildSalidaData(data, canonical, segmentos, residenciaEventualIntl);
+
+    // 8. Renderizar salida
     window.salidaDesp?.renderSalida?.(despEl, salidaData);
 
     // 8. Devolver resultado
