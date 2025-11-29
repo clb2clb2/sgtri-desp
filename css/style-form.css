@@ -934,6 +934,15 @@ input[type="number"]:focus {
   border-bottom: 1px solid #9dbfc2;
 }
 
+.calc-titulo-ResEvent {
+  color: var(--color-primary);
+  font-style: italic;
+  text-align: center;
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.6rem;
+  border-bottom: 1px solid #9dbfc2;
+}
+
 /* ============================================
    Fila de otros gastos con checkbox
    ============================================ */
