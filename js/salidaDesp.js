@@ -136,8 +136,11 @@
 
     /**
      * Segmento de viaje internacional.
+     * Muestra manutención y alojamiento máximo con desglose.
+     * El flag residenciaEventual se usa para mostrar "× 80%" en el cálculo.
      */
-    segmento(seg) {
+    segmento(seg, residenciaEventual = false) {
+      const factorStr = residenciaEventual ? ' × 80%' : '';
       return `<div class="calc-result-segment">
         ${templates.tituloSeccion(seg.titulo)}
         <div class="calc-line">
@@ -146,7 +149,7 @@
           <span class="amount manut">${fmt(seg.manutencionAmount)} €</span>
         </div>
         <div class="calc-line aloj-line">
-          <span class="label">Alojamiento máx: ${seg.noches} noches = ${fmt(seg.nochesAmount)} €</span>
+          <span class="label">Alojamiento: <em>[ Máximo: ${seg.noches} × ${fmt(seg.precioNoche)}${factorStr} = ${fmt(seg.nochesAmount)} € ]</em></span>
         </div>
       </div>`;
     },
@@ -214,8 +217,13 @@
     // Si no hay líneas, no mostrar nada
     if (lines.length === 0) return '';
 
+    // Badge de Residencia Eventual si aplica
+    const badgeResEvent = residenciaEventual 
+      ? `<div class="calc-titulo-ResEvent">[ Residencia Eventual ]</div>\n      ` 
+      : '';
+
     return `<div class="calc-result" aria-live="polite" data-desp-id="${data.id}">
-      ${lines.join('\n      ')}
+      ${badgeResEvent}${lines.join('\n      ')}
       ${templates.total(totales.total)}
     </div>`;
   }
@@ -234,33 +242,29 @@
       segmentos.some(seg => seg.manutenciones > 0 || seg.noches > 0);
 
     // Generar HTML de segmentos solo si hay datos válidos
+    // Pasar residenciaEventual a cada segmento para mostrar "× 80%" en el desglose
     let segmentosHtml = '';
     if (segmentosValidos) {
-      segmentosHtml = segmentos.map(seg => templates.segmento(seg)).join('');
+      segmentosHtml = segmentos.map(seg => templates.segmento(seg, residenciaEventual)).join('');
     }
 
     // Líneas de totales (solo las que tienen importe > 0)
     const totalLines = [];
 
     // Manutención total (solo si > 0 y segmentos válidos)
-    // Para internacional con residencia eventual: "Total manutención: BASE × 80% = FINAL"
     if (totales.manutencion > 0 && segmentosValidos) {
-      if (residenciaEventual) {
-        const label = `Total manutención: ${fmt(totales.manutencionBase)} € × 80%`;
-        totalLines.push(templates.lineaConcepto(label, totales.manutencion, 'manut'));
-      } else {
-        totalLines.push(templates.lineaConcepto('Total manutención', totales.manutencion, 'manut'));
-      }
+      totalLines.push(templates.lineaConcepto('Total manutención', totales.manutencion, 'manut'));
     }
 
     // Alojamiento (solo si usuario introdujo algo > 0 y segmentos válidos)
+    // En TOTALES solo mostramos el máximo sumado, sin desglose
     if (totales.alojamientoUser > 0 && segmentosValidos) {
       totalLines.push(templates.lineaAlojamientoInternacional({
         maxAmount: totales.alojamientoMax,
         maxAmountBase: totales.alojamientoMaxBase,
         userAmount: totales.alojamientoUser,
         excedeMax: ui.alojamientoExcedeMax,
-        residenciaEventual
+        residenciaEventual: false  // En TOTALES no mostramos "× 80%" porque ya está aplicado en cada tramo
       }));
     }
 
@@ -284,6 +288,11 @@
 
     // Construir HTML
     let html = `<div class="calc-result composite" data-desp-id="${data.id}">`;
+
+    // Mostrar título de Residencia Eventual si aplica
+    if (residenciaEventual) {
+      html += '<div class="calc-titulo-ResEvent">[ Residencia Eventual ]</div>';
+    }
 
     if (segmentosHtml) {
       html += segmentosHtml;
