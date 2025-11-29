@@ -295,6 +295,12 @@ select:focus {
   gap: 0.6rem;
 }
 
+/* Tres columnas fijas: 25% | 25% | 50% (uso para eventos: gastos + comidas + asociado) */
+.form-row.three-cols-25-25-50 {
+  grid-template-columns: calc(25% - 0.4rem) calc(25% - 0.4rem) 1fr;
+  gap: 0.6rem;
+}
+
 /* Ensure children can shrink and inputs don't overflow their grid cell in the three-column layout */
 .form-row.three-cols-25-50-25>.form-group {
   min-width: 0;

@@ -198,6 +198,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const desplazamientos = Array.from(document.querySelectorAll('.desplazamiento-grupo'));
       if (desplazamientos.length === 0) {
         hidden.value = '0.00';
+        if (msg) msg.style.display = '';
+        if (msgAmount) msgAmount.textContent = '0,00 €';
         return;
       }
 
@@ -207,55 +209,110 @@ document.addEventListener('DOMContentLoaded', () => {
         if (paisSelect) paisIndex = paisSelect.selectedIndex >= 0 ? paisSelect.selectedIndex : 0;
       } else {
         const eventoSelect = document.getElementById('evento-asociado');
-        if (!eventoSelect) { hidden.value = '0.00'; return; }
+        if (!eventoSelect) { 
+          hidden.value = '0.00'; 
+          if (msg) msg.style.display = '';
+          if (msgAmount) msgAmount.textContent = '0,00 €';
+          return; 
+        }
         const valSel = eventoSelect.value || '';
         const m = valSel.match(/^desp(\d+)$/);
-        if (!m) { hidden.value = '0.00'; return; }
+        if (!m) { 
+          hidden.value = '0.00'; 
+          if (msg) msg.style.display = '';
+          if (msgAmount) msgAmount.textContent = '0,00 €';
+          return; 
+        }
         const idx = parseInt(m[1], 10) - 1;
         const target = desplazamientos[idx];
-        if (!target) { hidden.value = '0.00'; return; }
+        if (!target) { 
+          hidden.value = '0.00'; 
+          if (msg) msg.style.display = '';
+          if (msgAmount) msgAmount.textContent = '0,00 €';
+          return; 
+        }
         const paisSelect = target.querySelector('select[id^="pais-destino"]');
         if (paisSelect) paisIndex = paisSelect.selectedIndex >= 0 ? paisSelect.selectedIndex : 0;
       }
 
-      // Usar motor de cálculo centralizado
-      if (window.calculoDesp && typeof window.calculoDesp.calculateDesplazamiento === 'function') {
-        try {
-          const tipoProj = (document.getElementById('tipoProyecto') || {}).value;
-          const res = window.calculoDesp.calculateDesplazamiento({ paisIndex, tipoProyecto: tipoProj }) || {};
-          const precio = (res && typeof res.precioManutencion === 'number')
-            ? res.precioManutencion
-            : (res && res.precioManutencion ? Number(res.precioManutencion) : 0);
-          const descuento = Math.round((precio * 0.5 * n + Number.EPSILON) * 100) / 100;
-          hidden.value = descuento.toFixed(2);
-          if (msg && descuento > 0) {
-            const txt = descuento.toFixed(2).replace('.', ',') + ' €';
-            if (msgAmount) msgAmount.textContent = txt;
-            msg.style.display = '';
-          } else if (msg) {
-            msg.style.display = 'none';
-            if (msgAmount) msgAmount.textContent = '0,00 €';
-          }
-          return;
-        } catch (err) { /* fallthrough */ }
+      // Obtener precio de manutención según normativa y país
+      const tipoProj = (document.getElementById('tipoProyecto') || {}).value || '';
+      const datos = window.__sgtriDatos;
+      
+      if (!datos || !datos.dietasPorPais) {
+        hidden.value = '0.00';
+        if (msg) msg.style.display = '';
+        if (msgAmount) msgAmount.textContent = '0,00 €';
+        return;
       }
 
-      hidden.value = '0.00';
-    } catch (e) { /* ignore */ }
+      // Determinar normativa
+      const rdList = datos.normativasPorTipoProyecto?.rd || [];
+      const normativa = rdList.includes(tipoProj) ? 'rd' : 'decreto';
+      
+      // Obtener tabla de precios según normativa
+      const tablas = normativa === 'rd'
+        ? datos.dietasPorPais.rd462_2002
+        : datos.dietasPorPais.decreto42_2025;
+      
+      if (!tablas || !tablas.manutencion) {
+        hidden.value = '0.00';
+        if (msg) msg.style.display = '';
+        if (msgAmount) msgAmount.textContent = '0,00 €';
+        return;
+      }
+
+      // Obtener precio de manutención para el país
+      const precio = Number(tablas.manutencion[paisIndex]) || 50.55;
+      const descuento = Math.round((precio * 0.5 * n + Number.EPSILON) * 100) / 100;
+      hidden.value = descuento.toFixed(2);
+      
+      // Mostrar mensaje siempre que n > 0 (ya verificado arriba)
+      const txt = descuento.toFixed(2).replace('.', ',') + ' €';
+      if (msgAmount) msgAmount.textContent = txt;
+      if (msg) msg.style.display = '';
+    } catch (e) { 
+      console.warn('[computeDescuentoManutencion] Error:', e);
+    }
   }
 
   // Exponer globalmente para otros módulos
   window.computeDescuentoManutencion = computeDescuentoManutencion;
 
+  /**
+   * Recalcula todos los desplazamientos (para actualizar IRPF tras cambio en congreso).
+   */
+  function recalcularTodosDesplazamientos() {
+    if (!window.calculoDesp || typeof window.calculoDesp.calculaDesplazamientoFicha !== 'function') return;
+    
+    const desplazamientos = document.querySelectorAll('.desplazamiento-grupo');
+    desplazamientos.forEach(desp => {
+      try {
+        window.calculoDesp.calculaDesplazamientoFicha(desp);
+      } catch (e) { /* ignore */ }
+    });
+  }
+
   // Listeners para campos de congreso
   const eventoNumEl = document.getElementById('evento-num-comidas');
   if (eventoNumEl) {
-    eventoNumEl.addEventListener('input', computeDescuentoManutencion);
-    eventoNumEl.addEventListener('change', computeDescuentoManutencion);
+    eventoNumEl.addEventListener('input', () => {
+      computeDescuentoManutencion();
+      recalcularTodosDesplazamientos();
+    });
+    eventoNumEl.addEventListener('change', () => {
+      computeDescuentoManutencion();
+      recalcularTodosDesplazamientos();
+    });
   }
 
   const eventoSel = document.getElementById('evento-asociado');
-  if (eventoSel) eventoSel.addEventListener('change', computeDescuentoManutencion);
+  if (eventoSel) {
+    eventoSel.addEventListener('change', () => {
+      computeDescuentoManutencion();
+      recalcularTodosDesplazamientos();
+    });
+  }
 
   // Listener para tipo de proyecto (afecta precio de manutención)
   if (tipoProyecto) {
