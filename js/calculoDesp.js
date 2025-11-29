@@ -147,7 +147,13 @@ function extractFlags(input) {
     segmentMode: get('_segmentMode', false),
     excludeManutencion: get('excludeManutencion', false),
     excludeAlojamiento: get('excludeAlojamiento', false),
-    justificarPernocta: get('justificarPernocta', false)
+    justificarPernocta: get('justificarPernocta', false),
+    isLastIntlSegment: get('_isLastIntlSegment', false),      // Último tramo de viaje internacional (manutención)
+    forceAllNights: get('_forceAllNights', false),            // Forzar todas las noches (tramos no-finales)
+    comesFromPreviousDay: get('_comesFromPreviousDay', false), // Viene del día anterior (último tramo intl mismo día)
+    forceZeroNights: get('_forceZeroNights', false),          // Forzar 0 noches (cuando la noche ambigua pertenece al tramo anterior)
+    lastNightAmbiguousByHour: get('_lastNightAmbiguousByHour', null), // Hora para decidir si la última noche cuenta (formato 'HH:MM')
+    lastNightJustified: get('_lastNightJustified', false)     // Si la última noche está justificada (checkbox marcado)
   };
 }
 
@@ -314,8 +320,10 @@ const HORA_PERNOCTA_MAX = 7 * 60; // 07:00
 
 /**
  * Calcula manutenciones para un viaje de un solo día.
+ * @param {boolean} isLastIntlSegment - Si es el último tramo de un viaje internacional,
+ *   no se requiere volver después de las 16:00 para media manutención (basta con 14:00).
  */
-function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticketCena) {
+function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticketCena, isLastIntlSegment = false) {
   if (tDep === null || tRet === null) return 0;
 
   const durationHours = (dtVuelta.getTime() - dtIda.getTime()) / 3600000;
@@ -330,7 +338,9 @@ function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticket
   }
 
   // Media manutención por comida
-  const comidaCuenta = (tDep < HORA_COMIDA && tRet >= HORA_FIN_COMIDA);
+  // En el último tramo internacional, basta con volver después de las 14:00
+  const horaFinComidaEfectiva = isLastIntlSegment ? HORA_COMIDA : HORA_FIN_COMIDA;
+  const comidaCuenta = (tDep < HORA_COMIDA && tRet >= horaFinComidaEfectiva);
   const depHalf = comidaCuenta ? 0.5 : 0;
 
   return depHalf + retHalf;
@@ -338,8 +348,10 @@ function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticket
 
 /**
  * Calcula manutenciones para un viaje de varios días.
+ * @param {boolean} isLastIntlSegment - Si es el último tramo de un viaje internacional,
+ *   basta con volver después de las 14:00 para sumar media manutención.
  */
-function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena) {
+function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena, isLastIntlSegment = false) {
   let total = 0;
 
   // Día de ida
@@ -355,11 +367,14 @@ function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ti
   total += diasIntermedios;
 
   // Día de regreso
+  // En el último tramo internacional, basta con 14:00 para media manutención
   if (tRet !== null) {
     const cenaCuenta = (normativa === 'rd') ? (tRet >= HORA_CENA && ticketCena) : (tRet >= HORA_CENA);
     if (cenaCuenta) {
       total += 1;
     } else if (tRet >= HORA_COMIDA) {
+      // En desplazamientos normales se requiere >= 16:00, pero en último tramo intl basta con 14:00
+      // Como ya estamos verificando >= HORA_COMIDA (14:00), esto ya cubre ambos casos
       total += 0.5;
     }
   }
@@ -369,19 +384,20 @@ function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ti
 
 /**
  * Calcula el número total de manutenciones.
+ * @param {boolean} isLastIntlSegment - Si es el último tramo de un viaje internacional.
  */
-function calcManutenciones(parsed, normativa, ticketCena) {
+function calcManutenciones(parsed, normativa, ticketCena, isLastIntlSegment = false) {
   const { fechaIda, fechaRegreso, horaIda, horaRegreso, dtIda, dtRegreso } = parsed;
   const tDep = toMinutes(horaIda);
   const tRet = toMinutes(horaRegreso);
 
   if (isSameDay(fechaIda, fechaRegreso)) {
-    return calcManutencionesSameDay(tDep, tRet, dtIda, dtRegreso, normativa, ticketCena);
+    return calcManutencionesSameDay(tDep, tRet, dtIda, dtRegreso, normativa, ticketCena, isLastIntlSegment);
   }
 
   const dias = daysBetween(fechaIda, fechaRegreso);
   const diasIntermedios = Math.max(0, dias - 1);
-  return calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena);
+  return calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena, isLastIntlSegment);
 }
 
 // -----------------------------------------------------------------------------
@@ -389,39 +405,155 @@ function calcManutenciones(parsed, normativa, ticketCena) {
 // -----------------------------------------------------------------------------
 
 /**
- * Calcula el número de noches y detecta ambigüedad.
- * @returns {Object} { noches, nochesIfCounted, nochesIfNotCounted, ambiguous }
+ * Resultado de cálculo de noches.
+ * @typedef {Object} NochesResult
+ * @property {number} noches - Noches a contar (valor por defecto)
+ * @property {number} nochesIfCounted - Noches si se justifica la última
+ * @property {number} nochesIfNotCounted - Noches si NO se justifica la última
+ * @property {boolean} ambiguous - Si la última noche está en zona ambigua
  */
-function calcNoches(parsed) {
-  const { fechaIda, fechaRegreso, horaRegreso } = parsed;
-  const baseNP = daysBetween(fechaIda, fechaRegreso);
 
-  if (baseNP <= 0) {
-    return { noches: 0, nochesIfCounted: 0, nochesIfNotCounted: 0, ambiguous: false };
-  }
+/**
+ * Crea un resultado de noches estándar.
+ */
+function nochesResult(noches, nochesIfCounted, nochesIfNotCounted, ambiguous) {
+  return { noches, nochesIfCounted, nochesIfNotCounted, ambiguous };
+}
 
-  const nochesIfCounted = baseNP;
-  const nochesIfNotCounted = Math.max(0, baseNP - 1);
-  const tRet = toMinutes(horaRegreso);
-
-  // Determinar si la última noche cuenta
+/**
+ * Determina si una hora de regreso (en minutos) cuenta como pernocta.
+ * 
+ * Reglas de pernoctación:
+ * - <= 01:00 (HORA_PERNOCTA_MIN): NO pernocta
+ * - >= 07:00 (HORA_PERNOCTA_MAX): SÍ pernocta
+ * - Entre 01:01 y 06:59: Zona AMBIGUA
+ * 
+ * @param {number|null} tRet - Hora de regreso en minutos desde medianoche
+ * @param {boolean} justified - Si está justificada la última noche
+ * @returns {{ counts: boolean, ambiguous: boolean }}
+ */
+function evalLastNightByHour(tRet, justified = false) {
+  // Sin hora → conservador: NO pernocta
   if (tRet === null) {
-    // Sin hora, asumir que sí pernocta
-    return { noches: nochesIfCounted, nochesIfCounted, nochesIfNotCounted, ambiguous: false };
+    return { counts: false, ambiguous: false };
   }
-
+  // >= 07:00 → SÍ pernocta
   if (tRet >= HORA_PERNOCTA_MAX) {
-    // Regresa después de las 7:00 → sí pernocta
-    return { noches: nochesIfCounted, nochesIfCounted, nochesIfNotCounted, ambiguous: false };
+    return { counts: true, ambiguous: false };
   }
-
+  // <= 01:00 → NO pernocta
   if (tRet <= HORA_PERNOCTA_MIN) {
-    // Regresa antes de la 1:00 → no pernocta
-    return { noches: nochesIfNotCounted, nochesIfCounted, nochesIfNotCounted, ambiguous: false };
+    return { counts: false, ambiguous: false };
+  }
+  // Zona ambigua (01:01-06:59): depende de justificación
+  return { counts: justified, ambiguous: true };
+}
+
+/**
+ * Calcula noches de alojamiento.
+ * 
+ * Tipos de tramos y sus flags:
+ * 
+ * 1. TRAMO NO-FINAL (España ida o extranjero con regreso posterior):
+ *    - forceAllNights=true: todas las noches cuentan, sin ambigüedad
+ * 
+ * 2. TRAMO EXTRANJERO con regreso mismo día que cruceVuelta:
+ *    - forceAllNights=true + lastNightAmbiguousByHour='HH:MM'
+ *    - La última noche pertenece a este tramo (no al tramo España vuelta)
+ *    - Se evalúa ambigüedad según la hora de regreso real
+ *    - lastNightJustified indica si el usuario justificó la última noche
+ * 
+ * 3. TRAMO ESPAÑA VUELTA con regreso mismo día que cruceVuelta:
+ *    - forceZeroNights=true: 0 noches (la noche ambigua está en el tramo extranjero)
+ * 
+ * 4. TRAMO ESPAÑA VUELTA con regreso posterior a cruceVuelta:
+ *    - comesFromPreviousDay=true: aplica ambigüedad aunque el tramo sea de un solo día
+ *    - Usa la hora de regreso normal para evaluar la ambigüedad
+ * 
+ * 5. TRAMO NORMAL (nacional o sin flags especiales):
+ *    - Usa la lógica estándar de días entre fechas y hora de regreso
+ * 
+ * @param {Object} parsed - Datos parseados con fechaIda, fechaRegreso, horaRegreso
+ * @param {Object} flags - Flags de control para casos especiales
+ * @returns {NochesResult}
+ */
+function calcNoches(parsed, flags = {}) {
+  const { fechaIda, fechaRegreso, horaRegreso } = parsed;
+  const { 
+    forceAllNights, 
+    forceZeroNights, 
+    comesFromPreviousDay, 
+    lastNightAmbiguousByHour, 
+    lastNightJustified 
+  } = flags;
+  
+  const diasEntre = daysBetween(fechaIda, fechaRegreso);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CASO 1: Forzar 0 noches (tramo España vuelta cuando cruceVuelta == regreso)
+  // ─────────────────────────────────────────────────────────────────────────
+  if (forceZeroNights) {
+    return nochesResult(0, 0, 0, false);
   }
 
-  // Zona ambigua (entre 1:00 y 7:00)
-  return { noches: nochesIfNotCounted, nochesIfCounted, nochesIfNotCounted, ambiguous: true };
+  // ─────────────────────────────────────────────────────────────────────────
+  // CASO 2: Forzar todas las noches (tramos no-finales)
+  // ─────────────────────────────────────────────────────────────────────────
+  if (forceAllNights) {
+    const nochesBase = Math.max(0, diasEntre);
+    
+    // Subcaso 2a: La última noche es ambigua según hora de regreso externa
+    if (lastNightAmbiguousByHour && nochesBase > 0) {
+      const [hh, mm] = lastNightAmbiguousByHour.split(':').map(Number);
+      const tRet = hh * 60 + mm;
+      const { counts, ambiguous } = evalLastNightByHour(tRet, lastNightJustified);
+      
+      const nochesIfCounted = nochesBase;
+      const nochesIfNotCounted = Math.max(0, nochesBase - 1);
+      const noches = counts ? nochesIfCounted : nochesIfNotCounted;
+      
+      return nochesResult(noches, nochesIfCounted, nochesIfNotCounted, ambiguous);
+    }
+    
+    // Subcaso 2b: Sin ambigüedad, todas las noches cuentan
+    return nochesResult(nochesBase, nochesBase, nochesBase, false);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CASO 3: Mismo día con viaje que viene del día anterior
+  // ─────────────────────────────────────────────────────────────────────────
+  if (diasEntre <= 0 && comesFromPreviousDay) {
+    const tRet = toMinutes(horaRegreso);
+    const { counts, ambiguous } = evalLastNightByHour(tRet, false);
+    const noches = counts ? 1 : 0;
+    return nochesResult(noches, 1, 0, ambiguous);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CASO 4: Mismo día normal (sin pernocta)
+  // ─────────────────────────────────────────────────────────────────────────
+  if (diasEntre <= 0) {
+    return nochesResult(0, 0, 0, false);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CASO 5: Varios días (lógica estándar)
+  // ─────────────────────────────────────────────────────────────────────────
+  const nochesBase = diasEntre;
+  const nochesIfCounted = nochesBase;
+  const nochesIfNotCounted = Math.max(0, nochesBase - 1);
+
+  const tRet = toMinutes(horaRegreso);
+  
+  // Sin hora de regreso → asumir que sí pernocta
+  if (tRet === null) {
+    return nochesResult(nochesBase, nochesIfCounted, nochesIfNotCounted, false);
+  }
+
+  const { counts, ambiguous } = evalLastNightByHour(tRet, false);
+  const noches = counts ? nochesIfCounted : nochesIfNotCounted;
+  
+  return nochesResult(noches, nochesIfCounted, nochesIfNotCounted, ambiguous);
 }
 
 // -----------------------------------------------------------------------------
@@ -505,12 +637,13 @@ function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCen
  * Aplica el flag justificarPernocta (añade una noche extra).
  */
 function applyJustificarPernocta(result, precioNoche) {
-  result.noches += 1;
-  result.nochesAmount = round2(result.nochesAmount + precioNoche);
-  result.nochesIfCounted += 1;
-  result.nochesAmountIfCounted = round2(result.nochesAmountIfCounted + precioNoche);
-  result.nochesIfNotCounted = Math.max(0, result.nochesIfNotCounted - 1);
-  result.nochesAmountIfNotCounted = Math.max(0, result.nochesAmountIfNotCounted - precioNoche);
+  // Solo aplica si hay ambigüedad: asigna nochesIfCounted como valor final
+  // Mantiene nochesAmbiguous = true para que la UI siga mostrando el aviso
+  if (result.nochesAmbiguous) {
+    result.noches = result.nochesIfCounted;
+    result.nochesAmount = result.nochesAmountIfCounted;
+    // NO modificar nochesAmbiguous - la UI necesita saber que era ambiguo
+  }
 }
 
 /**
@@ -588,14 +721,20 @@ function calculateDesplazamiento(input) {
   const precios = getPrecios(input.paisIndex, input.pais, normativa);
   const ticketCena = input.ticketCena;
 
-  // Calcular manutenciones
-  let manutenciones = calcManutenciones(parsed, normativa, ticketCena);
+  // Calcular manutenciones (pasar flag de último tramo internacional)
+  let manutenciones = calcManutenciones(parsed, normativa, ticketCena, flags.isLastIntlSegment);
   if (flags.excludeManutencion) {
     manutenciones = 0;
   }
 
-  // Calcular noches
-  const nochesCalc = calcNoches(parsed);
+  // Calcular noches (pasando flags para viajes internacionales)
+  const nochesCalc = calcNoches(parsed, {
+    forceAllNights: flags.forceAllNights,
+    comesFromPreviousDay: flags.comesFromPreviousDay,
+    forceZeroNights: flags.forceZeroNights,
+    lastNightAmbiguousByHour: flags.lastNightAmbiguousByHour,
+    lastNightJustified: flags.lastNightJustified
+  });
 
   // Calcular importes
   const manutencionesAmount = round2(manutenciones * precios.manutencion);
@@ -722,9 +861,10 @@ window.calculoDesp._daysBetween = daysBetween;
 
   /**
    * Crea un input de segmento para el motor de cálculo.
+   * Incluye flags especiales para el cálculo de noches en viajes internacionales.
    */
   function createSegmentInput(opts) {
-    const { fechaIda, horaIda, fechaRegreso, horaRegreso, pais, paisIndex, ticketCena, tipoProyecto, kmTarifa, excludeManutencion, excludeAlojamiento } = opts;
+    const { fechaIda, horaIda, fechaRegreso, horaRegreso, pais, paisIndex, ticketCena, tipoProyecto, kmTarifa, excludeManutencion, excludeAlojamiento, isLastIntlSegment, forceAllNights, comesFromPreviousDay, forceZeroNights, lastNightAmbiguousByHour, lastNightJustified, justificarPernocta } = opts;
 
     return {
       fechaIda: formatDateStr(fechaIda),
@@ -741,14 +881,55 @@ window.calculoDesp._daysBetween = daysBetween;
       tipoProyecto,
       kmTarifa,
       excludeManutencion,
-      justificarPernocta: false,
+      justificarPernocta: !!justificarPernocta,  // Pasar el valor real
       excludeAlojamiento,
-      _segmentMode: true
+      _segmentMode: true,
+      _isLastIntlSegment: !!isLastIntlSegment,       // Último tramo internacional (manutención)
+      _forceAllNights: !!forceAllNights,             // Forzar todas las noches (tramos no-finales)
+      _comesFromPreviousDay: !!comesFromPreviousDay, // Viene del día anterior (último tramo intl mismo día)
+      _forceZeroNights: !!forceZeroNights,           // Forzar 0 noches (noche ambigua en tramo anterior)
+      _lastNightAmbiguousByHour: lastNightAmbiguousByHour || null,  // Hora para ambigüedad de última noche
+      _lastNightJustified: !!lastNightJustified      // Si la última noche está justificada
     };
   }
 
   /**
    * Construye los inputs para calcular segmentos de un viaje internacional.
+   * 
+   * ┌─────────────────────────────────────────────────────────────────────────┐
+   * │ ESTRUCTURA DE TRAMOS Y ASIGNACIÓN DE NOCHES                            │
+   * ├─────────────────────────────────────────────────────────────────────────┤
+   * │                                                                         │
+   * │ Tramo 1: España (ida)                                                   │
+   * │   - Existe si: fechaSalida < fechaCruceIda                              │
+   * │   - Periodo: (fechaSalida, horaSalida) → (cruceIda, 00:00)              │
+   * │   - Noches: forceAllNights=true (todas cuentan)                         │
+   * │                                                                         │
+   * │ Tramo 2: País extranjero                                                │
+   * │   - Periodo: (cruceIda, horaInicio) → (cruceVuelta, 00:00)              │
+   * │   - horaInicio: Si hay tramo España ida → 00:00; sino → hora usuario    │
+   * │   - Noches: Depende de si cruceVuelta == fechaRegreso                   │
+   * │                                                                         │
+   * │ Tramo 3: España (vuelta)                                                │
+   * │   - Periodo: (cruceVuelta, 00:00) → (fechaRegreso, horaRegreso)         │
+   * │   - Manutención: isLastIntlSegment=true (basta 14:00 para media)        │
+   * │   - Noches: Depende de si cruceVuelta == fechaRegreso                   │
+   * │                                                                         │
+   * ├─────────────────────────────────────────────────────────────────────────┤
+   * │ ASIGNACIÓN DE LA NOCHE AMBIGUA                                          │
+   * ├─────────────────────────────────────────────────────────────────────────┤
+   * │                                                                         │
+   * │ CASO A: cruceVuelta == fechaRegreso (regreso mismo día)                 │
+   * │   - La última noche pertenece al TRAMO EXTRANJERO                       │
+   * │   - Tramo extranjero: forceAllNights + lastNightAmbiguousByHour         │
+   * │   - Tramo España vuelta: forceZeroNights (0 noches)                     │
+   * │                                                                         │
+   * │ CASO B: cruceVuelta < fechaRegreso (regreso posterior)                  │
+   * │   - La última noche pertenece al TRAMO ESPAÑA VUELTA                    │
+   * │   - Tramo extranjero: forceAllNights (todas las noches)                 │
+   * │   - Tramo España vuelta: comesFromPreviousDay + justificarPernocta      │
+   * │                                                                         │
+   * └─────────────────────────────────────────────────────────────────────────┘
    */
   function buildSegmentInputs(data, baseInput) {
     const segments = [];
@@ -762,58 +943,124 @@ window.calculoDesp._daysBetween = daysBetween;
       excludeAlojamiento: baseInput.excludeAlojamiento
     };
 
-    // Tramo 1: España (ida → cruce ida)
-    if (data.fechaIda && data.cruceIda && data.fechaIda.getTime() !== data.cruceIda.getTime()) {
+    // Comprobar si fecha de salida es anterior a fecha de cruce ida (días distintos)
+    const salidaAntesDeCruceIda = data.fechaIda && data.cruceIda &&
+      data.fechaIda.getTime() < data.cruceIda.getTime();
+
+    // Determinar caso clave: ¿regresa el mismo día que cruza la frontera de vuelta?
+    const regresoMismoDiaQueCruceVuelta = data.cruceVuelta && data.fechaRegreso &&
+      isSameDay(data.cruceVuelta, data.fechaRegreso);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // TRAMO 1: España (ida) - Solo si sale antes del día de cruce
+    // ─────────────────────────────────────────────────────────────────────────
+    if (salidaAntesDeCruceIda) {
       segments.push({
         input: createSegmentInput({
           ...baseOpts,
           fechaIda: data.fechaIda,
           horaIda: formatTimeStr(data.horaIda),
           fechaRegreso: data.cruceIda,
-          horaRegreso: '08:00',
+          horaRegreso: '00:00',
           pais: 'España',
           paisIndex: 0,
-          ticketCena: nonFinalAssumeCena
+          ticketCena: nonFinalAssumeCena,
+          forceAllNights: true
         }),
         titulo: 'España (ida)',
         pais: 'España'
       });
     }
 
-    // Tramo 2: País destino (cruce ida → cruce vuelta)
+    // ─────────────────────────────────────────────────────────────────────────
+    // TRAMO 2: País extranjero (cruceIda → cruceVuelta)
+    // ─────────────────────────────────────────────────────────────────────────
     if (data.cruceIda && data.cruceVuelta) {
-      segments.push({
-        input: createSegmentInput({
-          ...baseOpts,
-          fechaIda: data.cruceIda,
-          horaIda: '08:00',
-          fechaRegreso: data.cruceVuelta,
-          horaRegreso: '23:59',
-          pais: data.pais,
-          paisIndex: data.paisIndex,
-          ticketCena: nonFinalAssumeCena
-        }),
-        titulo: data.pais || 'Extranjero',
-        pais: data.pais
-      });
+      const horaInicioIntl = salidaAntesDeCruceIda
+        ? '00:00'
+        : formatTimeStr(data.horaIda);
+      
+      if (regresoMismoDiaQueCruceVuelta) {
+        // CASO A: La noche ambigua pertenece a ESTE tramo
+        segments.push({
+          input: createSegmentInput({
+            ...baseOpts,
+            fechaIda: data.cruceIda,
+            horaIda: horaInicioIntl,
+            fechaRegreso: data.cruceVuelta,
+            horaRegreso: '00:00',
+            pais: data.pais,
+            paisIndex: data.paisIndex,
+            ticketCena: nonFinalAssumeCena,
+            forceAllNights: true,
+            lastNightAmbiguousByHour: formatTimeStr(data.horaRegreso),
+            lastNightJustified: !!data.justificarPernocta
+          }),
+          titulo: data.pais || 'Extranjero',
+          pais: data.pais
+        });
+      } else {
+        // CASO B: Todas las noches cuentan (sin ambigüedad aquí)
+        segments.push({
+          input: createSegmentInput({
+            ...baseOpts,
+            fechaIda: data.cruceIda,
+            horaIda: horaInicioIntl,
+            fechaRegreso: data.cruceVuelta,
+            horaRegreso: '00:00',
+            pais: data.pais,
+            paisIndex: data.paisIndex,
+            ticketCena: nonFinalAssumeCena,
+            forceAllNights: true
+          }),
+          titulo: data.pais || 'Extranjero',
+          pais: data.pais
+        });
+      }
     }
 
-    // Tramo 3: España (cruce vuelta → regreso)
+    // ─────────────────────────────────────────────────────────────────────────
+    // TRAMO 3: España (vuelta) - Desde cruceVuelta hasta regreso
+    // ─────────────────────────────────────────────────────────────────────────
     if (data.cruceVuelta && data.fechaRegreso) {
-      segments.push({
-        input: createSegmentInput({
-          ...baseOpts,
-          fechaIda: data.cruceVuelta,
-          horaIda: '00:00',
-          fechaRegreso: data.fechaRegreso,
-          horaRegreso: formatTimeStr(data.horaRegreso),
-          pais: 'España',
-          paisIndex: 0,
-          ticketCena: !!data.ticketCena
-        }),
-        titulo: 'España (vuelta)',
-        pais: 'España'
-      });
+      if (regresoMismoDiaQueCruceVuelta) {
+        // CASO A: 0 noches aquí (la noche ambigua está en el tramo extranjero)
+        segments.push({
+          input: createSegmentInput({
+            ...baseOpts,
+            fechaIda: data.cruceVuelta,
+            horaIda: '00:00',
+            fechaRegreso: data.fechaRegreso,
+            horaRegreso: formatTimeStr(data.horaRegreso),
+            pais: 'España',
+            paisIndex: 0,
+            ticketCena: !!data.ticketCena,
+            isLastIntlSegment: true,
+            forceZeroNights: true
+          }),
+          titulo: 'España (vuelta)',
+          pais: 'España'
+        });
+      } else {
+        // CASO B: La noche ambigua pertenece a ESTE tramo
+        segments.push({
+          input: createSegmentInput({
+            ...baseOpts,
+            fechaIda: data.cruceVuelta,
+            horaIda: '00:00',
+            fechaRegreso: data.fechaRegreso,
+            horaRegreso: formatTimeStr(data.horaRegreso),
+            pais: 'España',
+            paisIndex: 0,
+            ticketCena: !!data.ticketCena,
+            isLastIntlSegment: true,
+            comesFromPreviousDay: true,
+            justificarPernocta: !!data.justificarPernocta
+          }),
+          titulo: 'España (vuelta)',
+          pais: 'España'
+        });
+      }
     }
 
     return segments;
@@ -865,6 +1112,7 @@ window.calculoDesp._daysBetween = daysBetween;
       };
     }
 
+    // Para internacionales, sumar de todos los segmentos
     let manutencion = 0, alojamientoMax = 0, noches = 0, irpfSujeto = 0;
     let hayNochesAmbiguas = false, nochesAmbiguasRango = null;
 
