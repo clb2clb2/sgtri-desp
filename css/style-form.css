@@ -708,12 +708,13 @@ input[type="number"]:focus {
    ============================================ */
 .calc-result {
   margin-top: 0.6rem;
-  padding: 0.6rem;
+  padding: 0.5rem 1rem;
   background: #fffef3;
   border: 1px solid #d0cfaa;
   border-radius: var(--border-radius);
   font-family: inherit;
   color: var(--color-text);
+  border-left: 4px solid #e3b54c;
 }
 
 .calc-result .calc-line,
