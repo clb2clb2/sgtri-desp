@@ -711,11 +711,12 @@ input[type="number"]:focus {
 }
 
 .calc-result .calc-line,
-.calc-result .calc-total {
+.calc-result .calc-total,
+.calc-result .calc-irpf {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
   margin: 0.15rem 0;
+  gap: 0.6rem;
 }
 
 .calc-result .label {
@@ -732,7 +733,6 @@ input[type="number"]:focus {
 .calc-result .amount {
   white-space: nowrap;
   text-align: right;
-  min-width: 8ch;
 }
 
 .calc-result .amount.error-amount {
@@ -744,9 +744,24 @@ input[type="number"]:focus {
 }
 
 .calc-result .calc-total .label {
-  margin-right: 0.6rem;
   white-space: nowrap;
 }
+
+.calc-result .calc-irpf {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.3rem;
+  font-size: 0.92em;
+  color: var(--color-text-muted, #666);
+}
+
+.calc-result .calc-irpf .label {
+  white-space: nowrap;
+}
+
+
 
 /* ============================================
    Iconos y tooltips de advertencia
@@ -770,7 +785,6 @@ input[type="number"]:focus {
 
 .warn-wrapper .warn-icon {
   margin-left: 0;
-  margin-right: 0.4rem;
 }
 
 .warn-tooltip {
