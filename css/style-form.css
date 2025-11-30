@@ -36,6 +36,11 @@
 
   /* Tipografía */
   --font-family-title: "Saira", Arial, sans-serif;
+
+  /* Espaciado común */
+  --input-padding: 0.4rem 0.6rem;
+  --gap-sm: 0.45rem;
+  --gap-md: 0.6rem;
 }
 
 /* ============================================
@@ -60,14 +65,18 @@ label {
 }
 
 /* ============================================
-   Inputs y controles de formulario
+   Inputs y controles de formulario (BASE)
    ============================================ */
 input[type="text"],
+input[type="date"],
+input[type="time"],
+input[type="number"],
 select,
 textarea,
-input[type="time"],
-input[type="number"] {
-  padding: 0.4rem 0.6rem;
+.input-fecha,
+.format-km,
+.format-alojamiento {
+  padding: var(--input-padding);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius);
   font-size: 0.95rem;
@@ -86,7 +95,11 @@ select::-ms-expand {
   display: none;
 }
 
+/* Focus común para todos los inputs */
 input[type="text"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="number"]:focus,
 select:focus,
 textarea:focus {
   outline: none;
@@ -241,7 +254,7 @@ textarea:focus {
 .form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 0.6rem;
+  gap: var(--gap-md);
   margin-bottom: 0;
   align-items: start;
 }
@@ -279,13 +292,13 @@ textarea:focus {
 /* Tres columnas fijas: 25% | 50% | 25% (uso específico para Pago en + IBAN + SWIFT) */
 .form-row.three-cols-25-50-25 {
   grid-template-columns: calc(25% - 0.4rem) 1fr calc(25% - 0.4rem);
-  gap: 0.6rem;
+  gap: var(--gap-md);
 }
 
 /* Tres columnas fijas: 25% | 25% | 50% (uso para eventos: gastos + comidas + asociado) */
 .form-row.three-cols-25-25-50 {
   grid-template-columns: calc(25% - 0.4rem) calc(25% - 0.4rem) 1fr;
-  gap: 0.6rem;
+  gap: var(--gap-md);
 }
 
 /* Ensure children can shrink and inputs don't overflow their grid cell in the three-column layout */
@@ -326,26 +339,7 @@ textarea:focus {
   overflow: visible;
 }
 
-/* ============================================
-   Inputs de fecha, hora y número
-   ============================================ */
-input[type="date"],
-input[type="time"],
-input[type="number"] {
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  font-size: 1rem;
-  transition: border-color 0.2s ease;
-}
 
-.input-fecha {
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  font-size: 1rem;
-  transition: border-color 0.2s ease;
-}
 
 /* ============================================
    Estados de error
@@ -464,22 +458,7 @@ input.num-spinner::-webkit-inner-spin-button {
   margin: 0;
 }
 
-/* Inputs de formato especial */
-.format-km,
-.format-alojamiento {
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  font-size: 0.95rem;
-}
 
-input[type="date"]:focus,
-input[type="time"]:focus,
-input[type="number"]:focus {
-  outline: none;
-  border-color: var(--color-success);
-  box-shadow: 0 0 4px var(--color-success-shadow);
-}
 
 
 /* ============================================
@@ -534,21 +513,26 @@ input[type="number"]:focus {
    Otros gastos: wrapper, container y líneas
    ============================================ */
 .otros-gastos-wrapper {
-  margin-top: 0.6rem;
+  margin-top: var(--gap-md);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.6rem;
+  gap: var(--gap-md);
 }
 
 .otros-gastos-controls {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--gap-sm);
   position: relative;
 }
 
-.btn-otros-gastos {
+/* ============================================
+   BOTÓN DE ACCIÓN PRIMARIA (BASE)
+   ============================================ */
+.btn-action-primary,
+.btn-otros-gastos,
+.btn-otros-descuentos {
   background-color: var(--color-primary-light);
   color: var(--color-primary);
   padding: 7px 1rem 5px 1rem;
@@ -556,15 +540,20 @@ input[type="number"]:focus {
   border-radius: var(--border-radius);
   cursor: pointer;
   font-size: 0.8rem;
+  transition: background-color 0.2s ease;
 }
 
-.btn-otros-gastos .btn-icon {
+.btn-action-primary:hover,
+.btn-otros-gastos:hover,
+.btn-otros-descuentos:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-action-primary .btn-icon,
+.btn-otros-gastos .btn-icon,
+.btn-otros-descuentos .btn-icon {
   font-size: 1.7em;
   transform: translateY(-2px);
-}
-
-.btn-otros-gastos:hover {
-  background-color: var(--color-primary-hover);
 }
 
 .otros-gastos-container {
@@ -576,15 +565,26 @@ input[type="number"]:focus {
   display: none;
 }
 
-/* Mostrar etiquetas sólo en la primera línea de 'Otros gastos' */
-.otros-gastos-container .otros-gasto-line label {
+/* ============================================
+   PATRÓN: OCULTAR LABELS EXCEPTO PRIMERA LÍNEA
+   ============================================ */
+/* Aplicar a contenedores con líneas dinámicas */
+.otros-gastos-container .otros-gasto-line label,
+.otros-descuentos-container .descuento-line label {
   display: none;
 }
-.otros-gastos-container .otros-gasto-line:first-child label {
+
+.otros-gastos-container .otros-gasto-line:first-child label,
+.otros-descuentos-container .descuento-line:first-child label {
   display: block;
 }
 
-.btn-remove-otros-gasto {
+/* ============================================
+   BOTÓN ELIMINAR PEQUEÑO (BASE)
+   ============================================ */
+.btn-remove,
+.btn-remove-otros-gasto,
+.btn-remove-descuento {
   background-color: var(--color-danger-light);
   padding: 0 10px;
   border: 1px solid var(--color-danger);
@@ -596,13 +596,18 @@ input[type="number"]:focus {
   font-size: 0.8rem;
   width: 2rem;
   height: 2rem;
+  transition: background-color 0.2s ease;
 }
 
-.btn-remove-otros-gasto:hover {
+.btn-remove:hover,
+.btn-remove-otros-gasto:hover,
+.btn-remove-descuento:hover {
   background-color: var(--color-danger-hover);
 }
 
-.btn-remove-otros-gasto .btn-icon {
+.btn-remove .btn-icon,
+.btn-remove-otros-gasto .btn-icon,
+.btn-remove-descuento .btn-icon {
   color: var(--color-danger);
   font-size: 1.4rem;
   font-weight: 200;
@@ -714,6 +719,11 @@ input[type="number"]:focus {
   75% { transform: translateX(4px); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Animación de entrada para bloques dinámicos */
 .entry {
   opacity: 0;
@@ -752,7 +762,7 @@ input[type="number"]:focus {
 .vehiculo-ficha .veh-radio-label {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--gap-sm);
   margin: 0;
 }
 
@@ -764,8 +774,8 @@ input[type="number"]:focus {
 .vehiculo-ficha .veh-datos-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.6rem;
-  margin-top: 0.6rem;
+  gap: var(--gap-md);
+  margin-top: var(--gap-md);
 }
 
 .vehiculo-ficha .veh-datos-row .form-group {
@@ -792,7 +802,7 @@ input[type="number"]:focus {
   display: flex;
   align-items: center;
   margin: 0.15rem 0;
-  gap: 0.6rem;
+  gap: var(--gap-md);
 }
 
 .calc-result .label {
@@ -986,7 +996,7 @@ input[type="number"]:focus {
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.6rem;
+  gap: var(--gap-md);
 }
 
 .btn-confirm-yes {
@@ -1060,13 +1070,13 @@ input[type="number"]:focus {
   font-size: 0.95rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--gap-sm);
 }
 
 .otros-gastos-right {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--gap-sm);
 }
 
 .no-manutencion {
@@ -1082,7 +1092,7 @@ input[type="number"]:focus {
 .ajuste-line {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: var(--gap-md);
   margin-bottom: 0.8rem;
 }
 
@@ -1108,44 +1118,26 @@ input[type="number"]:focus {
   text-align: right;
 }
 
-/* Botón otros descuentos - mismo estilo que btn-otros-gastos */
+/* Wrapper del botón otros descuentos */
 .otros-descuentos-btn-wrapper {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 0.8rem;
 }
-
-.btn-otros-descuentos {
-  background-color: var(--color-primary-light);
-  color: var(--color-primary);
-  padding: 7px 1rem 5px 1rem;
-  border: 1px solid var(--color-primary);
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  font-size: 0.8rem;
-}
-
-.btn-otros-descuentos .btn-icon {
-  font-size: 1.7em;
-  transform: translateY(-2px);
-}
-
-.btn-otros-descuentos:hover {
-  background-color: var(--color-primary-hover);
-}
+/* Nota: .btn-otros-descuentos hereda estilos de la clase base .btn-action-primary */
 
 /* Contenedor de descuentos */
 .otros-descuentos-container {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--gap-md);
 }
 
 /* Línea de descuento */
 .descuento-line {
   display: grid;
   grid-template-columns: 1fr 2fr 1fr;
-  gap: 0.6rem;
+  gap: var(--gap-md);
   align-items: end;
   border-radius: var(--border-radius);
   animation: fadeIn 0.2s ease;
@@ -1161,13 +1153,7 @@ input[type="number"]:focus {
   font-size: 0.95rem;
 }
 
-/* Mostrar etiquetas sólo en la primera línea de descuentos */
-.otros-descuentos-container .descuento-line label {
-  display: none;
-}
-.otros-descuentos-container .descuento-line:first-child label {
-  display: block;
-}
+/* Nota: reglas de labels en .descuento-line consolidadas con .otros-gasto-line */
 
 .descuento-line .descuento-importe-wrapper {
   display: flex;
@@ -1179,30 +1165,4 @@ input[type="number"]:focus {
   flex: 1;
 }
 
-/* Botón eliminar descuento - mismo estilo que btn-remove-otros-gasto */
-.btn-remove-descuento {
-  background-color: var(--color-danger-light);
-  padding: 0 10px;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  width: 2rem;
-  height: 2rem;
-}
-
-.btn-remove-descuento:hover {
-  background-color: var(--color-danger-hover);
-}
-
-.btn-remove-descuento .btn-icon {
-  color: var(--color-danger);
-  font-size: 1.4rem;
-  font-weight: 200;
-  margin-right: 0;
-  line-height: 1;
-  transform: rotate(45deg);
-}
+/* Nota: .btn-remove-descuento hereda estilos de la clase base .btn-remove */
