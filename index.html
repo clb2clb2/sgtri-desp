@@ -449,20 +449,19 @@
       <div class="section-content-wrapper">
         <div class="section-content">
           <form id="form-ajustes">
-            <!-- Línea: Financiación máxima concedida -->
-            <div class="ajuste-line">
-              <span class="ajuste-label">Financiación máxima concedida</span>
-              <span class="ajuste-leader"></span>
-              <input type="text" id="financiacion-maxima" name="financiacion-maxima" 
-                     class="format-alojamiento ajuste-importe" maxlength="12" placeholder="0,00 €" />
-            </div>
-
-            <!-- Botón otros descuentos -->
-            <div class="otros-descuentos-btn-wrapper">
-              <button type="button" class="btn-otros-descuentos" id="btn-add-descuento">
-                <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
-                Otros descuentos
-              </button>
+            <!-- Línea: Financiación máxima + Botón otros descuentos -->
+            <div class="ajustes-row">
+              <div class="form-group">
+                <label for="financiacion-maxima">Financiación máxima concedida:</label>
+                <input type="text" id="financiacion-maxima" name="financiacion-maxima" 
+                       class="format-alojamiento" maxlength="12" placeholder="0,00 €" />
+              </div>
+              <div class="ajustes-btn-wrapper">
+                <button type="button" class="btn-otros-descuentos" id="btn-add-descuento">
+                  <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
+                  Otros descuentos
+                </button>
+              </div>
             </div>
 
             <!-- Contenedor de líneas de descuentos -->

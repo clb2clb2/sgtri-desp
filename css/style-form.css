@@ -1088,41 +1088,25 @@ input.num-spinner::-webkit-inner-spin-button {
    Sección Ajustes de la liquidación
    ============================================ */
 
-/* Línea de ajuste con leader de puntos */
-.ajuste-line {
+/* Fila principal: campo 50% + botón alineado a la derecha */
+.ajustes-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--gap-md);
   margin-bottom: 0.8rem;
 }
 
-.ajuste-label {
-  white-space: nowrap;
-  font-weight: 600;
-  font-size: 0.95rem;
+.ajustes-row .form-group {
+  width: 50%;
+  margin-bottom: 0;
 }
 
-.ajuste-leader {
-  flex: 1 1 auto;
-  border-bottom: 1px dotted #999;
-  min-height: 1px;
-  align-self: flex-end;
-  margin-bottom: 0.5rem;
-}
-
-.ajuste-importe {
-  width: 25%;
-  max-width: 150px;
-  min-width: 100px;
-  flex-shrink: 0;
-  text-align: right;
-}
-
-/* Wrapper del botón otros descuentos */
-.otros-descuentos-btn-wrapper {
+.ajustes-btn-wrapper {
+  flex: 1;
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 0.8rem;
+  align-items: flex-end;
+  padding-bottom: 0.1rem;
 }
 /* Nota: .btn-otros-descuentos hereda estilos de la clase base .btn-action-primary */
 
@@ -1148,12 +1132,11 @@ input.num-spinner::-webkit-inner-spin-button {
 }
 
 .descuento-line .form-group label {
-  display: block;
   margin-bottom: 0.3rem;
   font-size: 0.95rem;
 }
 
-/* Nota: reglas de labels en .descuento-line consolidadas con .otros-gasto-line */
+/* Labels ocultos excepto en primera línea - gestionado por el patrón consolidado arriba */
 
 .descuento-line .descuento-importe-wrapper {
   display: flex;
