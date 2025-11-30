@@ -9,7 +9,6 @@
  * @requires validaciones
  * @requires confirmDialog
  * @requires uiPagos
- * @requires uiProyectos
  * @requires uiDesplazamientos
  */
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const ld = window.limpiaDatos || {};
   const val = window.validaciones || {};
   const uiPagos = window.uiPagos || {};
-  const uiProyectos = window.uiProyectos || {};
   const uiDesp = window.uiDesplazamientos || {};
 
   // =========================================================================
@@ -120,9 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
       // Inicializar UI de pagos
       if (uiPagos.init) uiPagos.init();
 
-      // Inicializar UI de proyectos
-      if (uiProyectos.init) uiProyectos.init();
-
       // Inicializar UI de desplazamientos
       if (uiDesp.init) {
         uiDesp.init({
@@ -151,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (['G24', 'PEI', 'NAL'].includes(valor)) {
       infoDecreto.innerHTML = `
         Los cálculos se efectuarán en base al 
-        <strong>RD 462/2002 (Gobierno de España)</strong>.  
+        RD 462/2002 (Gobierno de España).  
         <a href="https://www.boe.es/buscar/act.php?id=BOE-A-2002-10337"
            target="_blank" rel="noopener noreferrer">
            Ver Real Decreto
@@ -160,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (valor) {
       infoDecreto.innerHTML = `
         Los cálculos se efectuarán en base al 
-        <strong>Decreto 42/2025 (Junta de Extremadura)</strong>.  
+        Decreto 42/2025 (Junta de Extremadura).  
         <a href="https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o"
            target="_blank" rel="noopener noreferrer">
            Ver Decreto
