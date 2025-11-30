@@ -24,6 +24,22 @@
   }
 
   /**
+   * Formatea precio unitario sin redondear (hasta 3 decimales si los tiene).
+   * Ejemplo: 0.106 → "0,106", 0.26 → "0,26"
+   */
+  function fmtPrecio(n) {
+    const num = Number(n) || 0;
+    // Determinar cuántos decimales tiene realmente el número
+    const str = num.toString();
+    const decimals = str.includes('.') ? str.split('.')[1].length : 0;
+    const maxDecimals = Math.max(2, Math.min(decimals, 3));
+    return num.toLocaleString('de-DE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: maxDecimals
+    });
+  }
+
+  /**
    * Obtiene el descuento por comidas de congreso para un desplazamiento específico.
    * Solo devuelve el descuento si el desplazamiento es el asociado al congreso.
    * @param {string|number} despId - ID del desplazamiento
@@ -105,7 +121,7 @@
      */
     lineaKilometraje(km, precioKm, totalKm) {
       return `<div class="calc-line">
-        <span class="label">Km: ${km} × ${fmt(precioKm)} €</span>
+        <span class="label">Km: ${km} × ${fmtPrecio(precioKm)} €</span>
         <span class="leader" aria-hidden="true"></span>
         <span class="amount km">${fmt(totalKm)} €</span>
       </div>`;

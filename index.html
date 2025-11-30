@@ -446,6 +446,56 @@
       </div>
     </section>
 
+    <!-- Sección 5: Liquidación de honorarios (plegada por defecto) -->
+    <section class="form-section">
+      <div class="section-title" data-start-collapsed="true">
+        Liquidación de honorarios
+        <span class="toggle-section" aria-hidden="true">
+          <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
+            <use href="#icon-caret"></use>
+          </svg>
+        </span>
+      </div>
+      <div class="section-content-wrapper">
+        <div class="section-content">
+          <form id="form-honorarios">
+            <!-- Línea 1: Importe (33%) | Beneficiario (33%) | Situación (33%) -->
+            <div class="form-row three-cols-33">
+              <div class="form-group">
+                <label for="honorarios-importe">Importe honorarios:</label>
+                <input type="text" id="honorarios-importe" name="honorarios-importe" class="format-alojamiento"
+                  placeholder="0,00 €" />
+              </div>
+              <div class="form-group">
+                <label for="honorarios-beneficiario">Beneficiario:</label>
+                <select id="honorarios-beneficiario" name="honorarios-beneficiario">
+                  <option value="SIUEX" selected>Perteneciente a la UEX</option>
+                  <option value="NOUEX">Ajeno a la UEX</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="honorarios-situacion">Situación:</label>
+                <select id="honorarios-situacion" name="honorarios-situacion">
+                  <option value="PDIAC" selected>PDI en activo</option>
+                  <option value="NOPDI">Empleado público no PDI</option>
+                  <option value="NOEMP">Ni empleado público ni PDI</option>
+                  <option value="PDIJU">PDI jubilado</option>
+                </select>
+              </div>
+            </div>
+            <!-- Línea 2: Concepto (100%) -->
+            <div class="form-row full-width">
+              <div class="form-group">
+                <label for="honorarios-concepto">En concepto de:</label>
+                <textarea id="honorarios-concepto" name="honorarios-concepto" 
+                          rows="3" maxlength="255" placeholder="Descripción del concepto..."></textarea>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
   </div>
 </body>
 
