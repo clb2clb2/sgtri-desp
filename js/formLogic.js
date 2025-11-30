@@ -133,6 +133,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
+      // Inicializar UI de ajustes
+      const uiAjustes = window.uiAjustes || {};
+      if (uiAjustes.init) {
+        uiAjustes.init();
+      }
+
       // Actualizar ticket cena inicial
       if (uiDesp.actualizarTicketCena) uiDesp.actualizarTicketCena();
 
@@ -583,6 +589,30 @@ document.addEventListener('DOMContentLoaded', () => {
       el.value = String(v);
       return;
     }
+
+    // Orgánica blur: validar formato (2-5 pares de 2 caracteres separados por puntos, empezando por "18.")
+    if (el.id === 'organica') {
+      const warnWrapper = document.querySelector('.organica-warn');
+      const val = (el.value || '').trim();
+      // Si está vacío o es solo "18.", no marcar error (el usuario lo completará)
+      if (val === '' || val === '18.') {
+        if (warnWrapper) warnWrapper.style.display = 'none';
+        el.classList.remove('field-error');
+        return;
+      }
+      // Regex: 2 a 5 pares de exactamente 2 caracteres alfanuméricos separados por puntos
+      const regexOrganica = /^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){1,4}$/;
+      const esValida = val.startsWith('18.') && regexOrganica.test(val);
+      if (warnWrapper) {
+        warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
+      }
+      if (esValida) {
+        el.classList.remove('field-error');
+      } else {
+        el.classList.add('field-error');
+      }
+      return;
+    }
   }, true);
 
   // =========================================================================
@@ -622,6 +652,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (parts.length > 2) core = parts[0] + ',' + parts.slice(1).join('');
       if (core !== el.value) el.value = core;
       try { el.setSelectionRange(el.value.length, el.value.length); } catch (err) { /* ignore */ }
+      return;
+    }
+
+    // Orgánica focusin: posicionar cursor al final
+    if (el && el.id === 'organica') {
+      setTimeout(() => {
+        try { el.setSelectionRange(el.value.length, el.value.length); } catch (err) { /* ignore */ }
+      }, 0);
       return;
     }
   });
