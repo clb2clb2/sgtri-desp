@@ -25,7 +25,6 @@
   
   <!-- Scripts: Módulos de UI -->
   <script src="js/uiPagos.js" defer></script>
-  <script src="js/uiProyectos.js" defer></script>
   <script src="js/uiDesplazamientos.js" defer></script>
   
   <!-- Scripts: Motor de cálculo y lógica -->
@@ -40,62 +39,6 @@
 </head>
 
 <body>
-  <!-- Botón de debug: captura datos del primer desplazamiento -->
-  <button id="btn-debug-desp" style="position: fixed; top: 10px; right: 10px; z-index: 9999; padding: 8px 12px; background: #ff6b6b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-    📋 Debug Desp 1
-  </button>
-  <script>
-    document.getElementById('btn-debug-desp').addEventListener('click', function() {
-      const despEl = document.querySelector('.desplazamiento-grupo[data-desplazamiento-id="1"]');
-      if (!despEl) {
-        console.warn('No se encontró el desplazamiento 1');
-        return;
-      }
-      
-      // Recoger datos usando cogeDatosDesp si está disponible
-      let data = null;
-      if (window.cogeDatosDesp && window.cogeDatosDesp.collectDataFromFicha) {
-        data = window.cogeDatosDesp.collectDataFromFicha(despEl);
-      }
-      
-      // Construir el objeto calcInput similar al de calculoDesp
-      const getKmTarifa = () => {
-        const veh = document.querySelector('input[name="vehiculo-tipo"]:checked');
-        const tipoVeh = veh?.value || 'coche';
-        const datos = window.__sgtriDatos;
-        return datos?.kmTarifas?.[tipoVeh] || 0.26;
-      };
-      
-      const kmTarifa = getKmTarifa();
-      
-      const calcInput = data ? {
-        fechaIda: data.raw?.fechaIda,
-        horaIda: data.raw?.horaIda,
-        fechaRegreso: data.raw?.fechaRegreso,
-        horaRegreso: data.raw?.horaRegreso,
-        cruceIda: data.raw?.cruceIda,
-        cruceVuelta: data.raw?.cruceVuelta,
-        pais: data.pais,
-        paisIndex: data.paisIndex,
-        km: data.km,
-        alojamiento: data.alojamiento,
-        ticketCena: data.ticketCena,
-        tipoProyecto: data.tipoProyecto,
-        kmTarifa,
-        excludeManutencion: data.noManutencion,
-        justificarPernocta: data.justificarPernocta,
-        excludeAlojamiento: data.dtInvalid
-      } : null;
-      
-      console.group('🔍 DEBUG - Desplazamiento 1');
-      console.log('📦 Data completa (cogeDatosDesp):', data);
-      console.log('📤 calcInput (para calculoDesp):', calcInput);
-      console.log('📋 JSON para copiar:');
-      console.log(JSON.stringify({ data, calcInput }, null, 2));
-      console.groupEnd();
-    });
-  </script>
-
   <!-- SVG sprite: símbolos reutilizables (ocultos visualmente, disponibles via <use>) -->
   <svg aria-hidden="true" focusable="false" class="svg-sprite-hidden"
     xmlns="http://www.w3.org/2000/svg">
@@ -180,7 +123,7 @@
               <select id="tipoProyecto" name="tipoProyecto"></select>
 
               <!-- Texto informativo -->
-              <p id="infoDecreto">
+              <p id="infoDecreto" class="info-normativa">
                 Los cálculos se efectuarán en base al Decreto 42/2005 (Junta de Extremadura).
                 <a href="https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o"
                   target="_blank" rel="noopener noreferrer">
@@ -188,40 +131,22 @@
                 </a>
               </p>
 
-              <!-- Contenedor para los proyectos -->
-              <div id="proyectos-container">
-                <!-- Template para un proyecto -->
-                <div class="proyecto-grupo" data-proyecto-id="1">
-                  <h3 class="proyecto-titulo">Proyecto 1</h3>
-                  <div class="form-group">
-                    <label for="responsable-1">Responsable: D./D.ª</label>
-                    <input type="text" id="responsable-1" name="responsable-1" class="responsable" maxlength="70"
-                      required />
-                  </div>
-                  <div class="form-row two-cols-50-50">
-                    <div class="form-group">
-                      <label for="organica-1">Orgánica</label>
-                      <input type="text" id="organica-1" name="organica-1" class="organica"
-                        pattern="^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){0,4}$" maxlength="14" required />
-                    </div>
-                    <div class="form-group">
-                      <label for="referencia-1">Referencia del proyecto</label>
-                      <input type="text" id="referencia-1" name="referencia-1" class="referencia-proyecto"
-                        maxlength="50" required />
-                    </div>
-                  </div>
-                  <button type="button" class="btn-eliminar-proyecto" style="display: none;" aria-label="Eliminar proyecto 1">
-                    <span class="btn-icon btn-icon-minus" aria-hidden="true">−</span>
-                    Eliminar
-                  </button>
+              <!-- Campos del proyecto -->
+              <div class="form-group">
+                <label for="responsable">Responsable: D./D.ª</label>
+                <input type="text" id="responsable" name="responsable" maxlength="70" required />
+              </div>
+              <div class="form-row two-cols-50-50">
+                <div class="form-group">
+                  <label for="organica">Orgánica</label>
+                  <input type="text" id="organica" name="organica"
+                    pattern="^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){0,4}$" maxlength="14" required />
+                </div>
+                <div class="form-group">
+                  <label for="referencia">Referencia del proyecto</label>
+                  <input type="text" id="referencia" name="referencia" maxlength="50" required />
                 </div>
               </div>
-
-              <!-- Botón para añadir nuevo proyecto -->
-              <button type="button" id="btn-add-proyecto" class="btn-add-proyecto">
-                <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
-                Añadir otro proyecto
-              </button>
           </form>
         </div>
       </div>
