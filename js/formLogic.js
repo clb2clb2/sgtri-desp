@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const val = window.validaciones || {};
   const uiPagos = window.uiPagos || {};
   const uiDesp = window.uiDesplazamientos || {};
+  const serializar = window.serializacionDatos || {};
 
   // =========================================================================
   // CARGA DE DATOS JSON
@@ -118,6 +119,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // Inicializar UI de pagos
       if (uiPagos.init) uiPagos.init();
 
+      // Inicializar módulo de serialización con la versión del esquema
+      if (serializar.inicializar && data.versionEsquema) {
+        serializar.inicializar(data.versionEsquema);
+      }
+
       // Inicializar UI de desplazamientos
       if (uiDesp.init) {
         uiDesp.init({
@@ -129,6 +135,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Actualizar ticket cena inicial
       if (uiDesp.actualizarTicketCena) uiDesp.actualizarTicketCena();
+
+      // Configurar botones de guardar/cargar
+      const btnGuardar = document.getElementById('btn-guardar-datos');
+      const btnCargar = document.getElementById('btn-cargar-datos');
+
+      if (btnGuardar && serializar.exportarArchivo) {
+        btnGuardar.addEventListener('click', () => {
+          serializar.exportarArchivo();
+        });
+      }
+
+      if (btnCargar && serializar.abrirDialogoImportar) {
+        btnCargar.addEventListener('click', () => {
+          serializar.abrirDialogoImportar();
+        });
+      }
     })
     .catch(error => console.error('Error cargando datos del JSON:', error));
 
@@ -409,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Orgánica
-    if (el.classList.contains('organica') || /^organica-/.test(el.id || '')) {
+    if (el.classList.contains('organica') || el.id === 'organica' || /^organica-/.test(el.id || '')) {
       applyWithCaret(el, (valOrg, selStart) => {
         const v = valOrg || '';
         if (selStart > 0 && v[selStart - 1] === '.') {
