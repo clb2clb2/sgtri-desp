@@ -26,6 +26,7 @@
   <!-- Scripts: Módulos de UI -->
   <script src="js/uiPagos.js" defer></script>
   <script src="js/uiDesplazamientos.js" defer></script>
+  <script src="js/serializacionDatos.js" defer></script>
   
   <!-- Scripts: Motor de cálculo y lógica -->
   <script src="js/cogeDatosDesp.js" defer></script>
@@ -51,6 +52,14 @@
   <header class="Encabezado">
     <img src="assets/img/logo-uex-blanco.png" alt="Logo UEx" class="logo" />
     <h1>SGTRI - Liquidación de Dietas y Desplazamientos</h1>
+    <div class="header-actions">
+      <button type="button" id="btn-cargar-datos" class="btn-header" title="Cargar borrador">
+        📂 Cargar
+      </button>
+      <button type="button" id="btn-guardar-datos" class="btn-header" title="Guardar borrador">
+        💾 Guardar
+      </button>
+    </div>
   </header>
 
   <!-- Contenedor único para todas las secciones -->
@@ -133,7 +142,7 @@
 
               <!-- Campos del proyecto -->
               <div class="form-group">
-                <label for="responsable">Responsable: D./D.ª</label>
+                <label for="responsable">Responsable:</label>
                 <input type="text" id="responsable" name="responsable" maxlength="70" required />
               </div>
               <div class="form-row two-cols-50-50">
@@ -374,7 +383,7 @@
     <!-- Sección 5: Liquidación de honorarios (plegada por defecto) -->
     <section class="form-section">
       <div class="section-title" data-start-collapsed="true">
-        Liquidación de honorarios
+        Honorarios
         <span class="toggle-section" aria-hidden="true">
           <svg class="caret" viewBox="0 0 7 3" aria-hidden="true" focusable="false">
             <use href="#icon-caret"></use>

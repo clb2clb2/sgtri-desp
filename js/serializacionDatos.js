@@ -1,0 +1,636 @@
+/**
+ * serializacionDatos.js
+ * ======================
+ * Módulo de serialización y deserialización de datos del formulario.
+ * Permite guardar y cargar el estado completo del formulario en archivos .dta
+ *
+ * @module serializacionDatos
+ * @requires limpiaDatos
+ */
+(function (global) {
+  'use strict';
+
+  // =========================================================================
+  // VERSIÓN DEL ESQUEMA (se obtiene de datos.json al inicializar)
+  // =========================================================================
+  let VERSION_ESQUEMA = null;
+
+  /**
+   * Inicializa el módulo con la versión del esquema desde datos.json
+   * @param {string} version - Versión del esquema desde window.__sgtriDatos
+   */
+  function inicializar(version) {
+    VERSION_ESQUEMA = version;
+    console.log(`[serializacionDatos] Inicializado con versión esquema: ${VERSION_ESQUEMA}`);
+  }
+
+  // =========================================================================
+  // UTILIDADES
+  // =========================================================================
+
+  /**
+   * Genera nombre de archivo por defecto: Liquidacion DDMMYY-HHMM.dta
+   * @returns {string}
+   */
+  function generarNombreArchivo() {
+    const ahora = new Date();
+    const dd = String(ahora.getDate()).padStart(2, '0');
+    const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+    const yy = String(ahora.getFullYear()).slice(-2);
+    const hh = String(ahora.getHours()).padStart(2, '0');
+    const min = String(ahora.getMinutes()).padStart(2, '0');
+    return `Liquidacion ${dd}${mm}${yy}-${hh}${min}.dta`;
+  }
+
+  /**
+   * Obtiene el valor de un campo del DOM
+   * @param {string} id - ID del elemento
+   * @param {string} [tipo='text'] - Tipo de valor esperado
+   * @returns {*}
+   */
+  function obtenerValorCampo(id, tipo = 'text') {
+    const el = document.getElementById(id);
+    if (!el) return tipo === 'checkbox' ? false : '';
+    
+    if (tipo === 'checkbox') return el.checked;
+    if (tipo === 'number') return parseFloat(el.value) || 0;
+    return el.value || '';
+  }
+
+  /**
+   * Establece el valor de un campo del DOM
+   * @param {string} id - ID del elemento
+   * @param {*} valor - Valor a establecer
+   * @param {string} [tipo='text'] - Tipo de valor
+   */
+  function establecerValorCampo(id, valor, tipo = 'text') {
+    const el = document.getElementById(id);
+    if (!el) return;
+    
+    if (tipo === 'checkbox') {
+      el.checked = !!valor;
+    } else {
+      el.value = valor ?? '';
+    }
+  }
+
+  // =========================================================================
+  // RECOPILACIÓN DE DATOS (DOM → Objeto)
+  // =========================================================================
+
+  /**
+   * Recopila los datos del beneficiario
+   * @returns {Object}
+   */
+  function recopilarBeneficiario() {
+    return {
+      nombre: obtenerValorCampo('nombre-benef'),
+      dni: obtenerValorCampo('dni'),
+      entidad: obtenerValorCampo('entidad'),
+      categoria: obtenerValorCampo('categoria')
+    };
+  }
+
+  /**
+   * Recopila los datos de pago
+   * @returns {Object}
+   */
+  function recopilarPago() {
+    const tipoPago = obtenerValorCampo('tipo-pago');
+    const datos = {
+      tipo: tipoPago
+    };
+
+    // IBAN o número de tarjeta según el tipo
+    if (tipoPago === 'CE' || tipoPago === 'CI') {
+      datos.iban = obtenerValorCampo('iban');
+    }
+    if (tipoPago === 'CI') {
+      datos.swift = obtenerValorCampo('swift');
+    }
+    if (tipoPago === 'TJ') {
+      datos.tarjeta = obtenerValorCampo('tarjeta-uex');
+    }
+
+    return datos;
+  }
+
+  /**
+   * Recopila los datos del proyecto
+   * @returns {Object}
+   */
+  function recopilarProyecto() {
+    return {
+      tipo: obtenerValorCampo('tipoProyecto'),
+      responsable: obtenerValorCampo('responsable'),
+      organica: obtenerValorCampo('organica'),
+      referencia: obtenerValorCampo('referencia')
+    };
+  }
+
+  /**
+   * Recopila los otros gastos de un desplazamiento
+   * @param {number} despId - ID del desplazamiento
+   * @returns {Array}
+   */
+  function recopilarOtrosGastos(despId) {
+    const contenedor = document.getElementById(`otros-gastos-${despId}`);
+    if (!contenedor) return [];
+
+    const gastos = [];
+    const lineas = contenedor.querySelectorAll('.otros-gastos-linea');
+    
+    lineas.forEach((linea, idx) => {
+      const lineaId = idx + 1;
+      const tipo = linea.querySelector(`[id^="otros-gastos-tipo-"]`)?.value || '';
+      const concepto = linea.querySelector(`[id^="otros-gastos-concepto-"]`)?.value || '';
+      const importe = linea.querySelector(`[id^="otros-gastos-importe-"]`)?.value || '';
+      
+      if (tipo || concepto || importe) {
+        gastos.push({ tipo, concepto, importe });
+      }
+    });
+
+    return gastos;
+  }
+
+  /**
+   * Recopila los datos de todos los desplazamientos
+   * @returns {Array}
+   */
+  function recopilarDesplazamientos() {
+    const contenedor = document.getElementById('desplazamientos-container');
+    if (!contenedor) return [];
+
+    const desplazamientos = [];
+    const grupos = contenedor.querySelectorAll('.desplazamiento-grupo');
+
+    grupos.forEach(grupo => {
+      const id = parseInt(grupo.dataset.desplazamientoId, 10);
+      
+      desplazamientos.push({
+        id,
+        fechaIda: obtenerValorCampo(`fecha-ida-${id}`),
+        horaIda: obtenerValorCampo(`hora-ida-${id}`),
+        fechaRegreso: obtenerValorCampo(`fecha-regreso-${id}`),
+        horaRegreso: obtenerValorCampo(`hora-regreso-${id}`),
+        ticketCena: obtenerValorCampo(`ticket-cena-${id}`, 'checkbox'),
+        origen: obtenerValorCampo(`origen-${id}`),
+        destino: obtenerValorCampo(`destino-${id}`),
+        paisDestino: obtenerValorCampo(`pais-destino-${id}`),
+        cruceIda: obtenerValorCampo(`cruce-ida-${id}`),
+        cruceVuelta: obtenerValorCampo(`cruce-vuelta-${id}`),
+        motivo: obtenerValorCampo(`motivo-${id}`),
+        km: obtenerValorCampo(`km-${id}`),
+        alojamiento: obtenerValorCampo(`alojamiento-${id}`),
+        noManutencion: obtenerValorCampo(`no-manutencion-${id}`, 'checkbox'),
+        otrosGastos: recopilarOtrosGastos(id)
+      });
+    });
+
+    return desplazamientos;
+  }
+
+  /**
+   * Recopila los datos del vehículo particular
+   * @returns {Object|null}
+   */
+  function recopilarVehiculo() {
+    const tipoVehiculo = document.querySelector('input[name="vehiculo-tipo"]:checked');
+    if (!tipoVehiculo) return null;
+
+    return {
+      tipo: tipoVehiculo.value,
+      matricula: obtenerValorCampo('vehiculo-matricula'),
+      justificarPernocta: obtenerValorCampo('justificar-pernocta', 'checkbox')
+    };
+  }
+
+  /**
+   * Recopila los datos del evento/congreso
+   * @returns {Object}
+   */
+  function recopilarEvento() {
+    return {
+      nombre: obtenerValorCampo('evento-nombre'),
+      lugar: obtenerValorCampo('evento-lugar'),
+      fechaDesde: obtenerValorCampo('evento-del'),
+      fechaHasta: obtenerValorCampo('evento-al'),
+      gastosInscripcion: obtenerValorCampo('evento-gastos'),
+      comidasIncluidas: obtenerValorCampo('evento-num-comidas', 'number'),
+      desplazamientoAsociado: obtenerValorCampo('evento-asociado')
+    };
+  }
+
+  /**
+   * Recopila los datos de honorarios
+   * @returns {Object}
+   */
+  function recopilarHonorarios() {
+    return {
+      importe: obtenerValorCampo('honorarios-importe'),
+      beneficiario: obtenerValorCampo('honorarios-beneficiario'),
+      situacion: obtenerValorCampo('honorarios-situacion'),
+      concepto: obtenerValorCampo('honorarios-concepto')
+    };
+  }
+
+  /**
+   * Recopila todos los datos del formulario
+   * @returns {Object} Objeto con todos los datos serializados
+   */
+  function recopilarTodo() {
+    return {
+      versionEsquema: VERSION_ESQUEMA,
+      guardadoEl: new Date().toISOString(),
+      
+      beneficiario: recopilarBeneficiario(),
+      pago: recopilarPago(),
+      proyecto: recopilarProyecto(),
+      desplazamientos: recopilarDesplazamientos(),
+      vehiculo: recopilarVehiculo(),
+      evento: recopilarEvento(),
+      honorarios: recopilarHonorarios()
+    };
+  }
+
+  // =========================================================================
+  // RESTAURACIÓN DE DATOS (Objeto → DOM)
+  // =========================================================================
+
+  /**
+   * Restaura los datos del beneficiario
+   * @param {Object} datos
+   */
+  function restaurarBeneficiario(datos) {
+    if (!datos) return;
+    establecerValorCampo('nombre-benef', datos.nombre);
+    establecerValorCampo('dni', datos.dni);
+    establecerValorCampo('entidad', datos.entidad);
+    establecerValorCampo('categoria', datos.categoria);
+  }
+
+  /**
+   * Restaura los datos de pago
+   * @param {Object} datos
+   */
+  function restaurarPago(datos) {
+    if (!datos) return;
+    establecerValorCampo('tipo-pago', datos.tipo);
+    
+    // Disparar evento change para que se actualice la UI
+    const tipoPagoEl = document.getElementById('tipo-pago');
+    if (tipoPagoEl) {
+      tipoPagoEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Esperar un poco para que la UI se actualice antes de establecer IBAN/SWIFT
+    setTimeout(() => {
+      if (datos.iban) establecerValorCampo('iban', datos.iban);
+      if (datos.swift) establecerValorCampo('swift', datos.swift);
+      if (datos.tarjeta) establecerValorCampo('tarjeta-uex', datos.tarjeta);
+    }, 50);
+  }
+
+  /**
+   * Restaura los datos del proyecto
+   * @param {Object} datos
+   */
+  function restaurarProyecto(datos) {
+    if (!datos) return;
+    establecerValorCampo('tipoProyecto', datos.tipo);
+    establecerValorCampo('responsable', datos.responsable);
+    establecerValorCampo('organica', datos.organica);
+    establecerValorCampo('referencia', datos.referencia);
+
+    // Disparar evento change para actualizar info decreto
+    const tipoProyectoEl = document.getElementById('tipoProyecto');
+    if (tipoProyectoEl) {
+      tipoProyectoEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
+  /**
+   * Restaura los otros gastos de un desplazamiento
+   * @param {number} despId - ID del desplazamiento
+   * @param {Array} gastos - Array de gastos
+   */
+  function restaurarOtrosGastos(despId, gastos) {
+    if (!gastos || gastos.length === 0) return;
+
+    const uiDesp = window.uiDesplazamientos;
+    if (!uiDesp || !uiDesp.agregarLineaOtrosGastos) return;
+
+    gastos.forEach((gasto, idx) => {
+      // Añadir línea si no existe
+      uiDesp.agregarLineaOtrosGastos(despId);
+      
+      // Establecer valores (la línea se numera desde 1)
+      const lineaIdx = idx + 1;
+      const contenedor = document.getElementById(`otros-gastos-${despId}`);
+      if (contenedor) {
+        const lineas = contenedor.querySelectorAll('.otros-gastos-linea');
+        const linea = lineas[idx];
+        if (linea) {
+          const selectTipo = linea.querySelector(`[id^="otros-gastos-tipo-"]`);
+          const inputConcepto = linea.querySelector(`[id^="otros-gastos-concepto-"]`);
+          const inputImporte = linea.querySelector(`[id^="otros-gastos-importe-"]`);
+          
+          if (selectTipo) selectTipo.value = gasto.tipo;
+          if (inputConcepto) inputConcepto.value = gasto.concepto;
+          if (inputImporte) inputImporte.value = gasto.importe;
+        }
+      }
+    });
+  }
+
+  /**
+   * Restaura los datos de un desplazamiento
+   * @param {Object} desp - Datos del desplazamiento
+   * @param {number} indice - Índice en el array (0-based)
+   */
+  function restaurarDesplazamiento(desp, indice) {
+    const id = desp.id;
+    
+    establecerValorCampo(`fecha-ida-${id}`, desp.fechaIda);
+    establecerValorCampo(`hora-ida-${id}`, desp.horaIda);
+    establecerValorCampo(`fecha-regreso-${id}`, desp.fechaRegreso);
+    establecerValorCampo(`hora-regreso-${id}`, desp.horaRegreso);
+    establecerValorCampo(`ticket-cena-${id}`, desp.ticketCena, 'checkbox');
+    establecerValorCampo(`origen-${id}`, desp.origen);
+    establecerValorCampo(`destino-${id}`, desp.destino);
+    establecerValorCampo(`pais-destino-${id}`, desp.paisDestino);
+    establecerValorCampo(`cruce-ida-${id}`, desp.cruceIda);
+    establecerValorCampo(`cruce-vuelta-${id}`, desp.cruceVuelta);
+    establecerValorCampo(`motivo-${id}`, desp.motivo);
+    establecerValorCampo(`km-${id}`, desp.km);
+    establecerValorCampo(`alojamiento-${id}`, desp.alojamiento);
+    establecerValorCampo(`no-manutencion-${id}`, desp.noManutencion, 'checkbox');
+
+    // Disparar evento change en país para mostrar/ocultar fronteras
+    const paisEl = document.getElementById(`pais-destino-${id}`);
+    if (paisEl) {
+      paisEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Restaurar otros gastos
+    restaurarOtrosGastos(id, desp.otrosGastos);
+  }
+
+  /**
+   * Restaura todos los desplazamientos
+   * @param {Array} desplazamientos
+   */
+  function restaurarDesplazamientos(desplazamientos) {
+    if (!desplazamientos || desplazamientos.length === 0) return;
+
+    const uiDesp = window.uiDesplazamientos;
+    const contenedor = document.getElementById('desplazamientos-container');
+    if (!contenedor) return;
+
+    // Crear desplazamientos adicionales si es necesario
+    // El primero ya existe (id=1), creamos los demás
+    for (let i = 1; i < desplazamientos.length; i++) {
+      if (uiDesp && uiDesp.crearNuevoDesplazamiento) {
+        uiDesp.crearNuevoDesplazamiento();
+      }
+    }
+
+    // Esperar a que se creen los elementos en el DOM
+    setTimeout(() => {
+      // Obtener los grupos de desplazamiento reales del DOM
+      const grupos = contenedor.querySelectorAll('.desplazamiento-grupo');
+      
+      desplazamientos.forEach((desp, idx) => {
+        // Usar el ID real del elemento DOM, no el del archivo
+        const grupo = grupos[idx];
+        if (grupo) {
+          const idReal = parseInt(grupo.dataset.desplazamientoId, 10);
+          // Crear copia del objeto con el ID correcto
+          const despConIdReal = { ...desp, id: idReal };
+          restaurarDesplazamiento(despConIdReal, idx);
+        }
+      });
+
+      // Actualizar números
+      if (uiDesp && uiDesp.actualizarNumerosDesplazamientos) {
+        uiDesp.actualizarNumerosDesplazamientos();
+      }
+    }, 150);
+  }
+
+  /**
+   * Restaura los datos del vehículo
+   * @param {Object} datos
+   */
+  function restaurarVehiculo(datos) {
+    if (!datos) return;
+
+    // El contenedor de vehículo se genera dinámicamente
+    // Esperar a que exista
+    setTimeout(() => {
+      const radio = document.querySelector(`input[name="vehiculo-tipo"][value="${datos.tipo}"]`);
+      if (radio) {
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      establecerValorCampo('vehiculo-matricula', datos.matricula);
+      establecerValorCampo('justificar-pernocta', datos.justificarPernocta, 'checkbox');
+    }, 150);
+  }
+
+  /**
+   * Restaura los datos del evento
+   * @param {Object} datos
+   */
+  function restaurarEvento(datos) {
+    if (!datos) return;
+    establecerValorCampo('evento-nombre', datos.nombre);
+    establecerValorCampo('evento-lugar', datos.lugar);
+    establecerValorCampo('evento-del', datos.fechaDesde);
+    establecerValorCampo('evento-al', datos.fechaHasta);
+    establecerValorCampo('evento-gastos', datos.gastosInscripcion);
+    establecerValorCampo('evento-num-comidas', datos.comidasIncluidas);
+    establecerValorCampo('evento-asociado', datos.desplazamientoAsociado);
+  }
+
+  /**
+   * Restaura los datos de honorarios
+   * @param {Object} datos
+   */
+  function restaurarHonorarios(datos) {
+    if (!datos) return;
+    establecerValorCampo('honorarios-importe', datos.importe);
+    establecerValorCampo('honorarios-beneficiario', datos.beneficiario);
+    establecerValorCampo('honorarios-situacion', datos.situacion);
+    establecerValorCampo('honorarios-concepto', datos.concepto);
+  }
+
+  /**
+   * Restaura todos los datos del formulario
+   * @param {Object} datos - Objeto con todos los datos
+   * @returns {boolean} true si se restauró correctamente
+   */
+  function restaurarTodo(datos) {
+    if (!datos) {
+      console.error('[serializacionDatos] No hay datos para restaurar');
+      return false;
+    }
+
+    // Verificar versión del esquema
+    if (datos.versionEsquema !== VERSION_ESQUEMA) {
+      console.warn(`[serializacionDatos] Versión diferente: archivo=${datos.versionEsquema}, app=${VERSION_ESQUEMA}`);
+      const continuar = confirm(
+        `El archivo fue guardado con una versión diferente del esquema.\n` +
+        `Archivo: ${datos.versionEsquema}\n` +
+        `Aplicación: ${VERSION_ESQUEMA}\n\n` +
+        `¿Desea intentar cargarlo de todos modos?`
+      );
+      if (!continuar) return false;
+    }
+
+    // Restaurar cada sección
+    restaurarBeneficiario(datos.beneficiario);
+    restaurarPago(datos.pago);
+    restaurarProyecto(datos.proyecto);
+    restaurarDesplazamientos(datos.desplazamientos);
+    restaurarVehiculo(datos.vehiculo);
+    restaurarEvento(datos.evento);
+    restaurarHonorarios(datos.honorarios);
+
+    console.log('[serializacionDatos] Datos restaurados correctamente');
+    return true;
+  }
+
+  // =========================================================================
+  // EXPORTAR / IMPORTAR ARCHIVO
+  // =========================================================================
+
+  /**
+   * Exporta los datos a un archivo .dta mostrando diálogo para el nombre
+   */
+  async function exportarArchivo() {
+    const datos = recopilarTodo();
+    const json = JSON.stringify(datos, null, 2);
+    
+    // Generar nombre por defecto sin extensión
+    const nombreCompleto = generarNombreArchivo();
+    const nombreSinExt = nombreCompleto.replace(/\.dta$/, '');
+    
+    // Mostrar diálogo para que el usuario pueda cambiar el nombre
+    const showPrompt = window.showPrompt || window.confirmDialog?.showPrompt;
+    if (!showPrompt) {
+      console.error('[serializacionDatos] showPrompt no disponible');
+      return;
+    }
+    
+    const nombreUsuario = await showPrompt('Nombre del archivo:', {
+      defaultValue: nombreSinExt,
+      suffix: '.dta',
+      confirmText: 'Guardar',
+      cancelText: 'Cancelar',
+      maxLength: 80
+    });
+    
+    // Si el usuario canceló, no hacer nada
+    if (nombreUsuario === null) {
+      console.log('[serializacionDatos] Guardado cancelado por el usuario');
+      return;
+    }
+    
+    // Construir nombre final
+    const nombreFinal = `${nombreUsuario}.dta`;
+    
+    // Descargar archivo
+    const blob = new Blob([json], { type: 'application/json' });
+    const enlace = document.createElement('a');
+    enlace.href = URL.createObjectURL(blob);
+    enlace.download = nombreFinal;
+    
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    
+    URL.revokeObjectURL(enlace.href);
+    
+    console.log(`[serializacionDatos] Archivo exportado: ${nombreFinal}`);
+  }
+
+  /**
+   * Importa datos desde un archivo .dta
+   * @param {File} archivo - Archivo seleccionado
+   * @returns {Promise<boolean>}
+   */
+  function importarArchivo(archivo) {
+    return new Promise((resolve, reject) => {
+      if (!archivo) {
+        reject(new Error('No se seleccionó ningún archivo'));
+        return;
+      }
+
+      // Verificar extensión
+      if (!archivo.name.toLowerCase().endsWith('.dta')) {
+        reject(new Error('El archivo debe tener extensión .dta'));
+        return;
+      }
+
+      const lector = new FileReader();
+      
+      lector.onload = (e) => {
+        try {
+          const datos = JSON.parse(e.target.result);
+          const exito = restaurarTodo(datos);
+          resolve(exito);
+        } catch (error) {
+          reject(new Error(`Error al leer el archivo: ${error.message}`));
+        }
+      };
+
+      lector.onerror = () => {
+        reject(new Error('Error al leer el archivo'));
+      };
+
+      lector.readAsText(archivo);
+    });
+  }
+
+  /**
+   * Abre el diálogo de selección de archivo para importar
+   */
+  function abrirDialogoImportar() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.dta';
+    
+    input.onchange = async (e) => {
+      const archivo = e.target.files[0];
+      if (archivo) {
+        try {
+          await importarArchivo(archivo);
+          alert('Datos cargados correctamente');
+        } catch (error) {
+          alert(`Error: ${error.message}`);
+        }
+      }
+    };
+    
+    input.click();
+  }
+
+  // =========================================================================
+  // EXPORTACIÓN DEL MÓDULO
+  // =========================================================================
+
+  const serializacionDatos = {
+    inicializar,
+    recopilarTodo,
+    restaurarTodo,
+    exportarArchivo,
+    importarArchivo,
+    abrirDialogoImportar,
+    generarNombreArchivo
+  };
+
+  global.serializacionDatos = serializacionDatos;
+
+})(typeof window !== 'undefined' ? window : this);
