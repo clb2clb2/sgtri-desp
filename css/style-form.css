@@ -859,6 +859,11 @@ input[type="number"]:focus {
   z-index: 0;
 }
 
+.warn-wrapper.organica-warn {
+  margin-left: 0.35rem;
+  margin-right: 0;
+}
+
 .warn-wrapper .warn-icon {
   margin-left: 0;
 }
@@ -1067,4 +1072,137 @@ input[type="number"]:focus {
 .no-manutencion {
   width: 18px;
   height: 18px;
+}
+
+/* ============================================
+   Sección Ajustes de la liquidación
+   ============================================ */
+
+/* Línea de ajuste con leader de puntos */
+.ajuste-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.ajuste-label {
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.ajuste-leader {
+  flex: 1 1 auto;
+  border-bottom: 1px dotted #999;
+  min-height: 1px;
+  align-self: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.ajuste-importe {
+  width: 25%;
+  max-width: 150px;
+  min-width: 100px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+/* Botón otros descuentos - mismo estilo que btn-otros-gastos */
+.otros-descuentos-btn-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.8rem;
+}
+
+.btn-otros-descuentos {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  padding: 7px 1rem 5px 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-otros-descuentos .btn-icon {
+  font-size: 1.7em;
+  transform: translateY(-2px);
+}
+
+.btn-otros-descuentos:hover {
+  background-color: var(--color-primary-hover);
+}
+
+/* Contenedor de descuentos */
+.otros-descuentos-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* Línea de descuento */
+.descuento-line {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 0.6rem;
+  align-items: end;
+  border-radius: var(--border-radius);
+  animation: fadeIn 0.2s ease;
+}
+
+.descuento-line .form-group {
+  margin-bottom: 0;
+}
+
+.descuento-line .form-group label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.95rem;
+}
+
+/* Mostrar etiquetas sólo en la primera línea de descuentos */
+.otros-descuentos-container .descuento-line label {
+  display: none;
+}
+.otros-descuentos-container .descuento-line:first-child label {
+  display: block;
+}
+
+.descuento-line .descuento-importe-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.descuento-line .descuento-importe {
+  flex: 1;
+}
+
+/* Botón eliminar descuento - mismo estilo que btn-remove-otros-gasto */
+.btn-remove-descuento {
+  background-color: var(--color-danger-light);
+  padding: 0 10px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  width: 2rem;
+  height: 2rem;
+}
+
+.btn-remove-descuento:hover {
+  background-color: var(--color-danger-hover);
+}
+
+.btn-remove-descuento .btn-icon {
+  color: var(--color-danger);
+  font-size: 1.4rem;
+  font-weight: 200;
+  margin-right: 0;
+  line-height: 1;
+  transform: rotate(45deg);
 }

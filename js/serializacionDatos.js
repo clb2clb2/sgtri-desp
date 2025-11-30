@@ -568,9 +568,10 @@
         return;
       }
 
-      // Verificar extensión
-      if (!archivo.name.toLowerCase().endsWith('.dta')) {
-        reject(new Error('El archivo debe tener extensión .dta'));
+      // Verificar extensión (.dta o .json para compatibilidad con Android)
+      const nombreLower = archivo.name.toLowerCase();
+      if (!nombreLower.endsWith('.dta') && !nombreLower.endsWith('.json')) {
+        reject(new Error('El archivo debe tener extensión .dta o .json'));
         return;
       }
 
@@ -600,7 +601,7 @@
   function abrirDialogoImportar() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.dta';
+    input.accept = '.dta,.json';
     
     input.onchange = async (e) => {
       const archivo = e.target.files[0];
