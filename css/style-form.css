@@ -423,6 +423,25 @@ input[type="number"] {
   grid-template-columns: repeat(3, 1fr);
 }
 
+/* Fila de ancho completo (una sola columna) */
+.form-row.full-width {
+  grid-template-columns: 1fr;
+}
+
+.form-row.full-width .form-group {
+  width: 100%;
+}
+
+.form-row.full-width textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
 /* Quitar flechas de inputs number */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
