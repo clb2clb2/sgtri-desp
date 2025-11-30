@@ -55,6 +55,38 @@ body {
     pointer-events: none;
 }
 
+/* Botones de acción en el header */
+.header-actions {
+    position: absolute;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 0.5rem;
+    z-index: 2;
+}
+
+.btn-header {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    font-family: var(--font-family-title, "Saira", Arial, sans-serif);
+}
+
+.btn-header:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.btn-header:active {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
 /* ============================================
    Contenedor de secciones
    ============================================ */

@@ -1,4 +1,5 @@
 {
+  "versionEsquema": "25.1.0",
   "categorias": [
     ["Investigador/a principal", "IP"],
     ["Director/a del convenio/contrato", "DC"],
@@ -38,7 +39,8 @@
     ["Seguro de accidentes", "SAC"],
     ["Seguro médico", "SME"],
     ["Tasa turística", "TTR"],
-    ["Tasa agencia de viajes", "TAG"]
+    ["Tasa agencia de viajes", "TAG"],
+    ["Otros gastos", "OTR"]
 ],
   "kmTarifas": {
     "coche": 0.26,

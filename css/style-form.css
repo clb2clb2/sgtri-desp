@@ -660,6 +660,60 @@ input[type="number"]:focus {
   transform: translateY(0) scale(1);
 }
 
+/* Estilos para prompt dialog (entrada de texto) */
+.prompt-dialog .confirm-body {
+  margin-bottom: 1rem;
+}
+
+.prompt-dialog label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+}
+
+.prompt-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.prompt-input-wrapper:focus-within {
+  border-color: var(--color-success);
+  box-shadow: 0 0 4px var(--color-success-shadow);
+}
+
+.prompt-input {
+  flex: 1;
+  border: none;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.95rem;
+  outline: none;
+  min-width: 200px;
+}
+
+.prompt-suffix {
+  background-color: var(--color-bg-light);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  border-left: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.prompt-input.input-error {
+  animation: shake 0.3s ease-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
 /* Animación de entrada para bloques dinámicos */
 .entry {
   opacity: 0;
