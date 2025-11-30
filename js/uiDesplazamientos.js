@@ -60,15 +60,15 @@
         <div class="form-row three-cols-33" id="veh-datos-row" name="vehiculo-datos-row">
           <div class="form-group">
             <label for="veh-marca">Marca:</label>
-            <input type="text" id="veh-marca" name="veh-marca" class="veh-text" />
+            <input type="text" id="veh-marca" name="veh-marca" class="veh-text" maxlength="25" />
           </div>
           <div class="form-group">
             <label for="veh-modelo">Modelo:</label>
-            <input type="text" id="veh-modelo" name="veh-modelo" class="veh-text" />
+            <input type="text" id="veh-modelo" name="veh-modelo" class="veh-text" maxlength="25" />
           </div>
           <div class="form-group">
             <label for="veh-matricula">Matrícula:</label>
-            <input type="text" id="veh-matricula" name="veh-matricula" class="veh-text" />
+            <input type="text" id="veh-matricula" name="veh-matricula" class="veh-text" maxlength="25" />
           </div>
         </div>
       </div>
@@ -295,6 +295,7 @@
     const inputDesc = document.createElement('input');
     inputDesc.type = 'text';
     inputDesc.className = 'otros-gasto-desc';
+    inputDesc.maxLength = 60;
     inputDesc.setAttribute('aria-label', 'Descripción del gasto');
     colDesc.appendChild(labelDesc);
     colDesc.appendChild(inputDesc);
@@ -312,6 +313,7 @@
     inputImp.type = 'text';
     inputImp.className = 'format-alojamiento otros-gasto-importe';
     inputImp.placeholder = '0,00 €';
+    inputImp.maxLength = 12;
     inputImp.setAttribute('aria-label', 'Importe del gasto');
     const btnRemove = document.createElement('button');
     btnRemove.type = 'button';
@@ -402,11 +404,11 @@
       <div class="form-row three-cols-33">
         <div class="form-group">
           <label for="origen-${desplazamientoCounter}">Origen</label>
-          <input type="text" id="origen-${desplazamientoCounter}" name="origen-${desplazamientoCounter}" class="general-text" required />
+          <input type="text" id="origen-${desplazamientoCounter}" name="origen-${desplazamientoCounter}" class="general-text" maxlength="40" required />
         </div>
         <div class="form-group">
           <label for="destino-${desplazamientoCounter}">Destino</label>
-          <input type="text" id="destino-${desplazamientoCounter}" name="destino-${desplazamientoCounter}" class="general-text" required />
+          <input type="text" id="destino-${desplazamientoCounter}" name="destino-${desplazamientoCounter}" class="general-text" maxlength="40" required />
         </div>
         <div class="form-group">
           <label for="pais-destino-${desplazamientoCounter}">País de Destino</label>
@@ -436,11 +438,11 @@
       <div class="form-row two-cols-50-50">
         <div class="form-group">
           <label for="km-${desplazamientoCounter}">Km:</label>
-          <input type="text" id="km-${desplazamientoCounter}" name="km-${desplazamientoCounter}" class="format-km" placeholder="0 km" />
+          <input type="text" id="km-${desplazamientoCounter}" name="km-${desplazamientoCounter}" class="format-km" maxlength="12" placeholder="0 km" />
         </div>
         <div class="form-group">
           <label for="alojamiento-${desplazamientoCounter}">Alojamiento (€):</label>
-          <input type="text" id="alojamiento-${desplazamientoCounter}" name="alojamiento-${desplazamientoCounter}" class="format-alojamiento" placeholder="0,00 €" />
+          <input type="text" id="alojamiento-${desplazamientoCounter}" name="alojamiento-${desplazamientoCounter}" class="format-alojamiento" maxlength="12" placeholder="0,00 €" />
         </div>
       </div>
 

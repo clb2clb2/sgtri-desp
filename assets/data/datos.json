@@ -41,7 +41,14 @@
     ["Tasa turística", "TTR"],
     ["Tasa agencia de viajes", "TAG"],
     ["Otros gastos", "OTR"]
-],
+  ],
+  "otrosDescuentos": [
+    ["Total", "TOT"],
+    ["Manutención", "MNT"],
+    ["Alojamiento", "ALJ"],
+    ["Kilometraje", "KLM"],
+    ["Otros gastos", "OTR"]
+  ],
   "kmTarifas": {
     "coche": 0.26,
     "motocicleta": 0.106
