@@ -16,6 +16,7 @@
   --color-danger-light: #f3ebeb;
   --color-danger-hover: #e1cdcd;
   --color-error: #c50909;
+  --color-error-shadow: rgba(197, 9, 9, 0.3);
   --color-error-dark: #b23a3a;
 
   /* Colores de éxito/enfoque */
@@ -617,6 +618,7 @@ input.num-spinner::-webkit-inner-spin-button {
   background-color: var(--color-primary-light);
   padding: 0.5rem 1rem;
   border-radius: var(--border-radius);
+  border: 1px solid var(--color-primary);
   margin: 0.5rem 0;
   border-left: 4px solid var(--color-primary);
   text-align: left;
@@ -1050,7 +1052,9 @@ input.num-spinner::-webkit-inner-spin-button {
    16. ESTADOS DE ERROR
    ============================================ */
 .field-error {
-  color: var(--color-error);
+  color: var(--color-error-dark);
+  border: 1px solid var(--color-error);
+  box-shadow: 0 0 0 2px var(--color-error-shadow);
 }
 
 .dt-order-error {
