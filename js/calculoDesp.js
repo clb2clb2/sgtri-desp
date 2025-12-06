@@ -1401,7 +1401,15 @@ window.calculoDesp._daysBetween = daysBetween;
     // 8. Renderizar salida
     window.salidaDesp?.renderSalida?.(despEl, salidaData);
 
-    // 8. Devolver resultado
+    // 9. Registrar totales en el registro centralizado
+    if (window.resultadoLiquidacion?.registrarDesplazamiento) {
+      window.resultadoLiquidacion.registrarDesplazamiento(data.id, salidaData.totales);
+    }
+
+    // 10. Actualizar resultado de la liquidación
+    window.resultadoLiquidacion?.renderResultado?.();
+
+    // 11. Devolver resultado
     return {
       salidaData,
       canonical,

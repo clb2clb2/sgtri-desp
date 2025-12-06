@@ -335,8 +335,9 @@
     linea.appendChild(colImporte);
 
     // Poblar el select desde los datos cargados
-    const otros = (global.__sgtriDatos && global.__sgtriDatos.otrosGastos) ? global.__sgtriDatos.otrosGastos : [];
-    otros.forEach(item => {
+    const otrosGastos = (global.utils?.getSgtriDatos()?.otrosGastos) || 
+                        (global.__sgtriDatos?.otrosGastos) || [];
+    otrosGastos.forEach(item => {
       const opt = document.createElement('option');
       opt.value = item[1] || item[0];
       opt.textContent = item[0];
@@ -580,7 +581,7 @@
   }
 
   /**
-   * Elimina un desplazamiento con confirmación.
+   * Elimina un desplazamiento con confirmación y animación.
    * @param {HTMLElement} grupo - Elemento del desplazamiento a eliminar
    */
   async function eliminarDesplazamiento(grupo) {
@@ -590,24 +591,49 @@
     const confirmed = await showConfirm(`¿Eliminar ${titulo}?`);
     if (!confirmed) return;
 
-    grupo.remove();
-    actualizarNumerosDesplazamientos();
-
-    // Callback externo
-    if (typeof onDesplazamientoDeleted === 'function') {
-      onDesplazamientoDeleted();
+    // Eliminar del registro de totales antes de quitar del DOM
+    const id = grupo.dataset.desplazamientoId;
+    if (id && global.resultadoLiquidacion?.eliminarDesplazamiento) {
+      global.resultadoLiquidacion.eliminarDesplazamiento(id);
     }
 
-    // Ocultar botón eliminar si solo queda uno
-    const desplazamientos = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo');
-    if (desplazamientos.length === 1) {
-      const botonEliminar = desplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
-      if (botonEliminar) botonEliminar.style.display = 'none';
-    }
+    // Capturar altura actual y fijarla para poder animarla
+    const currentHeight = grupo.offsetHeight;
+    grupo.style.height = currentHeight + 'px';
+    grupo.style.overflow = 'hidden';
+    
+    // Forzar reflow para que el navegador registre la altura fija
+    grupo.offsetHeight;
+    
+    // Aplicar animación de salida (colapsa a altura 0)
+    grupo.style.height = '0';
+    grupo.classList.add('exit');
+    
+    // Esperar a que termine la animación antes de eliminar
+    const onTransitionEnd = () => {
+      grupo.remove();
+      actualizarNumerosDesplazamientos();
 
-    // Recalcular y evaluar vehículo
-    scheduleFullRecalc(60);
-    evaluarKmParaMostrarFicha();
+      // Callback externo
+      if (typeof onDesplazamientoDeleted === 'function') {
+        onDesplazamientoDeleted();
+      }
+
+      // Ocultar botón eliminar si solo queda uno
+      const desplazamientos = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo');
+      if (desplazamientos.length === 1) {
+        const botonEliminar = desplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
+        if (botonEliminar) botonEliminar.style.display = 'none';
+      }
+
+      // Recalcular y evaluar vehículo
+      scheduleFullRecalc(60);
+      evaluarKmParaMostrarFicha();
+    };
+
+    grupo.addEventListener('transitionend', onTransitionEnd, { once: true });
+    // Fallback por si la transición no dispara el evento
+    setTimeout(onTransitionEnd, 280);
   }
 
   // =========================================================================
