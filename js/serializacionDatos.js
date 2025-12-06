@@ -101,15 +101,17 @@
       tipo: tipoPago
     };
 
-    // IBAN o número de tarjeta según el tipo
-    if (tipoPago === 'CE' || tipoPago === 'CI') {
+    // IBAN según tipo de cuenta
+    if (tipoPago === 'CE') {
       datos.iban = obtenerValorCampo('iban');
     }
     if (tipoPago === 'CI') {
+      // Cuenta extranjera usa iban-ext
+      datos.iban = obtenerValorCampo('iban-ext');
       datos.swift = obtenerValorCampo('swift');
     }
     if (tipoPago === 'TJ') {
-      datos.tarjeta = obtenerValorCampo('tarjeta-uex');
+      datos.tarjeta = obtenerValorCampo('numero-tarjeta');
     }
 
     return datos;
@@ -284,11 +286,18 @@
       tipoPagoEl.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // Esperar un poco para que la UI se actualice antes de establecer IBAN/SWIFT
+    // Esperar a que la UI se actualice antes de establecer IBAN/SWIFT
     setTimeout(() => {
-      if (datos.iban) establecerValorCampo('iban', datos.iban);
-      if (datos.swift) establecerValorCampo('swift', datos.swift);
-      if (datos.tarjeta) establecerValorCampo('tarjeta-uex', datos.tarjeta);
+      if (datos.tipo === 'CE' && datos.iban) {
+        establecerValorCampo('iban', datos.iban);
+      }
+      if (datos.tipo === 'CI') {
+        if (datos.iban) establecerValorCampo('iban-ext', datos.iban);
+        if (datos.swift) establecerValorCampo('swift', datos.swift);
+      }
+      if (datos.tipo === 'TJ' && datos.tarjeta) {
+        establecerValorCampo('numero-tarjeta', datos.tarjeta);
+      }
     }, 50);
   }
 
@@ -321,6 +330,12 @@
     const uiDesp = global.uiDesplazamientos;
     const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${despId}"]`);
     if (!desp || !uiDesp?.crearLineaOtroGasto) return;
+
+    // Asegurar que el contenedor sea visible
+    const container = desp.querySelector('.otros-gastos-container');
+    if (container) {
+      container.style.display = 'block';
+    }
 
     gastos.forEach((gasto) => {
       // Crear línea usando la función del módulo
@@ -373,43 +388,66 @@
   /**
    * Restaura todos los desplazamientos
    * @param {Array} desplazamientos
+   * @returns {Promise} Promesa que se resuelve cuando todos los desplazamientos están restaurados
    */
   function restaurarDesplazamientos(desplazamientos) {
-    if (!desplazamientos || desplazamientos.length === 0) return;
-
-    const uiDesp = global.uiDesplazamientos;
-    const contenedor = document.getElementById('desplazamientos-container');
-    if (!contenedor) return;
-
-    // Crear desplazamientos adicionales si es necesario
-    // El primero ya existe (id=1), creamos los demás
-    for (let i = 1; i < desplazamientos.length; i++) {
-      if (uiDesp && uiDesp.crearNuevoDesplazamiento) {
-        uiDesp.crearNuevoDesplazamiento();
+    return new Promise((resolve) => {
+      if (!desplazamientos || desplazamientos.length === 0) {
+        resolve();
+        return;
       }
-    }
 
-    // Esperar a que se creen los elementos en el DOM
-    setTimeout(() => {
-      // Obtener los grupos de desplazamiento reales del DOM
-      const grupos = contenedor.querySelectorAll('.desplazamiento-grupo');
-      
-      desplazamientos.forEach((desp, idx) => {
-        // Usar el ID real del elemento DOM, no el del archivo
-        const grupo = grupos[idx];
-        if (grupo) {
-          const idReal = parseInt(grupo.dataset.desplazamientoId, 10);
-          // Crear copia del objeto con el ID correcto
-          const despConIdReal = { ...desp, id: idReal };
-          restaurarDesplazamiento(despConIdReal, idx);
+      const uiDesp = global.uiDesplazamientos;
+      const contenedor = document.getElementById('desplazamientos-container');
+      if (!contenedor) {
+        resolve();
+        return;
+      }
+
+      // Crear desplazamientos adicionales si es necesario
+      // El primero ya existe (id=1), creamos los demás
+      for (let i = 1; i < desplazamientos.length; i++) {
+        if (uiDesp && uiDesp.crearNuevoDesplazamiento) {
+          uiDesp.crearNuevoDesplazamiento();
         }
-      });
-
-      // Actualizar números
-      if (uiDesp && uiDesp.actualizarNumerosDesplazamientos) {
-        uiDesp.actualizarNumerosDesplazamientos();
       }
-    }, 150);
+
+      // Esperar a que se creen los elementos en el DOM
+      setTimeout(() => {
+        // Obtener los grupos de desplazamiento reales del DOM
+        const grupos = contenedor.querySelectorAll('.desplazamiento-grupo');
+        
+        // Mapa de IDs originales a índices reales (para evento-asociado)
+        const mapeoIds = {};
+        
+        desplazamientos.forEach((desp, idx) => {
+          const grupo = grupos[idx];
+          if (grupo) {
+            // Quitar clase entry para asegurar visibilidad
+            grupo.classList.remove('entry');
+            
+            const idReal = parseInt(grupo.dataset.desplazamientoId, 10);
+            
+            // Guardar mapeo: "despX" original → "despY" real
+            mapeoIds[`desp${desp.id}`] = `desp${idx + 1}`;
+            
+            // Crear copia del objeto con el ID correcto
+            const despConIdReal = { ...desp, id: idReal };
+            restaurarDesplazamiento(despConIdReal, idx);
+          }
+        });
+
+        // Actualizar números
+        if (uiDesp && uiDesp.actualizarNumerosDesplazamientos) {
+          uiDesp.actualizarNumerosDesplazamientos();
+        }
+        
+        // Devolver el mapeo para uso posterior
+        global.__tempMapeoDesplazamientos = mapeoIds;
+        
+        resolve();
+      }, 150);
+    });
   }
 
   /**
@@ -444,7 +482,16 @@
     establecerValorCampo('evento-al', datos.fechaHasta);
     establecerValorCampo('evento-gastos', datos.gastosInscripcion);
     establecerValorCampo('evento-num-comidas', datos.comidasIncluidas);
-    establecerValorCampo('evento-asociado', datos.desplazamientoAsociado);
+    
+    // Usar el mapeo de IDs si existe
+    let desplazamientoAsociado = datos.desplazamientoAsociado;
+    if (global.__tempMapeoDesplazamientos && datos.desplazamientoAsociado) {
+      const mapeado = global.__tempMapeoDesplazamientos[datos.desplazamientoAsociado];
+      if (mapeado) {
+        desplazamientoAsociado = mapeado;
+      }
+    }
+    establecerValorCampo('evento-asociado', desplazamientoAsociado);
   }
 
   /**
@@ -460,11 +507,78 @@
   }
 
   /**
+   * Verifica si una sección tiene contenido
+   * @param {string} sectionId - Identificador de la sección
+   * @param {Object} datos - Datos cargados
+   * @returns {boolean}
+   */
+  function seccionTieneContenido(sectionId, datos) {
+    if (sectionId === 'evento' || sectionId === 'congresos') {
+      const e = datos.evento;
+      return e && (e.nombre || e.lugar || e.fechaDesde || e.fechaHasta || e.gastosInscripcion);
+    }
+    if (sectionId === 'honorarios') {
+      const h = datos.honorarios;
+      return h && (h.importe || h.concepto);
+    }
+    if (sectionId === 'ajustes') {
+      // TODO: si hay ajustes/descuentos guardados
+      return false;
+    }
+    return false;
+  }
+
+  /**
+   * Abre una sección colapsada
+   * @param {HTMLElement} sectionTitle - Elemento .section-title
+   */
+  function abrirSeccion(sectionTitle) {
+    if (!sectionTitle) return;
+    const wrapper = sectionTitle.nextElementSibling;
+    const icon = sectionTitle.querySelector('.toggle-section');
+    const content = wrapper?.querySelector('.section-content');
+    
+    if (wrapper && content) {
+      wrapper.classList.remove('collapsed');
+      wrapper.style.maxHeight = content.scrollHeight + 'px';
+      if (icon) icon.classList.add('open');
+      sectionTitle.setAttribute('aria-expanded', 'true');
+      wrapper.setAttribute('aria-hidden', 'false');
+    }
+  }
+
+  /**
+   * Despliega las secciones que tienen contenido
+   * @param {Object} datos - Datos restaurados
+   */
+  function desplegarSeccionesConContenido(datos) {
+    // Buscar secciones colapsables
+    const secciones = document.querySelectorAll('.section-title[data-start-collapsed="true"]');
+    
+    secciones.forEach(title => {
+      const texto = title.textContent.toLowerCase();
+      let tieneContenido = false;
+      
+      if (texto.includes('congreso') || texto.includes('evento')) {
+        tieneContenido = seccionTieneContenido('evento', datos);
+      } else if (texto.includes('honorario')) {
+        tieneContenido = seccionTieneContenido('honorarios', datos);
+      } else if (texto.includes('ajuste')) {
+        tieneContenido = seccionTieneContenido('ajustes', datos);
+      }
+      
+      if (tieneContenido) {
+        abrirSeccion(title);
+      }
+    });
+  }
+
+  /**
    * Restaura todos los datos del formulario
    * @param {Object} datos - Objeto con todos los datos
-   * @returns {boolean} true si se restauró correctamente
+   * @returns {Promise<boolean>} true si se restauró correctamente
    */
-  function restaurarTodo(datos) {
+  async function restaurarTodo(datos) {
     if (!datos) {
       console.error('[serializacionDatos] No hay datos para restaurar');
       return false;
@@ -482,16 +596,45 @@
       if (!continuar) return false;
     }
 
-    // Restaurar cada sección
+    // Restaurar cada sección (orden importante)
     restaurarBeneficiario(datos.beneficiario);
     restaurarPago(datos.pago);
     restaurarProyecto(datos.proyecto);
-    restaurarDesplazamientos(datos.desplazamientos);
-    restaurarVehiculo(datos.vehiculo);
+    
+    // Restaurar desplazamientos (asíncrono)
+    await restaurarDesplazamientos(datos.desplazamientos);
+    
+    // Esperar un poco más para que el DOM se actualice completamente
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Restaurar evento (después de desplazamientos para tener el mapeo)
     restaurarEvento(datos.evento);
     restaurarHonorarios(datos.honorarios);
+    
+    // Restaurar vehículo (espera a que la ficha sea visible)
+    restaurarVehiculo(datos.vehiculo);
 
-    console.log('[serializacionDatos] Datos restaurados correctamente');
+    // Tareas post-restauración
+    setTimeout(() => {
+      // 1. Mostrar ficha de vehículo si hay km
+      if (global.uiDesplazamientos?.evaluarKmParaMostrarFicha) {
+        global.uiDesplazamientos.evaluarKmParaMostrarFicha();
+      }
+      
+      // 2. Desplegar secciones con contenido
+      desplegarSeccionesConContenido(datos);
+      
+      // 3. Recalcular todo
+      if (global.logicaDesp?.scheduleFullRecalc) {
+        global.logicaDesp.scheduleFullRecalc(0);
+      }
+      
+      // 4. Limpiar mapeo temporal
+      delete global.__tempMapeoDesplazamientos;
+      
+      console.log('[serializacionDatos] Datos restaurados y recalculados correctamente');
+    }, 300);
+
     return true;
   }
 
@@ -570,10 +713,10 @@
 
       const lector = new FileReader();
       
-      lector.onload = (e) => {
+      lector.onload = async (e) => {
         try {
           const datos = JSON.parse(e.target.result);
-          const exito = restaurarTodo(datos);
+          const exito = await restaurarTodo(datos);
           resolve(exito);
         } catch (error) {
           reject(new Error(`Error al leer el archivo: ${error.message}`));
