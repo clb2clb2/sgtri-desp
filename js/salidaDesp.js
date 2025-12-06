@@ -10,13 +10,17 @@
   'use strict';
 
   // =========================================================================
-  // UTILIDADES DE FORMATEO
+  // UTILIDADES DE FORMATEO (delegadas a utils.js)
   // =========================================================================
 
   /**
    * Formatea número a string con 2 decimales y separador de miles alemán.
+   * Delega a utils.fmt si está disponible.
    */
   function fmt(n) {
+    if (window.utils && typeof window.utils.fmt === 'function') {
+      return window.utils.fmt(n);
+    }
     return (Number(n) || 0).toLocaleString('de-DE', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
@@ -25,11 +29,13 @@
 
   /**
    * Formatea precio unitario sin redondear (hasta 3 decimales si los tiene).
-   * Ejemplo: 0.106 → "0,106", 0.26 → "0,26"
+   * Delega a utils.fmtPrecio si está disponible.
    */
   function fmtPrecio(n) {
+    if (window.utils && typeof window.utils.fmtPrecio === 'function') {
+      return window.utils.fmtPrecio(n);
+    }
     const num = Number(n) || 0;
-    // Determinar cuántos decimales tiene realmente el número
     const str = num.toString();
     const decimals = str.includes('.') ? str.split('.')[1].length : 0;
     const maxDecimals = Math.max(2, Math.min(decimals, 3));
@@ -631,4 +637,4 @@
     convertLegacyToUnified
   };
 
-})();
+})(typeof window !== 'undefined' ? window : this);

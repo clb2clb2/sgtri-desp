@@ -2,7 +2,9 @@
 // Lógica UI y validaciones para fichas de desplazamiento
 // Funciones expuestas en window.logicaDesp
 
-(function () {
+(function (global) {
+  'use strict';
+
   // Timers para debounce global y por-id
   const perIdTimers = Object.create(null);
   let fullTimer = null;
@@ -111,9 +113,9 @@
 
       // Call calculoDesp; the calculator is responsible for invoking the renderer.
       try {
-        if (window.calculoDesp && typeof window.calculoDesp.calculaDesplazamientoFicha === 'function') {
+        if (global.calculoDesp && typeof global.calculoDesp.calculaDesplazamientoFicha === 'function') {
           // calculaDesplazamientoFicha will call salidaDesp.renderSalida internally
-          window.calculoDesp.calculaDesplazamientoFicha(desp);
+          global.calculoDesp.calculaDesplazamientoFicha(desp);
         }
       } catch (e) { /* ignore calculation/render errors */ }
     } catch (e) { console.error('handleFichaChange error', e); }
@@ -250,7 +252,7 @@
   }
 
   // Expose API
-  window.logicaDesp = {
+  global.logicaDesp = {
     init,
     shouldShowTicketCena,
     shouldShowJustificarPernocta,
@@ -259,4 +261,4 @@
     scheduleFullRecalc,
     scheduleRecalcForId
   };
-})();
+})(typeof window !== 'undefined' ? window : this);

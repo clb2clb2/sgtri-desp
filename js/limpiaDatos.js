@@ -247,28 +247,27 @@
 
   /**
    * Parsea un número con tolerancia a formatos europeos/internacionales.
-   * Acepta comas y puntos como separadores decimales/miles.
-   * Heurística: punto seguido de exactamente 3 dígitos (ej: 1.500) = miles (europeo).
+   * Delegamos a utils.parseNumber si está disponible, sino usamos implementación local.
    * @param {string|number} str - Valor a parsear
    * @returns {number} Número parseado (0 si no es válido)
    */
   function parseNumber(str) {
+    // Usar utils.parseNumber si está disponible
+    if (global.utils && typeof global.utils.parseNumber === 'function') {
+      return global.utils.parseNumber(str);
+    }
+    // Fallback para compatibilidad
     if (!str && str !== 0) return 0;
     try {
       const s = String(str || '').trim();
       if (s === '') return 0;
       let cleaned = s.replace(/€/g, '').replace(/km/g, '').replace(/\s/g, '');
-      // Si tiene ambos separadores, el punto es de miles
       if (/,/.test(cleaned) && /\./.test(cleaned)) {
         cleaned = cleaned.replace(/\./g, '');
       } else if (/\./.test(cleaned) && !/,/.test(cleaned)) {
-        // Solo tiene punto: detectar si es separador de miles (ej: 1.500 → 3 dígitos tras punto)
-        // Patrón europeo: puntos seguidos de exactamente 3 dígitos (excepto al final si hay más texto)
         if (/\.\d{3}(?!\d)/.test(cleaned)) {
-          // Es separador de miles (formato europeo): eliminar puntos
           cleaned = cleaned.replace(/\./g, '');
         }
-        // Si no cumple el patrón, se asume decimal (ej: 1.5)
       }
       cleaned = cleaned.replace(/,/g, '.');
       cleaned = cleaned.replace(/[^0-9.\-]/g, '');
