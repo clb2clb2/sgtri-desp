@@ -42,6 +42,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // ========================================
 
     document.querySelectorAll('.section-title').forEach((title, index) => {
+        // Saltar secciones no colapsables
+        if (title.classList.contains('no-collapse')) {
+            return;
+        }
+
         const icon = title.querySelector('.toggle-section');
         const wrapper = title.nextElementSibling; // section-content-wrapper
         const content = wrapper.querySelector('.section-content');
@@ -131,6 +136,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     } catch (e) { 
         console.warn('Error al inicializar logicaDesp:', e); 
+    }
+
+    // Inicializar resultadoLiquidacion
+    try {
+        if (window.resultadoLiquidacion?.init) {
+            window.resultadoLiquidacion.init();
+        }
+    } catch (e) {
+        console.warn('Error al inicializar resultadoLiquidacion:', e);
     }
 
     // Ejecutar cálculo inicial por cada desplazamiento

@@ -1,33 +1,43 @@
 // js/cogeDatosDesp.js
 // Recolecta y normaliza datos del DOM para el cálculo de desplazamientos.
-// Delega el parseo a limpiaDatos.js.
+// Delega el parseo a limpiaDatos.js y utils.js.
 
-(function(){
+(function (global) {
   'use strict';
 
   // =========================================================================
-  // ACCESO A MÓDULO LIMPIA DATOS
+  // ACCESO A MÓDULOS DE UTILIDADES
   // =========================================================================
 
   /**
-   * Obtiene una función de limpiaDatos con fallback si no está cargado.
-   * @param {string} fnName - Nombre de la función
-   * @param {Function} fallback - Función fallback
+   * Obtiene parseNumber de utils o limpiaDatos con fallback.
    * @returns {Function}
    */
-  function getLimpiaDatosFn(fnName, fallback) {
-    const ld = window.limpiaDatos;
-    return (ld && typeof ld[fnName] === 'function') ? ld[fnName] : fallback;
-  }
-
-  // Fallbacks mínimos
-  const fallbacks = {
-    parseNumber: v => {
+  function getParseNumber() {
+    if (global.utils && typeof global.utils.parseNumber === 'function') {
+      return global.utils.parseNumber;
+    }
+    if (global.limpiaDatos && typeof global.limpiaDatos.parseNumber === 'function') {
+      return global.limpiaDatos.parseNumber;
+    }
+    // Fallback mínimo
+    return v => {
       if (!v && v !== 0) return 0;
       const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '').replace(/,/g, '.'));
       return isNaN(n) ? 0 : n;
-    },
-    parseDateStrict: ddmmaa => {
+    };
+  }
+
+  /**
+   * Obtiene parseDateStrict de limpiaDatos con fallback.
+   * @returns {Function}
+   */
+  function getParseDateStrict() {
+    if (global.limpiaDatos && typeof global.limpiaDatos.parseDateStrict === 'function') {
+      return global.limpiaDatos.parseDateStrict;
+    }
+    // Fallback
+    return ddmmaa => {
       if (!ddmmaa) return null;
       const parts = String(ddmmaa).split('/').map(p => p.trim());
       if (parts.length < 3) return null;
@@ -37,8 +47,19 @@
       if (y < 100) y = 2000 + y;
       const date = new Date(y, m, d, 0, 0, 0, 0);
       return isNaN(date.getTime()) ? null : date;
-    },
-    parseTimeStrict: hhmm => {
+    };
+  }
+
+  /**
+   * Obtiene parseTimeStrict de limpiaDatos con fallback.
+   * @returns {Function}
+   */
+  function getParseTimeStrict() {
+    if (global.limpiaDatos && typeof global.limpiaDatos.parseTimeStrict === 'function') {
+      return global.limpiaDatos.parseTimeStrict;
+    }
+    // Fallback
+    return hhmm => {
       if (!hhmm) return null;
       const m = String(hhmm).trim().match(/^(\d{1,2}):(\d{1,2})$/);
       if (!m) return null;
@@ -46,13 +67,13 @@
       const mm = parseInt(m[2], 10);
       if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
       return { hh, mm };
-    }
-  };
+    };
+  }
 
-  // Parsers con fallback
-  const parseNumber = () => getLimpiaDatosFn('parseNumber', fallbacks.parseNumber);
-  const parseDateStrict = () => getLimpiaDatosFn('parseDateStrict', fallbacks.parseDateStrict);
-  const parseTimeStrict = () => getLimpiaDatosFn('parseTimeStrict', fallbacks.parseTimeStrict);
+  // Parsers con resolución dinámica
+  const parseNumber = () => getParseNumber();
+  const parseDateStrict = () => getParseDateStrict();
+  const parseTimeStrict = () => getParseTimeStrict();
 
   // =========================================================================
   // HELPERS DE DOM
@@ -283,11 +304,11 @@
   // EXPORTACIÓN API
   // =========================================================================
 
-  window.cogeDatosDesp = {
+  global.cogeDatosDesp = {
     collectDataFromFicha,
     parseNumber: v => parseNumber()(v),
     parseNumericLoose: v => parseNumber()(v),
     esInternacional,
     validarFechas
   };
-})();
+})(typeof window !== 'undefined' ? window : this);

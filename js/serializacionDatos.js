@@ -138,13 +138,13 @@
     if (!contenedor) return [];
 
     const gastos = [];
-    const lineas = contenedor.querySelectorAll('.otros-gastos-linea');
+    // Nota: la clase es .otros-gasto-line (singular)
+    const lineas = contenedor.querySelectorAll('.otros-gasto-line');
     
-    lineas.forEach((linea, idx) => {
-      const lineaId = idx + 1;
-      const tipo = linea.querySelector(`[id^="otros-gastos-tipo-"]`)?.value || '';
-      const concepto = linea.querySelector(`[id^="otros-gastos-concepto-"]`)?.value || '';
-      const importe = linea.querySelector(`[id^="otros-gastos-importe-"]`)?.value || '';
+    lineas.forEach((linea) => {
+      const tipo = linea.querySelector('.otros-gasto-tipo')?.value || '';
+      const concepto = linea.querySelector('.otros-gasto-desc')?.value || '';
+      const importe = linea.querySelector('.otros-gasto-importe')?.value || '';
       
       if (tipo || concepto || importe) {
         gastos.push({ tipo, concepto, importe });
@@ -318,28 +318,21 @@
   function restaurarOtrosGastos(despId, gastos) {
     if (!gastos || gastos.length === 0) return;
 
-    const uiDesp = window.uiDesplazamientos;
-    if (!uiDesp || !uiDesp.agregarLineaOtrosGastos) return;
+    const uiDesp = global.uiDesplazamientos;
+    const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${despId}"]`);
+    if (!desp || !uiDesp?.crearLineaOtroGasto) return;
 
-    gastos.forEach((gasto, idx) => {
-      // Añadir línea si no existe
-      uiDesp.agregarLineaOtrosGastos(despId);
-      
-      // Establecer valores (la línea se numera desde 1)
-      const lineaIdx = idx + 1;
-      const contenedor = document.getElementById(`otros-gastos-${despId}`);
-      if (contenedor) {
-        const lineas = contenedor.querySelectorAll('.otros-gastos-linea');
-        const linea = lineas[idx];
-        if (linea) {
-          const selectTipo = linea.querySelector(`[id^="otros-gastos-tipo-"]`);
-          const inputConcepto = linea.querySelector(`[id^="otros-gastos-concepto-"]`);
-          const inputImporte = linea.querySelector(`[id^="otros-gastos-importe-"]`);
-          
-          if (selectTipo) selectTipo.value = gasto.tipo;
-          if (inputConcepto) inputConcepto.value = gasto.concepto;
-          if (inputImporte) inputImporte.value = gasto.importe;
-        }
+    gastos.forEach((gasto) => {
+      // Crear línea usando la función del módulo
+      const linea = uiDesp.crearLineaOtroGasto(desp);
+      if (linea) {
+        const selectTipo = linea.querySelector('.otros-gasto-tipo');
+        const inputDesc = linea.querySelector('.otros-gasto-desc');
+        const inputImporte = linea.querySelector('.otros-gasto-importe');
+        
+        if (selectTipo) selectTipo.value = gasto.tipo;
+        if (inputDesc) inputDesc.value = gasto.concepto;
+        if (inputImporte) inputImporte.value = gasto.importe;
       }
     });
   }
@@ -384,7 +377,7 @@
   function restaurarDesplazamientos(desplazamientos) {
     if (!desplazamientos || desplazamientos.length === 0) return;
 
-    const uiDesp = window.uiDesplazamientos;
+    const uiDesp = global.uiDesplazamientos;
     const contenedor = document.getElementById('desplazamientos-container');
     if (!contenedor) return;
 
@@ -518,7 +511,7 @@
     const nombreSinExt = nombreCompleto.replace(/\.dta$/, '');
     
     // Mostrar diálogo para que el usuario pueda cambiar el nombre
-    const showPrompt = window.showPrompt || window.confirmDialog?.showPrompt;
+    const showPrompt = global.showPrompt || global.confirmDialog?.showPrompt;
     if (!showPrompt) {
       console.error('[serializacionDatos] showPrompt no disponible');
       return;

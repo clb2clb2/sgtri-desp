@@ -15,10 +15,10 @@
     rel="stylesheet">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="css/style-page.css" />
-  <link rel="stylesheet" href="css/style-form.css" />
+  <link rel="stylesheet" href="css/styles.css" />
 
   <!-- Scripts: Módulos base (sin dependencias) -->
+  <script src="js/utils.js" defer></script>
   <script src="js/limpiaDatos.js" defer></script>
   <script src="js/confirmDialog.js" defer></script>
   <script src="js/validaciones.js" defer></script>
@@ -34,6 +34,7 @@
   <script src="js/calculoDesp.js" defer></script>
   <script src="js/logicaDesp.js" defer></script>
   <script src="js/salidaDesp.js" defer></script>
+  <script src="js/resultadoLiquidacion.js" defer></script>
   
   <!-- Scripts: Orquestadores principales -->
   <script src="js/main.js" defer></script>
@@ -467,6 +468,20 @@
             <!-- Contenedor de líneas de descuentos -->
             <div class="otros-descuentos-container" id="otros-descuentos-container"></div>
           </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección 7: Resultado de la liquidación (siempre visible, no plegable) -->
+    <section class="form-section resultado-section">
+      <div class="section-title no-collapse">
+        Resultado de la liquidación
+      </div>
+      <div class="section-content-wrapper">
+        <div class="section-content">
+          <div id="resultado-liquidacion-container">
+            <!-- El resultado se renderiza dinámicamente aquí -->
+          </div>
         </div>
       </div>
     </section>

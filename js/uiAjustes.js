@@ -43,8 +43,8 @@
     selectTipo.className = 'descuento-tipo';
 
     // Poblar select desde datos.json
-    const descuentos = (window.__sgtriDatos && window.__sgtriDatos.otrosDescuentos) 
-      ? window.__sgtriDatos.otrosDescuentos : [];
+    const descuentos = (global.utils?.getSgtriDatos()?.otrosDescuentos) ||
+                       (global.__sgtriDatos?.otrosDescuentos) || [];
     descuentos.forEach((item, index) => {
       const opt = document.createElement('option');
       opt.value = item[1] || item[0];
