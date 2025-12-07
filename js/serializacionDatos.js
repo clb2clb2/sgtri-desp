@@ -453,12 +453,12 @@
   /**
    * Restaura los datos del vehículo
    * @param {Object} datos
+   * @param {number} delay - Tiempo de espera antes de restaurar
    */
-  function restaurarVehiculo(datos) {
+  function restaurarVehiculo(datos, delay = 150) {
     if (!datos) return;
 
-    // El contenedor de vehículo se genera dinámicamente
-    // Esperar a que exista
+    // El contenedor de vehículo se genera dinámicamente por evaluarKmParaMostrarFicha
     setTimeout(() => {
       const radio = document.querySelector(`input[name="vehiculo-tipo"][value="${datos.tipo}"]`);
       if (radio) {
@@ -467,7 +467,7 @@
       }
       establecerValorCampo('vehiculo-matricula', datos.matricula);
       establecerValorCampo('justificar-pernocta', datos.justificarPernocta, 'checkbox');
-    }, 150);
+    }, delay);
   }
 
   /**
@@ -610,9 +610,6 @@
     // Restaurar evento (después de desplazamientos para tener el mapeo)
     restaurarEvento(datos.evento);
     restaurarHonorarios(datos.honorarios);
-    
-    // Restaurar vehículo (espera a que la ficha sea visible)
-    restaurarVehiculo(datos.vehiculo);
 
     // Tareas post-restauración
     setTimeout(() => {
@@ -621,15 +618,23 @@
         global.uiDesplazamientos.evaluarKmParaMostrarFicha();
       }
       
-      // 2. Desplegar secciones con contenido
+      // 2. Restaurar vehículo DESPUÉS de que la ficha esté visible
+      restaurarVehiculo(datos.vehiculo, 100);
+      
+      // 3. Desplegar secciones con contenido
       desplegarSeccionesConContenido(datos);
       
-      // 3. Recalcular todo
+      // 4. Calcular descuento por comidas de congreso
+      if (typeof global.computeDescuentoManutencion === 'function') {
+        global.computeDescuentoManutencion();
+      }
+      
+      // 5. Recalcular todo
       if (global.logicaDesp?.scheduleFullRecalc) {
         global.logicaDesp.scheduleFullRecalc(0);
       }
       
-      // 4. Limpiar mapeo temporal
+      // 6. Limpiar mapeo temporal
       delete global.__tempMapeoDesplazamientos;
       
       console.log('[serializacionDatos] Datos restaurados y recalculados correctamente');

@@ -64,10 +64,12 @@
    ============================================ */
 body {
   font-family: var(--font-family-base);
-  background-color: var(--color-bg-page);
+  /*background-color: var(--color-bg-page);*/
   color: var(--color-text-muted);
   margin: 0;
   padding: 0;
+  background: #dae2f7;
+  background: linear-gradient(to right, #bfc8d0, #dae2f7, #bfc8d0);
 }
 
 /* Utilidades globales */
@@ -199,7 +201,7 @@ body {
 .section-content-wrapper {
   overflow: hidden;
   transition: max-height 0.28s ease-out, padding 0.28s ease-out, margin 0.28s ease-out;
-  background: var(--color-bg-page);
+  /*background: var(--color-bg-page);*/
 }
 
 .section-content-wrapper:not(.collapsed) {
