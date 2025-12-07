@@ -670,6 +670,11 @@
     registrarFinanciacionMaxima,
     registrarDescuentosAjustes,
     
+    // Actualización desde DOM (para usar tras restaurar datos)
+    actualizarHonorarios,
+    actualizarGastosInscripcion,
+    actualizarDescuentoCongreso,
+    
     // Renderizado
     renderResultado,
     calcularResultado,
