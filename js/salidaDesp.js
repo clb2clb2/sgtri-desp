@@ -301,9 +301,8 @@
       ? `<div class="calc-titulo-ResEvent">[ Residencia Eventual ]</div>\n      ` 
       : '';
 
-    // Línea de IRPF (ajustada por descuento de congreso, solo si > 0)
-    const irpfAjustado = calcIrpfAjustado(totales.irpfSujeto, data.id);
-    const irpfLine = templates.lineaIRPF(irpfAjustado);
+    // Línea de IRPF (sin ajustar por descuento de congreso; el descuento se aplica solo en el total)
+    const irpfLine = templates.lineaIRPF(totales.irpfSujeto);
 
     return `<div class="calc-result" aria-live="polite" data-desp-id="${data.id}">
       ${badgeResEvent}${lines.join('\n      ')}
@@ -385,9 +384,8 @@
 
     html += totalLines.join('\n      ');
     html += templates.total(totales.total);
-    // IRPF ajustado por descuento de congreso
-    const irpfAjustado = calcIrpfAjustado(totales.irpfSujeto, data.id);
-    html += templates.lineaIRPF(irpfAjustado);
+    // IRPF sin ajustar (el descuento de congreso se aplica solo en el total)
+    html += templates.lineaIRPF(totales.irpfSujeto);
     html += '</div>';
 
     return html;

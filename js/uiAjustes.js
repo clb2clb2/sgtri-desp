@@ -102,6 +102,15 @@
     // Evento eliminar
     btnRemove.addEventListener('click', () => {
       linea.remove();
+      // Actualizar registro de descuentos y recalcular el resultado
+      if (window.resultadoLiquidacion) {
+        if (window.resultadoLiquidacion.actualizarDescuentosAjustes) {
+          window.resultadoLiquidacion.actualizarDescuentosAjustes();
+        }
+        if (window.resultadoLiquidacion.renderResultado) {
+          window.resultadoLiquidacion.renderResultado();
+        }
+      }
     });
 
     wrapper.appendChild(inputImporte);
