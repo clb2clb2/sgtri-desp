@@ -126,6 +126,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ========================================
+    // Prevenir envío de formularios con Enter
+    // ========================================
+
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+        });
+    });
+
+    // ========================================
     // Inicialización de módulos externos
     // ========================================
 
