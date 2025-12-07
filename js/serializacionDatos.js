@@ -203,7 +203,9 @@
 
     return {
       tipo: tipoVehiculo.value,
-      matricula: obtenerValorCampo('vehiculo-matricula'),
+      marca: obtenerValorCampo('veh-marca'),
+      modelo: obtenerValorCampo('veh-modelo'),
+      matricula: obtenerValorCampo('veh-matricula'),
       justificarPernocta: obtenerValorCampo('justificar-pernocta', 'checkbox')
     };
   }
@@ -465,7 +467,9 @@
         radio.checked = true;
         radio.dispatchEvent(new Event('change', { bubbles: true }));
       }
-      establecerValorCampo('vehiculo-matricula', datos.matricula);
+      establecerValorCampo('veh-marca', datos.marca);
+      establecerValorCampo('veh-modelo', datos.modelo);
+      establecerValorCampo('veh-matricula', datos.matricula);
       establecerValorCampo('justificar-pernocta', datos.justificarPernocta, 'checkbox');
     }, delay);
   }
@@ -629,12 +633,22 @@
         global.computeDescuentoManutencion();
       }
       
-      // 5. Recalcular todo
+      // 5. Actualizar registro de honorarios y gastos de inscripción
+      if (global.resultadoLiquidacion) {
+        if (typeof global.resultadoLiquidacion.actualizarHonorarios === 'function') {
+          global.resultadoLiquidacion.actualizarHonorarios();
+        }
+        if (typeof global.resultadoLiquidacion.actualizarGastosInscripcion === 'function') {
+          global.resultadoLiquidacion.actualizarGastosInscripcion();
+        }
+      }
+      
+      // 6. Recalcular todo
       if (global.logicaDesp?.scheduleFullRecalc) {
         global.logicaDesp.scheduleFullRecalc(0);
       }
       
-      // 6. Limpiar mapeo temporal
+      // 7. Limpiar mapeo temporal
       delete global.__tempMapeoDesplazamientos;
       
       console.log('[serializacionDatos] Datos restaurados y recalculados correctamente');
