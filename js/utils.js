@@ -64,25 +64,32 @@
       // Eliminar símbolos de moneda y unidades
       s = s.replace(/[€$£¥]/g, '').replace(/km/gi, '').replace(/\s/g, '');
       
-      // Determinar formato según posición de separadores
+      // Determinar formato según presencia y posición de separadores
+      const hasComma = s.includes(',');
+      const hasDot = s.includes('.');
       const lastComma = s.lastIndexOf(',');
       const lastDot = s.lastIndexOf('.');
       
-      if (lastComma > lastDot) {
-        // Formato europeo: 1.234,56 → quitar puntos, coma a punto
-        s = s.replace(/\./g, '').replace(',', '.');
-      } else if (lastDot > lastComma) {
-        // Formato anglosajón: 1,234.56 → quitar comas
-        s = s.replace(/,/g, '');
-      } else if (lastComma !== -1) {
-        // Solo coma: 123,45 → coma a punto
+      if (hasComma && hasDot) {
+        // Hay ambos separadores
+        if (lastComma > lastDot) {
+          // Formato europeo: 1.234,56 → quitar puntos, coma a punto
+          s = s.replace(/\./g, '').replace(',', '.');
+        } else {
+          // Formato anglosajón: 1,234.56 → quitar comas
+          s = s.replace(/,/g, '');
+        }
+      } else if (hasComma) {
+        // Solo coma: 123,45 → coma a punto (decimal europeo)
         s = s.replace(',', '.');
-      } else if (lastDot !== -1) {
-        // Solo punto: verificar si es miles o decimal
-        // Patrón europeo: puntos seguidos de exactamente 3 dígitos
+      } else if (hasDot) {
+        // Solo punto: verificar si es miles europeo o decimal
+        // Patrón europeo: punto(s) seguido(s) de exactamente 3 dígitos cada uno
         if (/\.\d{3}(?!\d)/.test(s)) {
+          // Es separador de miles europeo (ej: 1.500 o 1.234.567)
           s = s.replace(/\./g, '');
         }
+        // Si no cumple el patrón, asumimos que es decimal (ej: 1.5)
       }
       
       // Limpiar caracteres no numéricos excepto punto decimal y signo negativo

@@ -500,13 +500,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Km
+    // Km (solo números enteros, sin decimales)
     if (el.classList.contains('format-km')) {
       applyWithCaret(el, (valKm) => {
-        let s = (valKm || '').replace(/\./g, ',').replace(/[^0-9,]/g, '');
-        const parts = s.split(',');
-        if (parts.length > 2) s = parts[0] + ',' + parts.slice(1).join('');
-        return s;
+        // Solo permitir dígitos (km es siempre entero)
+        return (valKm || '').replace(/[^0-9]/g, '');
       });
       return;
     }
@@ -551,17 +549,16 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Km blur
+    // Km blur (formatear con separador de miles)
     if (el.classList && el.classList.contains('format-km')) {
       const raw = (el.value || '').toString();
       if (!raw) { el.value = ''; return; }
-      // Eliminar separadores de miles (puntos) y convertir coma decimal a punto
-      let cleaned = raw.replace(/[^0-9,]/g, '').replace(/,/g, '.');
+      // Solo dígitos
+      const cleaned = raw.replace(/[^0-9]/g, '');
       if (!cleaned) { el.value = ''; return; }
-      const num = parseFloat(cleaned);
+      const num = parseInt(cleaned, 10);
       if (isNaN(num)) { el.value = ''; return; }
-      const rounded = Math.round(num);
-      el.value = Number(rounded).toLocaleString('de-DE') + ' km';
+      el.value = num.toLocaleString('de-DE') + ' km';
       return;
     }
 

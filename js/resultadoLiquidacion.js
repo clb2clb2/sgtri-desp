@@ -368,25 +368,39 @@
 
     // Total de la liquidación (incluye gastos inscripción y honorarios)
     // El descuento de tipo TOT se aplica al total final, incluyendo honorarios
-    let totalLiquidacion = round2(
+    let totalAntesFinanciacion = round2(
       netoManutencion + netoAlojamiento + netoKilometraje + netoOtrosGastos +
       gastosInscripcion + honorarios - descuentosAgrupados.TOT
     );
-    totalLiquidacion = Math.max(0, totalLiquidacion);
+    totalAntesFinanciacion = Math.max(0, totalAntesFinanciacion);
 
-    // Aplicar financiación máxima si está establecida
-    if (financiacionMaxima > 0 && totalLiquidacion > financiacionMaxima) {
+    // Calcular descuento por financiación máxima
+    let descuentoFinanciacionMaxima = 0;
+    let totalLiquidacion = totalAntesFinanciacion;
+    if (financiacionMaxima > 0 && totalAntesFinanciacion > financiacionMaxima) {
+      descuentoFinanciacionMaxima = totalAntesFinanciacion - financiacionMaxima;
       totalLiquidacion = financiacionMaxima;
     }
 
-    // IRPF: el de los desplazamientos YA tiene restado el descuento de congreso
-    // Pero debemos restar otros descuentos de manutención que el usuario haya introducido
-    // (solo los de tipo MNT que afecten a manutención)
-    const descuentoManutencionAjustes = descuentosAgrupados.MNT;
-    const irpfAjustado = Math.max(0, totales.irpfSujeto - descuentoManutencionAjustes);
+    // === CÁLCULO DEL IRPF ===
+    // Descuentos que afectan SOLO al IRPF de desplazamientos (manutención):
+    // - Descuento por comidas de congreso
+    // - Descuentos de manutención del usuario (tipo MNT)
+    const descuentosManut = descuentoCongreso + descuentosAgrupados.MNT;
     
-    // Sumar honorarios al IRPF (siempre sujetos a retención)
-    const irpfTotal = round2(irpfAjustado + honorarios);
+    // Descuentos que afectan al IRPF TOTAL (desplazamientos + honorarios):
+    // - Descuentos del total (tipo TOT)
+    // - Descuento por financiación máxima
+    const descuentosTotales = descuentosAgrupados.TOT + descuentoFinanciacionMaxima;
+    
+    // IRPF de desplazamientos (restando descuentos de manutención)
+    const irpfDesplazamientos = Math.max(0, totales.irpfSujeto - descuentosManut);
+    
+    // IRPF total antes de descuentos TOT (desplazamientos + honorarios)
+    const irpfAntesDescTot = irpfDesplazamientos + honorarios;
+    
+    // IRPF final (restando descuentos TOT y financiación máxima)
+    const irpfTotal = round2(Math.max(0, irpfAntesDescTot - descuentosTotales));
 
     return {
       totales,
@@ -394,6 +408,7 @@
       descuentosAjustes,
       descuentosAgrupados,
       financiacionMaxima,
+      descuentoFinanciacionMaxima,
       honorarios,
       gastosInscripcion,
       netos: {
@@ -674,6 +689,7 @@
     actualizarHonorarios,
     actualizarGastosInscripcion,
     actualizarDescuentoCongreso,
+    actualizarDescuentosAjustes,
     
     // Renderizado
     renderResultado,

@@ -1,128 +1,218 @@
 // js/logicaDesp.js
 // Lógica UI y validaciones para fichas de desplazamiento
 // Funciones expuestas en window.logicaDesp
+//
+// MODELO SIMPLIFICADO:
+// - Campos de texto (fechas, horas, km, alojamiento): recálculo en BLUR (después del formateo)
+// - Selects, checkboxes: recálculo inmediato en CHANGE
+// - Sin debounce ni timers complejos
 
 (function (global) {
   'use strict';
 
-  // Timers para debounce global y por-id
-  const perIdTimers = Object.create(null);
-  let fullTimer = null;
+  // =========================================================================
+  // RECÁLCULO DIRECTO (SIN DEBOUNCE)
+  // =========================================================================
 
-  // Schedule per-id with debounce
-  function scheduleRecalcForId(id, ms = 120) {
+  /**
+   * Ejecuta el recálculo para una ficha específica.
+   * Se llama directamente, sin timers ni debounce.
+   */
+  function recalcularFicha(id) {
+    if (!id) return;
     try {
-      if (!id) return;
-      if (perIdTimers[id]) clearTimeout(perIdTimers[id]);
-      perIdTimers[id] = setTimeout(() => { try { handleFichaChange(id); } catch (e) {} ; delete perIdTimers[id]; }, ms);
-    } catch (e) {}
+      handleFichaChange(id);
+    } catch (e) {
+      console.error('Error en recalcularFicha:', e);
+    }
   }
 
-  // Schedule full recalculation (debounced). Calls scheduleRecalcForId for each ficha.
-  function scheduleFullRecalc(ms = 120) {
+  /**
+   * Recalcula todas las fichas.
+   * Útil después de restaurar datos o cambios globales.
+   */
+  function recalcularTodas() {
     try {
-      if (fullTimer) clearTimeout(fullTimer);
-      fullTimer = setTimeout(() => {
-        try {
-          const groups = document.querySelectorAll('.desplazamiento-grupo');
-          groups.forEach(g => {
-            const id = g && g.dataset && g.dataset.desplazamientoId ? g.dataset.desplazamientoId : null;
-            if (id) scheduleRecalcForId(id, 20);
-          });
-        } catch (e) {}
-      }, ms);
-    } catch (e) {}
+      const groups = document.querySelectorAll('.desplazamiento-grupo');
+      groups.forEach(g => {
+        const id = g?.dataset?.desplazamientoId;
+        if (id) recalcularFicha(id);
+      });
+    } catch (e) {
+      console.error('Error en recalcularTodas:', e);
+    }
   }
+
+  // Mantener compatibilidad con código existente que usa scheduleFullRecalc
+  function scheduleFullRecalc(ms = 0) {
+    if (ms > 0) {
+      setTimeout(recalcularTodas, ms);
+    } else {
+      recalcularTodas();
+    }
+  }
+
+  function scheduleRecalcForId(id, ms = 0) {
+    if (ms > 0) {
+      setTimeout(() => recalcularFicha(id), ms);
+    } else {
+      recalcularFicha(id);
+    }
+  }
+
+  // =========================================================================
+  // INICIALIZACIÓN Y LISTENERS
+  // =========================================================================
+
   function init() {
-    // Inicialización: wiring de listeners delegados para fichas de desplazamiento.
-    // Este init actúa por delegación y usa debounce por-id para evitar recálculos innecesarios.
     try {
       const container = document.getElementById('desplazamientos-container');
       if (!container) return;
 
-      // use shared scheduleRecalcForId defined in outer scope
-
-      // Delegación: manejar blur en fechas/horas y change en selects/checkboxes
-      container.addEventListener('blur', (e) => {
+      // -----------------------------------------------------------------
+      // BLUR: Para campos de texto (fechas, horas, km, alojamiento)
+      // Usamos focusout que SÍ burbuja (a diferencia de blur)
+      // -----------------------------------------------------------------
+      container.addEventListener('focusout', (e) => {
         const el = e.target;
-        if (!el) return;
-        // Campos que disparan recálculo en blur
-        if (el.classList && (el.classList.contains('input-fecha') || el.classList.contains('input-hora') || el.classList.contains('format-km') || el.classList.contains('format-alojamiento') )) {
-          const m = (el.id || '').match(/-(\d+)$/);
-          const id = m ? m[1] : (el.closest && el.closest('.desplazamiento-grupo') && el.closest('.desplazamiento-grupo').dataset && el.closest('.desplazamiento-grupo').dataset.desplazamientoId);
-          if (id) scheduleRecalcForId(id);
-        }
-      }, true);
+        if (!el?.classList) return;
 
+        // Solo procesar campos que disparan recálculo
+        const isRecalcField = el.classList.contains('input-fecha') ||
+                              el.classList.contains('input-hora') ||
+                              el.classList.contains('format-km') ||
+                              el.classList.contains('format-alojamiento') ||
+                              el.classList.contains('otros-gasto-importe');
+
+        if (!isRecalcField) return;
+
+        // Obtener ID del desplazamiento
+        const id = getDesplazamientoId(el);
+        if (!id) return;
+
+        // Ejecutar recálculo en el siguiente tick del event loop
+        // Esto garantiza que el formateo de formLogic.js ya haya terminado
+        setTimeout(() => recalcularFicha(id), 0);
+      });
+
+      // -----------------------------------------------------------------
+      // CHANGE: Para selects y checkboxes (inmediato)
+      // -----------------------------------------------------------------
       container.addEventListener('change', (e) => {
         const el = e.target;
         if (!el) return;
-        // selects, checkboxes, botones otros gastos
-        const grp = el.closest && el.closest('.desplazamiento-grupo');
-        const id = grp && grp.dataset && grp.dataset.desplazamientoId ? grp.dataset.desplazamientoId : null;
-        if (id) scheduleRecalcForId(id);
+
+        // Obtener ID del desplazamiento
+        const id = getDesplazamientoId(el);
+        if (!id) return;
+
+        // Recálculo inmediato
+        recalcularFicha(id);
       });
 
-      // clicks para añadir/eliminar 'otros gastos' ya manejados por formLogic, pero
-      // por si hay eliminación por delegación, escuchamos clicks y recalc
+      // -----------------------------------------------------------------
+      // CLICK: Para botones de añadir/eliminar otros gastos
+      // -----------------------------------------------------------------
       container.addEventListener('click', (e) => {
-        const add = e.target.closest && e.target.closest('.btn-otros-gastos');
-        const remove = e.target.closest && e.target.closest('.btn-remove-otros-gasto');
-        const grp = e.target.closest && e.target.closest('.desplazamiento-grupo');
-        const id = grp && grp.dataset && grp.dataset.desplazamientoId ? grp.dataset.desplazamientoId : null;
-        if ((add || remove) && id) scheduleRecalcForId(id);
+        const addBtn = e.target.closest?.('.btn-otros-gastos');
+        const removeBtn = e.target.closest?.('.btn-remove-otros-gasto');
+
+        if (!addBtn && !removeBtn) return;
+
+        const id = getDesplazamientoId(e.target);
+        if (!id) return;
+
+        // Pequeño delay para que el DOM se actualice
+        setTimeout(() => recalcularFicha(id), 10);
       });
 
-    } catch (e) { console.error('logicaDesp.init error', e); }
+    } catch (e) {
+      console.error('logicaDesp.init error:', e);
+    }
   }
 
-  // Handle a ficha change: validate UI elements, then call cálculo and render
+  /**
+   * Obtiene el ID del desplazamiento a partir de un elemento.
+   */
+  function getDesplazamientoId(el) {
+    // Intentar extraer del ID del elemento (ej: "km-1" → "1")
+    const match = el.id?.match(/-(\d+)$/);
+    if (match) return match[1];
+
+    // Fallback: buscar en el contenedor padre
+    const grupo = el.closest?.('.desplazamiento-grupo');
+    return grupo?.dataset?.desplazamientoId || null;
+  }
+
+  // =========================================================================
+  // MANEJO DE CAMBIOS EN FICHA
+  // =========================================================================
+
+  /**
+   * Procesa un cambio en una ficha: valida UI y dispara el cálculo.
+   */
   function handleFichaChange(id) {
     try {
       const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
       if (!desp) return;
-      // show/hide fronteras based on country
+
+      // Mostrar/ocultar campos de fronteras según país
       const paisSel = desp.querySelector(`#pais-destino-${id}`);
       const fronteras = document.getElementById(`fronteras-fields-${id}`);
       const isIntl = paisSel && isInternationalCountry(paisSel.value);
       if (fronteras) fronteras.style.display = isIntl ? 'block' : 'none';
 
-      // show/hide ticket-cena according to tipoProyecto and hour
-      const tipoProj = (document.getElementById('tipoProyecto') || {}).value;
+      // Mostrar/ocultar ticket-cena según tipo de proyecto y hora
+      const tipoProj = document.getElementById('tipoProyecto')?.value || '';
       const horaRegEl = desp.querySelector(`#hora-regreso-${id}`);
-      const horaReg = horaRegEl ? horaRegEl.value : '';
+      const horaReg = horaRegEl?.value || '';
       const ticketField = desp.querySelector(`#ticket-cena-field-${id}`);
-      if (ticketField) ticketField.style.display = shouldShowTicketCena(tipoProj, horaReg) ? 'block' : 'none';
+      if (ticketField) {
+        ticketField.style.display = shouldShowTicketCena(tipoProj, horaReg) ? 'block' : 'none';
+      }
 
-      // show/hide justificar-pernocta placeholder: the renderer will create the checkbox
-      // but we control whether the inputs are valid and set dataset.dtInvalid
+      // Validar orden de fechas
       const fechaIdEl = desp.querySelector(`#fecha-ida-${id}`);
       const fechaRegEl = desp.querySelector(`#fecha-regreso-${id}`);
       const horaIdEl = desp.querySelector(`#hora-ida-${id}`);
       const horaRegE = desp.querySelector(`#hora-regreso-${id}`);
-      const fechaOk = validateFechaOrden(fechaIdEl && fechaIdEl.value, horaIdEl && horaIdEl.value, fechaRegEl && fechaRegEl.value, horaRegE && horaRegE.value);
+      
+      const fechaOk = validateFechaOrden(
+        fechaIdEl?.value, 
+        horaIdEl?.value, 
+        fechaRegEl?.value, 
+        horaRegE?.value
+      );
+      
       if (!fechaOk) {
-        // mark invalid dataset so calculaDesplazamiento can force manut=0 / aloj=0
         desp.dataset.dtInvalid = '1';
       } else {
-        if (desp && desp.dataset && desp.dataset.dtInvalid) delete desp.dataset.dtInvalid;
+        delete desp.dataset.dtInvalid;
       }
 
-      // Validate cruces too and update UI state accordingly
-      try { validateCrucesForFicha(id); } catch (e) { /* ignore */ }
+      // Validar cruces de fronteras
+      try { 
+        validateCrucesForFicha(id); 
+      } catch (e) { /* ignore */ }
 
-      // Call calculoDesp; the calculator is responsible for invoking the renderer.
+      // Ejecutar cálculo y renderizado
       try {
-        if (global.calculoDesp && typeof global.calculoDesp.calculaDesplazamientoFicha === 'function') {
-          // calculaDesplazamientoFicha will call salidaDesp.renderSalida internally
+        if (global.calculoDesp?.calculaDesplazamientoFicha) {
           global.calculoDesp.calculaDesplazamientoFicha(desp);
         }
-      } catch (e) { /* ignore calculation/render errors */ }
-    } catch (e) { console.error('handleFichaChange error', e); }
+      } catch (e) { 
+        console.warn('Error en cálculo de desplazamiento:', e);
+      }
+      
+    } catch (e) { 
+      console.error('handleFichaChange error:', e); 
+    }
   }
 
-  // Validate cruces (ida/vuelta) for a ficha - SOLO actualiza UI visual (clases CSS)
-  // NO marca dtInvalid - eso se deja al motor de cálculo (cogeDatosDesp + calculoDesp)
+  // =========================================================================
+  // VALIDACIÓN DE CRUCES DE FRONTERAS
+  // =========================================================================
+
   function validateCrucesForFicha(id) {
     try {
       const desp = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
@@ -131,41 +221,26 @@
       const cruceIdEl = desp.querySelector(`#cruce-ida-${id}`);
       const cruceVueltaEl = desp.querySelector(`#cruce-vuelta-${id}`);
       const paisEl = desp.querySelector(`#pais-destino-${id}`);
-      const isInternational = paisEl && paisEl.value && String(paisEl.value).trim() !== '' && String(paisEl.value).trim() !== 'España';
+      const isIntl = paisEl && isInternationalCountry(paisEl.value);
 
-      // Si no es internacional o no hay elementos de cruce, limpiar errores visuales y salir
-      if (!isInternational || !cruceIdEl || !cruceVueltaEl) {
-        if (cruceIdEl) cruceIdEl.classList.remove('field-error');
-        if (cruceVueltaEl) cruceVueltaEl.classList.remove('field-error');
+      // Si no es internacional, limpiar errores y salir
+      if (!isIntl || !cruceIdEl || !cruceVueltaEl) {
+        cruceIdEl?.classList.remove('field-error');
+        cruceVueltaEl?.classList.remove('field-error');
         return true;
-      }
-
-      // parse strict dd/mm/aa using simple parse function
-      function parseDateStrict(v) {
-        try {
-          if (!v) return null;
-          const parts = String(v).split('/');
-          if (parts.length !== 3) return null;
-          const d = parseInt(parts[0], 10);
-          const m = parseInt(parts[1], 10) - 1;
-          const y = 2000 + parseInt(parts[2], 10);
-          const dt = new Date(y, m, d);
-          if (isNaN(dt.getTime())) return null;
-          return dt;
-        } catch (e) { return null; }
       }
 
       const fechaIdEl = desp.querySelector(`#fecha-ida-${id}`);
       const fechaRegEl = desp.querySelector(`#fecha-regreso-${id}`);
-      const fId = parseDateStrict(fechaIdEl && fechaIdEl.value);
-      const fReg = parseDateStrict(fechaRegEl && fechaRegEl.value);
+      
+      const fId = parseDateStrict(fechaIdEl?.value);
+      const fReg = parseDateStrict(fechaRegEl?.value);
       const cId = parseDateStrict(cruceIdEl.value);
       const cV = parseDateStrict(cruceVueltaEl.value);
 
-      // Validar formato y orden
       let hasError = false;
 
-      // Formato incorrecto (valor introducido pero no parseable)
+      // Formato incorrecto
       if ((cruceIdEl.value && !cId) || (cruceVueltaEl.value && !cV)) {
         hasError = true;
       }
@@ -185,45 +260,59 @@
         cruceIdEl.classList.remove('field-error');
         cruceVueltaEl.classList.remove('field-error');
       }
-      return true;
-    } catch (e) { return true; }
+      
+      return !hasError;
+    } catch (e) { 
+      return true; 
+    }
+  }
+
+  // =========================================================================
+  // UTILIDADES
+  // =========================================================================
+
+  function parseDateStrict(v) {
+    if (!v) return null;
+    const parts = String(v).split('/');
+    if (parts.length !== 3) return null;
+    const d = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const y = 2000 + parseInt(parts[2], 10);
+    const dt = new Date(y, m, d);
+    return isNaN(dt.getTime()) ? null : dt;
   }
 
   function shouldShowTicketCena(tipoProyecto, horaRegreso) {
-    // tipoProyecto: string, horaRegreso: 'hh:mm' or ''
     try {
-      const esRD462 = ["G24", "PEI", "NAL"].includes(tipoProyecto);
-      if (!esRD462) return false;
-      if (!horaRegreso) return false;
+      const esRD462 = ['G24', 'PEI', 'NAL'].includes(tipoProyecto);
+      if (!esRD462 || !horaRegreso) return false;
       const m = horaRegreso.match(/^(\d{1,2}):(\d{2})$/);
       if (!m) return false;
       const hh = parseInt(m[1], 10);
       return hh >= 22 && hh < 24;
-    } catch (e) { return false; }
+    } catch (e) { 
+      return false; 
+    }
   }
 
   function shouldShowJustificarPernocta(horaRegreso) {
-    // Mostrar justificante si hora de regreso entre 01:00 y 06:59 (inclusive 01:00)
     try {
       if (!horaRegreso) return false;
       const m = horaRegreso.match(/^(\d{1,2}):(\d{2})$/);
       if (!m) return false;
       const hh = parseInt(m[1], 10);
       return hh >= 1 && hh < 7;
-    } catch (e) { return false; }
+    } catch (e) { 
+      return false; 
+    }
   }
 
   function isInternationalCountry(pais) {
-    try { return pais && String(pais).trim() !== '' && String(pais).trim() !== 'España'; } catch (e) { return false; }
+    return pais && String(pais).trim() !== '' && String(pais).trim() !== 'España';
   }
 
   function validateFechaOrden(fechaIda, horaIda, fechaReg, horaReg) {
-    // Valida que la fecha/hora de regreso sea posterior a la de ida.
-    // Devuelve:
-    //   true  - si los datos son válidos O si aún no hay suficientes datos para validar
-    //   false - SOLO si ambas fechas están presentes pero el orden es incorrecto
     try {
-      // parse dd/mm/aa
       function parse(d, h) {
         if (!d) return null;
         const parts = String(d).split('/');
@@ -234,31 +323,40 @@
         if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
         const date = new Date(year, month, day);
         if (h && /^(\d{1,2}):(\d{2})$/.test(h)) {
-          const hh = parseInt(h.split(':')[0], 10);
-          const mm = parseInt(h.split(':')[1], 10);
+          const [hh, mm] = h.split(':').map(n => parseInt(n, 10));
           date.setHours(hh, mm, 0, 0);
         }
         return date;
       }
+      
       const s = parse(fechaIda, horaIda);
       const e = parse(fechaReg, horaReg);
       
-      // Si faltan datos, no podemos validar el orden → asumimos OK (no marcar error)
+      // Si faltan datos, no podemos validar → asumimos OK
       if (!s || !e) return true;
       
-      // Si ambos existen, verificar orden: regreso debe ser posterior a ida
+      // Regreso debe ser posterior a ida
       return e > s;
-    } catch (e) { return true; }
+    } catch (e) { 
+      return true; 
+    }
   }
 
-  // Expose API
+  // =========================================================================
+  // API PÚBLICA
+  // =========================================================================
+
   global.logicaDesp = {
     init,
+    recalcularFicha,
+    recalcularTodas,
     shouldShowTicketCena,
     shouldShowJustificarPernocta,
     isInternationalCountry,
     validateFechaOrden,
+    // Mantener compatibilidad con código existente
     scheduleFullRecalc,
     scheduleRecalcForId
   };
+
 })(typeof window !== 'undefined' ? window : this);
