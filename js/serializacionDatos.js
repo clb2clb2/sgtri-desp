@@ -254,8 +254,20 @@
       desplazamientos: recopilarDesplazamientos(),
       vehiculo: recopilarVehiculo(),
       evento: recopilarEvento(),
-      honorarios: recopilarHonorarios()
+      honorarios: recopilarHonorarios(),
+      imputacion: recopilarImputacion()
     };
+  }
+
+  /**
+   * Recopila las líneas de imputación
+   * @returns {Array} Array de líneas de imputación
+   */
+  function recopilarImputacion() {
+    if (global.uiImputacion && typeof global.uiImputacion.obtenerLineas === 'function') {
+      return global.uiImputacion.obtenerLineas();
+    }
+    return [];
   }
 
   // =========================================================================
@@ -648,7 +660,14 @@
         global.logicaDesp.scheduleFullRecalc(0);
       }
       
-      // 7. Limpiar mapeo temporal
+      // 7. Restaurar imputación (después de recalcular para tener el total correcto)
+      setTimeout(() => {
+        if (global.uiImputacion && typeof global.uiImputacion.restaurarLineas === 'function') {
+          global.uiImputacion.restaurarLineas(datos.imputacion);
+        }
+      }, 100);
+      
+      // 8. Limpiar mapeo temporal
       delete global.__tempMapeoDesplazamientos;
       
       console.log('[serializacionDatos] Datos restaurados y recalculados correctamente');

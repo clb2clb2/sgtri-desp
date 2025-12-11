@@ -157,6 +157,15 @@ document.addEventListener("DOMContentLoaded", () => {
         console.warn('Error al inicializar resultadoLiquidacion:', e);
     }
 
+    // Inicializar uiImputacion
+    try {
+        if (window.uiImputacion?.init) {
+            window.uiImputacion.init();
+        }
+    } catch (e) {
+        console.warn('Error al inicializar uiImputacion:', e);
+    }
+
     // Ejecutar cálculo inicial por cada desplazamiento
     try {
         const grupos = document.querySelectorAll('.desplazamiento-grupo');

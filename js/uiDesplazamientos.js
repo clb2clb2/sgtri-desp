@@ -31,6 +31,45 @@
   let onPaisChanged = null;
 
   // =========================================================================
+  // LÍMITES CONFIGURABLES
+  // =========================================================================
+
+  /**
+   * Obtiene los límites desde datos.json
+   */
+  function getLimites() {
+    const datos = global.__sgtriDatos || {};
+    return datos.limites || {
+      maxDesplazamientos: 6,
+      maxOtrosGastosPorDesplazamiento: 10
+    };
+  }
+
+  /**
+   * Actualiza la visibilidad del botón de añadir desplazamiento según el límite.
+   */
+  function actualizarBotonAddDesplazamiento() {
+    if (!btnAddDesplazamiento || !desplazamientosContainer) return;
+    const limites = getLimites();
+    const count = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo').length;
+    btnAddDesplazamiento.style.display = count >= limites.maxDesplazamientos ? 'none' : '';
+  }
+
+  /**
+   * Actualiza la visibilidad del botón de añadir otros gastos en un desplazamiento.
+   * @param {HTMLElement} grupo - El elemento del desplazamiento
+   */
+  function actualizarBotonOtrosGastos(grupo) {
+    if (!grupo) return;
+    const limites = getLimites();
+    const container = grupo.querySelector('.otros-gastos-container');
+    const btn = grupo.querySelector('.btn-otros-gastos');
+    if (!container || !btn) return;
+    const count = container.querySelectorAll('.otros-gasto-line').length;
+    btn.style.display = count >= limites.maxOtrosGastosPorDesplazamiento ? 'none' : '';
+  }
+
+  // =========================================================================
   // FICHA DE VEHÍCULO
   // =========================================================================
 
@@ -345,6 +384,11 @@
     });
 
     cont.appendChild(linea);
+    
+    // Actualizar visibilidad del botón añadir otros gastos
+    const grupo = despEl.closest('.desplazamiento-grupo') || despEl;
+    actualizarBotonOtrosGastos(grupo);
+    
     return linea;
   }
 
@@ -498,6 +542,7 @@
     }
 
     actualizarNumerosDesplazamientos();
+    actualizarBotonAddDesplazamiento();
 
     // Adjuntar listeners de cálculo
     attachCalcListenersToDesplazamiento(desplazamientoCounter);
@@ -613,6 +658,7 @@
     const onTransitionEnd = () => {
       grupo.remove();
       actualizarNumerosDesplazamientos();
+      actualizarBotonAddDesplazamiento();
 
       // Callback externo
       if (typeof onDesplazamientoDeleted === 'function') {
@@ -839,8 +885,12 @@
       const targetRemove = e.target.closest && e.target.closest('.btn-remove-otros-gasto');
       if (targetRemove) {
         const linea = targetRemove.closest('.otros-gasto-line');
+        const grupo = targetRemove.closest('.desplazamiento-grupo');
         if (linea && linea.parentNode) {
           linea.parentNode.removeChild(linea);
+        }
+        if (grupo) {
+          actualizarBotonOtrosGastos(grupo);
         }
         return;
       }
@@ -882,6 +932,10 @@
     actualizarNumerosDesplazamientos,
     eliminarDesplazamiento,
     crearLineaOtroGasto,
+
+    // Límites
+    actualizarBotonAddDesplazamiento,
+    actualizarBotonOtrosGastos,
 
     // Vehículo
     crearFichaVehiculo,
