@@ -22,20 +22,21 @@
   <script src="js/limpiaDatos.js" defer></script>
   <script src="js/confirmDialog.js" defer></script>
   <script src="js/validaciones.js" defer></script>
-  
+
   <!-- Scripts: Módulos de UI -->
   <script src="js/uiPagos.js" defer></script>
   <script src="js/uiDesplazamientos.js" defer></script>
   <script src="js/uiAjustes.js" defer></script>
+  <script src="js/uiImputacion.js" defer></script>
   <script src="js/serializacionDatos.js" defer></script>
-  
+
   <!-- Scripts: Motor de cálculo y lógica -->
   <script src="js/cogeDatosDesp.js" defer></script>
   <script src="js/calculoDesp.js" defer></script>
   <script src="js/logicaDesp.js" defer></script>
   <script src="js/salidaDesp.js" defer></script>
   <script src="js/resultadoLiquidacion.js" defer></script>
-  
+
   <!-- Scripts: Orquestadores principales -->
   <script src="js/main.js" defer></script>
   <script src="js/formLogic.js" defer></script>
@@ -43,8 +44,7 @@
 
 <body>
   <!-- SVG sprite: símbolos reutilizables (ocultos visualmente, disponibles via <use>) -->
-  <svg aria-hidden="true" focusable="false" class="svg-sprite-hidden"
-    xmlns="http://www.w3.org/2000/svg">
+  <svg aria-hidden="true" focusable="false" class="svg-sprite-hidden" xmlns="http://www.w3.org/2000/svg">
     <symbol id="icon-caret" viewBox="0 0 7 3">
       <path d="M3.4662 2.1802l1.9746-2.176h1.3576L3.6496 3.4228h-.3894L.1152.0042h1.3576L3.4662 2.1802z"></path>
     </symbol>
@@ -130,39 +130,40 @@
       <div class="section-content-wrapper">
         <div class="section-content">
           <form id="form-proyecto">
-              <label for="tipoProyecto">Tipo de proyecto:</label>
-              <select id="tipoProyecto" name="tipoProyecto"></select>
+            <label for="tipoProyecto">Tipo de proyecto:</label>
+            <select id="tipoProyecto" name="tipoProyecto"></select>
 
-              <!-- Texto informativo -->
-              <p id="infoDecreto" class="info-normativa">
-                Los cálculos se efectuarán en base al Decreto 42/2005 (Junta de Extremadura).
-                <a href="https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o"
-                  target="_blank" rel="noopener noreferrer">
-                  Ver Decreto
-                </a>
-              </p>
+            <!-- Texto informativo -->
+            <p id="infoDecreto" class="info-normativa">
+              Los cálculos se efectuarán en base al Decreto 42/2005 (Junta de Extremadura).
+              <a href="https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o" target="_blank"
+                rel="noopener noreferrer">
+                Ver Decreto
+              </a>
+            </p>
 
-              <!-- Campos del proyecto -->
+            <!-- Campos del proyecto -->
+            <div class="form-group">
+              <label for="responsable">Responsable:</label>
+              <input type="text" id="responsable" name="responsable" maxlength="70" required />
+            </div>
+            <div class="form-row two-cols-50-50">
               <div class="form-group">
-                <label for="responsable">Responsable:</label>
-                <input type="text" id="responsable" name="responsable" maxlength="70" required />
+                <label for="organica">Orgánica:
+                  <span class="warn-wrapper organica-warn" tabindex="0" aria-label="Aviso de orgánica"
+                    style="display: none;">
+                    <span class="warn-icon" aria-hidden="true">⚠️</span>
+                    <span class="warn-tooltip">Atención, esa orgánica no parece correcta.</span>
+                  </span>
+                </label>
+                <input type="text" id="organica" name="organica" pattern="^18(\.[A-Za-z0-9]{2}){1,6}$" maxlength="21"
+                  value="18." required />
               </div>
-              <div class="form-row two-cols-50-50">
-                <div class="form-group">
-                  <label for="organica">Orgánica:
-                    <span class="warn-wrapper organica-warn" tabindex="0" aria-label="Aviso de orgánica" style="display: none;">
-                      <span class="warn-icon" aria-hidden="true">⚠️</span>
-                      <span class="warn-tooltip">Atención, esa orgánica no parece correcta.</span>
-                    </span>
-                  </label>
-                  <input type="text" id="organica" name="organica"
-                    pattern="^18(\.[A-Za-z0-9]{2}){1,4}$" maxlength="14" value="18." required />
-                </div>
-                <div class="form-group">
-                  <label for="referencia">Referencia del proyecto:</label>
-                  <input type="text" id="referencia" name="referencia" maxlength="50" required />
-                </div>
+              <div class="form-group">
+                <label for="referencia">Referencia del proyecto:</label>
+                <input type="text" id="referencia" name="referencia" maxlength="50" required />
               </div>
+            </div>
           </form>
         </div>
       </div>
@@ -246,10 +247,11 @@
                     </div>
                     <div class="form-group">
                       <label for="cruce-vuelta-1">Cruce de fronteras vuelta</label>
-                      <input type="text" class="input-fecha" id="cruce-vuelta-1" name="cruce-vuelta-1" placeholder="dd/mm/aa" />
+                      <input type="text" class="input-fecha" id="cruce-vuelta-1" name="cruce-vuelta-1"
+                        placeholder="dd/mm/aa" />
                     </div>
-                    </div>
-                    </div>
+                  </div>
+                </div>
 
                 <div class="form-group">
                   <label for="motivo-1">Motivo del desplazamiento:</label>
@@ -263,8 +265,8 @@
                   </div>
                   <div class="form-group">
                     <label for="alojamiento-1">Alojamiento (€):</label>
-                    <input type="text" id="alojamiento-1" name="alojamiento-1" class="format-alojamiento"
-                      maxlength="12" placeholder="0,00 €" />
+                    <input type="text" id="alojamiento-1" name="alojamiento-1" class="format-alojamiento" maxlength="12"
+                      placeholder="0,00 €" />
                   </div>
                 </div>
 
@@ -272,7 +274,8 @@
                 <div class="otros-gastos-wrapper">
                   <div class="otros-gastos-row">
                     <div class="otros-gastos-left">
-                      <label for="no-manutencion-1" class="no-manut-label"><input type="checkbox" id="no-manutencion-1" class="no-manutencion"> No incluir gastos de manutención:</label>
+                      <label for="no-manutencion-1" class="no-manut-label"><input type="checkbox" id="no-manutencion-1"
+                          class="no-manutencion"> No incluir gastos de manutención:</label>
                     </div>
                     <div class="otros-gastos-right">
                       <button type="button" class="btn-otros-gastos">
@@ -281,7 +284,8 @@
                       </button>
                       <span class="warn-wrapper" tabindex="0" aria-label="Información sobre otros gastos">
                         <span class="warn-icon" aria-hidden="true">ℹ️</span>
-                        <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto que financia esta liquidación</span>
+                        <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto
+                          que financia esta liquidación</span>
                       </span>
                     </div>
                   </div>
@@ -289,7 +293,8 @@
                   <div class="otros-gastos-container" id="otros-gastos-1"></div>
                 </div>
 
-                <button type="button" class="btn-eliminar-desplazamiento" style="display: none;" aria-label="Eliminar desplazamiento 1">
+                <button type="button" class="btn-eliminar-desplazamiento" style="display: none;"
+                  aria-label="Eliminar desplazamiento 1">
                   <span class="btn-icon btn-icon-minus" aria-hidden="true">−</span>
                   Eliminar
                 </button>
@@ -379,7 +384,8 @@
             </div>
             <!-- Mensaje de descuento calculado (se muestra sólo si hay importe > 0) -->
             <div id="descuento-manut-message" class="conditional-row" style="display:none; margin-top: 0.6rem;">
-              <label>Se descontarán <span id="descuento-manut-amount">0,00 €</span> al importe final de manutención.</label>
+              <label>Se descontarán <span id="descuento-manut-amount">0,00 €</span> al importe final de
+                manutención.</label>
             </div>
             <input type="hidden" id="descuento-manut-congreso" name="descuento-manut-congreso" value="0.00" />
           </form>
@@ -428,8 +434,7 @@
             <div class="form-row full-width">
               <div class="form-group">
                 <label for="honorarios-concepto">En concepto de:</label>
-                <textarea id="honorarios-concepto" name="honorarios-concepto" 
-                          rows="3" maxlength="255"></textarea>
+                <textarea id="honorarios-concepto" name="honorarios-concepto" rows="3" maxlength="255"></textarea>
               </div>
             </div>
           </form>
@@ -454,8 +459,8 @@
             <div class="ajustes-row">
               <div class="form-group">
                 <label for="financiacion-maxima">Financiación máxima concedida:</label>
-                <input type="text" id="financiacion-maxima" name="financiacion-maxima" 
-                       class="format-alojamiento" maxlength="12" placeholder="0,00 €" />
+                <input type="text" id="financiacion-maxima" name="financiacion-maxima" class="format-alojamiento"
+                  maxlength="12" placeholder="0,00 €" />
               </div>
               <div class="ajustes-btn-wrapper">
                 <button type="button" class="btn-otros-descuentos" id="btn-add-descuento">
@@ -481,6 +486,14 @@
         <div class="section-content">
           <div id="resultado-liquidacion-container">
             <!-- El resultado se renderiza dinámicamente aquí -->
+          </div>
+          <div id="imputacion-section">
+            <div class="imputacion-header">
+              <h3 class="desplazamiento-titulo imputacion-titulo">Imputación:</h3>
+            </div>
+            <div id="imputacion-container">
+              <!-- Las líneas de imputación se renderizan dinámicamente aquí -->
+            </div>
           </div>
         </div>
       </div>

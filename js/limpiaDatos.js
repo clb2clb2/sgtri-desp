@@ -78,11 +78,11 @@
    */
   function formatOrganica(value) {
     try {
-      const only = String(value || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toUpperCase();
+      const only = String(value || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 14).toUpperCase();
       const parts = only.match(/.{1,2}/g) || [];
       return parts.join('.');
     } catch (err) {
-      return String(value || '').slice(0, 14).toUpperCase();
+      return String(value || '').slice(0, 21).toUpperCase();
     }
   }
 

@@ -567,6 +567,11 @@
     lines.push(lineaIrpf(datos.irpfTotal));
 
     container.innerHTML = lines.join('\n');
+
+    // Actualizar sección de imputación
+    if (global.uiImputacion && typeof global.uiImputacion.actualizar === 'function') {
+      global.uiImputacion.actualizar();
+    }
   }
 
   /**

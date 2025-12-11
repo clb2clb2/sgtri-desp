@@ -16,6 +16,30 @@
   let descuentoCounter = 0;
 
   // =========================================================================
+  // LÍMITES CONFIGURABLES
+  // =========================================================================
+
+  /**
+   * Obtiene los límites desde datos.json
+   */
+  function getLimites() {
+    const datos = global.__sgtriDatos || {};
+    return datos.limites || { maxOtrosDescuentos: 5 };
+  }
+
+  /**
+   * Actualiza la visibilidad del botón de añadir descuentos según el límite.
+   */
+  function actualizarBotonAddDescuento() {
+    const container = document.getElementById('otros-descuentos-container');
+    const btn = document.getElementById('btn-add-descuento');
+    if (!container || !btn) return;
+    const limites = getLimites();
+    const count = container.querySelectorAll('.descuento-line').length;
+    btn.style.display = count >= limites.maxOtrosDescuentos ? 'none' : '';
+  }
+
+  // =========================================================================
   // FUNCIONES PRIVADAS
   // =========================================================================
 
@@ -102,6 +126,7 @@
     // Evento eliminar
     btnRemove.addEventListener('click', () => {
       linea.remove();
+      actualizarBotonAddDescuento();
       // Actualizar registro de descuentos y recalcular el resultado
       if (window.resultadoLiquidacion) {
         if (window.resultadoLiquidacion.actualizarDescuentosAjustes) {
@@ -135,6 +160,7 @@
 
     const linea = crearLineaDescuento();
     container.appendChild(linea);
+    actualizarBotonAddDescuento();
   }
 
   /**
