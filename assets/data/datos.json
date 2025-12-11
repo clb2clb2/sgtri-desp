@@ -1,5 +1,11 @@
 {
   "versionEsquema": "25.1.0",
+  "limites": {
+    "maxDesplazamientos": 8,
+    "maxOtrosGastosPorDesplazamiento": 10,
+    "maxOtrosDescuentos": 5,
+    "maxLineasImputacion": 4
+  },
   "categorias": [
     ["Investigador/a principal", "IP"],
     ["Director/a del convenio/contrato", "DC"],

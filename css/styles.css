@@ -327,7 +327,7 @@ input.num-spinner::-webkit-inner-spin-button {
   align-items: start;
 }
 
-.form-row > .form-group {
+.form-row>.form-group {
   min-width: 0;
 }
 
@@ -348,7 +348,7 @@ input.num-spinner::-webkit-inner-spin-button {
   grid-template-columns: 1fr minmax(0, 12rem) minmax(0, 12rem);
 }
 
-.form-row.two-cols-50-25 > .form-group {
+.form-row.two-cols-50-25>.form-group {
   min-width: 0;
   overflow: visible;
 }
@@ -362,7 +362,7 @@ input.num-spinner::-webkit-inner-spin-button {
   gap: var(--gap-md);
 }
 
-.form-row.three-cols-25-50-25 > .form-group {
+.form-row.three-cols-25-50-25>.form-group {
   min-width: 0;
   overflow: visible;
 }
@@ -392,6 +392,7 @@ input.num-spinner::-webkit-inner-spin-button {
 /* Específico para Otros gastos */
 .otros-gastos-container .form-row.three-cols-25-50-25 {
   grid-template-columns: 28% 45% minmax(0, 12rem);
+  animation: fadeIn 0.2s ease;
 }
 
 /* Responsive */
@@ -447,7 +448,11 @@ input.num-spinner::-webkit-inner-spin-button {
 .btn-action-primary:active,
 .btn-otros-gastos:active,
 .btn-otros-descuentos:active,
-.btn-add-desplazamiento:active {
+.btn-add-desplazamiento:active,
+.btn-remove-descuento:active,
+.btn-add-imputacion:active,
+.btn-remove-imputacion:active,
+.btn-remove-otros-gasto:active {
   transform: translateY(1px);
   box-shadow: 0 1px 2px -2px #777;
 }
@@ -459,6 +464,7 @@ input.num-spinner::-webkit-inner-spin-button {
   padding-top: 9px;
   padding-bottom: 6px;
   margin-bottom: 0.5rem;
+  margin-top: 0.8rem;
 }
 
 /* Botón de peligro (eliminar) */
@@ -494,10 +500,12 @@ input.num-spinner::-webkit-inner-spin-button {
   fill: white;
 }
 
-/* Botón eliminar pequeño (líneas dinámicas) */
+/* Botón eliminar/añadir pequeño (líneas dinámicas) */
 .btn-remove,
 .btn-remove-otros-gasto,
-.btn-remove-descuento {
+.btn-remove-descuento,
+.btn-remove-imputacion,
+.btn-add-imputacion {
   background-color: var(--color-danger-light);
   padding: 0 10px;
   border: 1px solid var(--color-danger);
@@ -509,24 +517,47 @@ input.num-spinner::-webkit-inner-spin-button {
   font-size: 0.8rem;
   width: 2rem;
   height: 2rem;
+  flex-shrink: 0;
   transition: background-color var(--transition-normal);
+  box-shadow: var(--shadow-card);
 }
 
 .btn-remove:hover,
 .btn-remove-otros-gasto:hover,
-.btn-remove-descuento:hover {
+.btn-remove-descuento:hover,
+.btn-remove-imputacion:hover {
   background-color: var(--color-danger-hover);
 }
 
 .btn-remove .btn-icon,
 .btn-remove-otros-gasto .btn-icon,
-.btn-remove-descuento .btn-icon {
+.btn-remove-descuento .btn-icon,
+.btn-remove-imputacion .btn-icon {
   color: var(--color-danger);
   font-size: 1.4rem;
   font-weight: 200;
   margin-right: 0;
   line-height: 1;
   transform: rotate(45deg);
+}
+
+/* Botón añadir pequeño (variante primaria) */
+.btn-add-imputacion {
+  background-color: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.btn-add-imputacion:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-add-imputacion .btn-icon {
+  color: var(--color-primary);
+  font-size: 1.4rem;
+  font-weight: 200;
+  margin-right: 0;
+  line-height: 1;
+  transform: none;
 }
 
 /* Iconos de botón */
@@ -581,6 +612,10 @@ input.num-spinner::-webkit-inner-spin-button {
   box-shadow: var(--shadow-card);
   transition: opacity var(--transition-smooth), transform var(--transition-smooth),
     height var(--transition-smooth), margin var(--transition-smooth), padding var(--transition-smooth);
+}
+
+.desplazamiento-grupo:last-of-type {
+    margin-bottom: 0.3rem;
 }
 
 .desplazamiento-grupo.entry {
@@ -1085,7 +1120,6 @@ input.num-spinner::-webkit-inner-spin-button {
   display: inline-flex;
   align-items: center;
   position: relative;
-  margin-right: 0.45rem;
   overflow: visible;
   z-index: 0;
 }
@@ -1106,17 +1140,17 @@ input.num-spinner::-webkit-inner-spin-button {
   left: 50%;
   bottom: calc(100% + 8px);
   transform: translateX(calc(-50% - 25%)) translateY(0);
-  background: linear-gradient(135deg, 
-    rgba(76, 76, 76, 1) 0%, 
-    rgba(89, 89, 89, 1) 12%, 
-    rgba(102, 102, 102, 1) 25%, 
-    rgba(71, 71, 71, 1) 39%, 
-    rgba(44, 44, 44, 1) 50%, 
-    rgba(0, 0, 0, 1) 51%, 
-    rgba(17, 17, 17, 1) 60%, 
-    rgba(43, 43, 43, 1) 76%, 
-    rgba(28, 28, 28, 1) 91%, 
-    rgba(19, 19, 19, 1) 100%);
+  background: linear-gradient(135deg,
+      rgba(76, 76, 76, 1) 0%,
+      rgba(89, 89, 89, 1) 12%,
+      rgba(102, 102, 102, 1) 25%,
+      rgba(71, 71, 71, 1) 39%,
+      rgba(44, 44, 44, 1) 50%,
+      rgba(0, 0, 0, 1) 51%,
+      rgba(17, 17, 17, 1) 60%,
+      rgba(43, 43, 43, 1) 76%,
+      rgba(28, 28, 28, 1) 91%,
+      rgba(19, 19, 19, 1) 100%);
   color: #fff;
   padding: 8px 14px;
   border-radius: var(--border-radius);
@@ -1291,9 +1325,19 @@ input.num-spinner::-webkit-inner-spin-button {
    19. ANIMACIONES
    ============================================ */
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4px);
+  }
+
+  75% {
+    transform: translateX(4px);
+  }
 }
 
 @keyframes fadeIn {
@@ -1301,10 +1345,29 @@ input.num-spinner::-webkit-inner-spin-button {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* Animación de salida para líneas dinámicas */
+.line-exit {
+  animation: fadeOut 0.15s ease forwards;
+  pointer-events: none;
 }
 
 /* Animación de entrada para bloques dinámicos */
@@ -1323,4 +1386,104 @@ input.num-spinner::-webkit-inner-spin-button {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   overflow: hidden;
+}
+
+/* ============================================
+   SECCIÓN IMPUTACIÓN
+   ============================================ */
+#imputacion-section {
+  margin-top: 1rem;
+  background-color: #dbdbdb;
+  padding: 0.5rem 1rem 1rem 1rem;
+  border-radius: var(--border-radius);
+  margin-bottom: .3rem;
+  border: 1px solid var(--color-border);
+}
+
+.imputacion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.imputacion-titulo {
+  margin: 0;
+  padding: 0;
+}
+
+#imputacion-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Anchos de imputación: orgánica y responsable iguales en todas las líneas */
+.imputacion-linea {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.imputacion-linea:not(.readonly) {
+  animation: fadeIn 0.2s ease;
+}
+
+.imputacion-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.imputacion-campo-importe {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.imputacion-campo-importe .imputacion-importe {
+  flex: 1;
+}
+
+.imputacion-linea input[readonly] {
+  background-color: var(--color-bg-light);
+  border-color: #bbb;
+  cursor: default;
+}
+
+.imputacion-linea .imputacion-organica {
+  font-family: var(--font-family-mono);
+}
+
+.imputacion-linea .imputacion-responsable {
+  min-width: 0;
+}
+
+.imputacion-linea .imputacion-importe {
+  text-align: right;
+  font-family: var(--font-family-mono);
+}
+
+/* Wrapper para tooltip del botón añadir imputación */
+.btn-add-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.imputacion-tooltip {
+  left: 50%;
+  min-width: 30ch;
+  max-width: min(35rem, calc(100vw - 3rem));
+}
+
+.imputacion-tooltip::after {
+  left: 50%;
+}
+
+.btn-add-wrapper:hover .imputacion-tooltip,
+.btn-add-wrapper:focus-within .imputacion-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-6px);
+  pointer-events: auto;
 }

@@ -587,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Orgánica blur: validar formato (2-5 pares de 2 caracteres separados por puntos, empezando por "18.")
+    // Orgánica blur: validar formato (2-7 pares de 2 caracteres separados por puntos, empezando por "18.")
     if (el.id === 'organica') {
       const warnWrapper = document.querySelector('.organica-warn');
       const val = (el.value || '').trim();
@@ -597,8 +597,8 @@ document.addEventListener('DOMContentLoaded', () => {
         el.classList.remove('field-error');
         return;
       }
-      // Regex: 2 a 5 pares de exactamente 2 caracteres alfanuméricos separados por puntos
-      const regexOrganica = /^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){1,4}$/;
+      // Regex: 2 a 7 pares de exactamente 2 caracteres alfanuméricos separados por puntos
+      const regexOrganica = /^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){1,6}$/;
       const esValida = val.startsWith('18.') && regexOrganica.test(val);
       if (warnWrapper) {
         warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
