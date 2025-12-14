@@ -695,6 +695,7 @@
     actualizarGastosInscripcion,
     actualizarDescuentoCongreso,
     actualizarDescuentosAjustes,
+    actualizarFinanciacionMaxima,
     
     // Renderizado
     renderResultado,

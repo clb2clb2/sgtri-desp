@@ -240,6 +240,38 @@
   }
 
   /**
+   * Recopila los datos de ajustes de liquidación
+   * @returns {Object}
+   */
+  function recopilarAjustes() {
+    const ajustes = {
+      financiacionMaxima: obtenerValorCampo('financiacion-maxima'),
+      descuentos: []
+    };
+
+    // Recopilar líneas de descuentos
+    const container = document.getElementById('otros-descuentos-container');
+    if (container) {
+      const lineas = container.querySelectorAll('.descuento-line');
+      lineas.forEach(linea => {
+        const selectTipo = linea.querySelector('.descuento-tipo');
+        const inputMotivo = linea.querySelector('.descuento-motivo');
+        const inputImporte = linea.querySelector('.descuento-importe');
+
+        if (selectTipo || inputMotivo || inputImporte) {
+          ajustes.descuentos.push({
+            tipo: selectTipo?.value || '',
+            motivo: inputMotivo?.value || '',
+            importe: inputImporte?.value || ''
+          });
+        }
+      });
+    }
+
+    return ajustes;
+  }
+
+  /**
    * Recopila todos los datos del formulario
    * @returns {Object} Objeto con todos los datos serializados
    */
@@ -255,7 +287,8 @@
       vehiculo: recopilarVehiculo(),
       evento: recopilarEvento(),
       honorarios: recopilarHonorarios(),
-      imputacion: recopilarImputacion()
+      imputacion: recopilarImputacion(),
+      ajustes: recopilarAjustes()
     };
   }
 
@@ -523,6 +556,58 @@
   }
 
   /**
+   * Restaura los datos de ajustes de liquidación
+   * @param {Object} datos
+   */
+  function restaurarAjustes(datos) {
+    if (!datos) return;
+
+    // Restaurar financiación máxima
+    establecerValorCampo('financiacion-maxima', datos.financiacionMaxima);
+
+    // Restaurar líneas de descuentos
+    if (datos.descuentos && Array.isArray(datos.descuentos) && datos.descuentos.length > 0) {
+      const container = document.getElementById('otros-descuentos-container');
+      if (container && global.uiAjustes) {
+        // Limpiar líneas existentes
+        container.innerHTML = '';
+
+        datos.descuentos.forEach(descuento => {
+          const linea = global.uiAjustes.crearLineaDescuento();
+          container.appendChild(linea);
+
+          // Establecer valores
+          const selectTipo = linea.querySelector('.descuento-tipo');
+          const inputMotivo = linea.querySelector('.descuento-motivo');
+          const inputImporte = linea.querySelector('.descuento-importe');
+
+          if (selectTipo) selectTipo.value = descuento.tipo || '';
+          if (inputMotivo) inputMotivo.value = descuento.motivo || '';
+          if (inputImporte) inputImporte.value = descuento.importe || '';
+        });
+
+        // Actualizar visibilidad del botón según límites
+        if (global.uiAjustes.actualizarBotonAddDescuento) {
+          global.uiAjustes.actualizarBotonAddDescuento();
+        }
+      }
+    }
+
+    // Actualizar registro de descuentos y recalcular el resultado
+    if (global.resultadoLiquidacion) {
+      if (global.resultadoLiquidacion.actualizarFinanciacionMaxima) {
+        global.resultadoLiquidacion.actualizarFinanciacionMaxima();
+      }
+      if (global.resultadoLiquidacion.actualizarDescuentosAjustes) {
+        global.resultadoLiquidacion.actualizarDescuentosAjustes();
+      }
+      if (global.resultadoLiquidacion.renderResultado) {
+        global.resultadoLiquidacion.renderResultado();
+      }
+    }
+  }
+
+  /**
    * Verifica si una sección tiene contenido
    * @param {string} sectionId - Identificador de la sección
    * @param {Object} datos - Datos cargados
@@ -538,8 +623,8 @@
       return h && (h.importe || h.concepto);
     }
     if (sectionId === 'ajustes') {
-      // TODO: si hay ajustes/descuentos guardados
-      return false;
+      const a = datos.ajustes;
+      return a && (a.financiacionMaxima || (a.descuentos && a.descuentos.length > 0));
     }
     return false;
   }
@@ -626,6 +711,7 @@
     // Restaurar evento (después de desplazamientos para tener el mapeo)
     restaurarEvento(datos.evento);
     restaurarHonorarios(datos.honorarios);
+    restaurarAjustes(datos.ajustes);
 
     // Tareas post-restauración
     setTimeout(() => {
