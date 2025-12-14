@@ -181,6 +181,7 @@
     init,
     agregarDescuento,
     crearLineaDescuento,
+    actualizarBotonAddDescuento,
     getDescuentoCounter: () => descuentoCounter,
     setDescuentoCounter: (val) => { descuentoCounter = val; }
   };
