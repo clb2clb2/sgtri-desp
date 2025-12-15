@@ -160,9 +160,16 @@
 
   /**
    * Evalúa si algún desplazamiento tiene km > 0 y muestra/oculta la ficha.
+   * También considera si existe el desplazamiento especial.
    */
   function evaluarKmParaMostrarFicha() {
-    const anyKm = Array.from(document.querySelectorAll('.desplazamiento-grupo .format-km')).some(inp => {
+    // Si existe desplazamiento especial, siempre mostrar
+    if (global.uiDesplazamientoEspecial?.existe && global.uiDesplazamientoEspecial.existe()) {
+      mostrarFichaVehiculo();
+      return;
+    }
+
+    const anyKm = Array.from(document.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial) .format-km')).some(inp => {
       const v = (inp.value || '').toString().replace(/[^0-9,\.]/g, '').replace(/\./g, '').replace(/,/g, '.');
       const n = parseFloat(v) || 0;
       return n > 0;
@@ -561,6 +568,7 @@
 
   /**
    * Actualiza la numeración visible de todos los desplazamientos.
+   * El desplazamiento especial no afecta a la numeración de los normales.
    */
   function actualizarNumerosDesplazamientos() {
     if (!desplazamientosContainer) {
@@ -568,46 +576,56 @@
     }
     if (!desplazamientosContainer) return;
 
-    const desplazamientos = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo');
+    const todosDesplazamientos = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo');
+    const desplazamientosNormales = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial)');
+    const hayEspecial = desplazamientosContainer.querySelector('.desplazamiento-especial') !== null;
+    const totalDesplazamientos = todosDesplazamientos.length;
     
-    desplazamientos.forEach((desp, index) => {
+    // Numerar solo los desplazamientos normales (siempre mostrar título)
+    let numeroNormal = 0;
+    desplazamientosNormales.forEach((desp) => {
+      numeroNormal++;
       const titulo = desp.querySelector('.desplazamiento-titulo');
-      if (desplazamientos.length > 1) {
-        if (titulo) {
-          titulo.textContent = `Desplazamiento ${index + 1}`;
-          titulo.style.display = 'block';
-        }
-      } else {
-        if (titulo) titulo.style.display = 'none';
+      if (titulo) {
+        titulo.textContent = `Desplazamiento ${numeroNormal}`;
+        titulo.style.display = 'block';
       }
     });
 
-    // Mostrar/ocultar botones eliminar
-    if (desplazamientos.length > 1) {
-      desplazamientos.forEach((d, idx) => {
+    // Mostrar/ocultar botones eliminar (si hay 2+ desplazamientos totales, incluyendo especial)
+    if (totalDesplazamientos > 1) {
+      let idxNormal = 0;
+      todosDesplazamientos.forEach((d) => {
         const btn = d.querySelector('.btn-eliminar-desplazamiento');
         if (btn) {
           btn.style.display = 'block';
-          btn.setAttribute('aria-label', `Eliminar desplazamiento ${idx + 1}`);
+          if (d.classList.contains('desplazamiento-especial')) {
+            btn.setAttribute('aria-label', 'Eliminar desplazamiento especial');
+          } else {
+            idxNormal++;
+            btn.setAttribute('aria-label', `Eliminar desplazamiento ${idxNormal}`);
+          }
         }
       });
-    } else if (desplazamientos.length === 1) {
-      const btn = desplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
+    } else if (totalDesplazamientos === 1) {
+      const btn = todosDesplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
       if (btn) btn.style.display = 'none';
     }
 
-    // Actualizar select de evento asociado (congresos)
+    // Actualizar select de evento asociado (congresos) - solo desplazamientos normales
     try {
       const eventoSelect = document.getElementById('evento-asociado');
       const eventoContainer = document.getElementById('evento-asociado-container');
       if (eventoSelect && eventoContainer) {
         eventoSelect.innerHTML = '';
-        if (desplazamientos.length > 1) {
+        if (desplazamientosNormales.length > 1) {
           eventoContainer.style.display = '';
-          desplazamientos.forEach((d, idx) => {
+          let idxNormal = 0;
+          desplazamientosNormales.forEach((d) => {
+            idxNormal++;
             const opt = document.createElement('option');
-            opt.value = `desp${idx + 1}`;
-            opt.textContent = `Desplazamiento ${idx + 1}`;
+            opt.value = `desp${idxNormal}`;
+            opt.textContent = `Desplazamiento ${idxNormal}`;
             eventoSelect.appendChild(opt);
           });
           try { eventoSelect.value = 'desp1'; } catch (e) { /* ignore */ }
@@ -837,9 +855,21 @@
 
     if (!desplazamientosContainer) return;
 
-    // Evento para añadir desplazamiento
+    // Evento para añadir desplazamiento (con soporte para Shift+click = especial)
     if (btnAddDesplazamiento) {
-      btnAddDesplazamiento.addEventListener('click', () => {
+      btnAddDesplazamiento.addEventListener('click', (e) => {
+        // Shift+click: crear desplazamiento especial
+        if (e.shiftKey) {
+          if (global.uiDesplazamientoEspecial?.crear) {
+            const especial = global.uiDesplazamientoEspecial.crear();
+            if (especial) {
+              especial.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+          return;
+        }
+
+        // Click normal: crear desplazamiento regular
         const nuevo = crearNuevoDesplazamiento();
         if (nuevo) {
           const firstInput = nuevo.querySelector('input, select');

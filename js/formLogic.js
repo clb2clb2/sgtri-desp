@@ -568,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (raw.trim() === '') { el.value = ''; return; }
       const cleaned = raw.replace(/[^0-9,\.]/g, '').replace(/,/g, '.');
       const num = parseFloat(cleaned || '0');
-      if (isNaN(num)) { el.value = ''; return; }
+      if (isNaN(num) || num === 0) { el.value = ''; return; }
       const parts = num.toFixed(2).split('.');
       parts[0] = Number(parts[0]).toLocaleString('de-DE');
       el.value = parts[0] + ',' + parts[1] + ' €';

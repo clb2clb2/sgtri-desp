@@ -165,7 +165,8 @@
     if (!contenedor) return [];
 
     const desplazamientos = [];
-    const grupos = contenedor.querySelectorAll('.desplazamiento-grupo');
+    // Excluir el desplazamiento especial de la recopilación
+    const grupos = contenedor.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial)');
 
     grupos.forEach(grupo => {
       const id = parseInt(grupo.dataset.desplazamientoId, 10);
@@ -284,12 +285,24 @@
       pago: recopilarPago(),
       proyecto: recopilarProyecto(),
       desplazamientos: recopilarDesplazamientos(),
+      desplazamientoEspecial: recopilarDesplazamientoEspecial(),
       vehiculo: recopilarVehiculo(),
       evento: recopilarEvento(),
       honorarios: recopilarHonorarios(),
       imputacion: recopilarImputacion(),
       ajustes: recopilarAjustes()
     };
+  }
+
+  /**
+   * Recopila los datos del desplazamiento especial
+   * @returns {Object|null}
+   */
+  function recopilarDesplazamientoEspecial() {
+    if (global.uiDesplazamientoEspecial && typeof global.uiDesplazamientoEspecial.recopilarDatos === 'function') {
+      return global.uiDesplazamientoEspecial.recopilarDatos();
+    }
+    return null;
   }
 
   /**
@@ -713,9 +726,14 @@
     restaurarHonorarios(datos.honorarios);
     restaurarAjustes(datos.ajustes);
 
+    // Restaurar desplazamiento especial
+    if (datos.desplazamientoEspecial && global.uiDesplazamientoEspecial?.restaurarDatos) {
+      global.uiDesplazamientoEspecial.restaurarDatos(datos.desplazamientoEspecial);
+    }
+
     // Tareas post-restauración
     setTimeout(() => {
-      // 1. Mostrar ficha de vehículo si hay km
+      // 1. Mostrar ficha de vehículo si hay km (o si hay desplazamiento especial)
       if (global.uiDesplazamientos?.evaluarKmParaMostrarFicha) {
         global.uiDesplazamientos.evaluarKmParaMostrarFicha();
       }
