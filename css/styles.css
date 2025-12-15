@@ -452,7 +452,8 @@ input.num-spinner::-webkit-inner-spin-button {
 .btn-remove-descuento:active,
 .btn-add-imputacion:active,
 .btn-remove-imputacion:active,
-.btn-remove-otros-gasto:active {
+.btn-remove-otros-gasto:active,
+.btn-remove-esp-linea:active {
   transform: translateY(1px);
   box-shadow: 0 1px 2px -2px #777;
 }
@@ -505,7 +506,8 @@ input.num-spinner::-webkit-inner-spin-button {
 .btn-remove-otros-gasto,
 .btn-remove-descuento,
 .btn-remove-imputacion,
-.btn-add-imputacion {
+.btn-add-imputacion,
+.btn-remove-esp-linea {
   background-color: var(--color-danger-light);
   padding: 0 10px;
   border: 1px solid var(--color-danger);
@@ -525,14 +527,16 @@ input.num-spinner::-webkit-inner-spin-button {
 .btn-remove:hover,
 .btn-remove-otros-gasto:hover,
 .btn-remove-descuento:hover,
-.btn-remove-imputacion:hover {
+.btn-remove-imputacion:hover,
+.btn-remove-esp-linea:hover {
   background-color: var(--color-danger-hover);
 }
 
 .btn-remove .btn-icon,
 .btn-remove-otros-gasto .btn-icon,
 .btn-remove-descuento .btn-icon,
-.btn-remove-imputacion .btn-icon {
+.btn-remove-imputacion .btn-icon,
+.btn-remove-esp-linea .btn-icon {
   color: var(--color-danger);
   font-size: 1.4rem;
   font-weight: 200;
@@ -615,7 +619,7 @@ input.num-spinner::-webkit-inner-spin-button {
 }
 
 .desplazamiento-grupo:last-of-type {
-    margin-bottom: 0.3rem;
+  margin-bottom: 0.3rem;
 }
 
 .desplazamiento-grupo.entry {
@@ -1036,7 +1040,16 @@ input.num-spinner::-webkit-inner-spin-button {
   color: var(--color-primary);
   font-style: italic;
   font-weight: 600;
-  margin-bottom: 0.45rem;
+}
+
+.esp-resultado .calc-seg-title {
+  margin: 0.45rem 0;
+}
+
+/* Margen superior en secciones del desplazamiento especial (excepto la primera) */
+.esp-resultado .calc-seg-title:not(:first-child) {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
 }
 
 .calc-result-segment {
@@ -1486,4 +1499,191 @@ input.num-spinner::-webkit-inner-spin-button {
   opacity: 1;
   transform: translateX(-50%) translateY(-6px);
   pointer-events: auto;
+}
+
+/* ============================================
+   23. DESPLAZAMIENTO ESPECIAL
+   ============================================ */
+
+.desplazamiento-especial {
+  border: 1px dashed var(--color-primary-text);
+  background-color: rgba(0, 110, 120, 0.03);
+}
+
+.desplazamiento-especial .esp-titulo {
+  color: var(--color-primary);
+}
+
+.desplazamiento-especial .btn-eliminar-desplazamiento {
+  display: block;
+}
+
+/* Botones añadir línea/sección */
+.esp-botones-wrapper {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: center;
+}
+
+/* margin-bottom solo cuando hay líneas debajo */
+.desplazamiento-especial:has(.esp-lineas-container:not(:empty)) > .esp-botones-wrapper {
+  margin-bottom: 1rem;
+}
+
+/* Campo Retención IRPF */
+.esp-irpf-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  margin-top: .8rem;
+}
+
+.esp-irpf-label {
+  font-size: 0.9rem;
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.esp-irpf-input {
+  max-width: 7rem;
+  text-align: right;
+}
+
+/* Línea IRPF en resultado */
+.calc-irpf {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--color-secondary);
+}
+
+/* Contenedor de líneas */
+.esp-lineas-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Línea base */
+.esp-linea {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Línea de sección (solo descripción) */
+.esp-linea-seccion .esp-desc-seccion {
+  flex: 1;
+  font-weight: 600;
+  font-style: italic;
+  background-color: rgba(0, 110, 120, 0.08);
+}
+
+/* Línea normal */
+.esp-linea-normal .esp-desc {
+  flex: 0 0 50%;
+  min-width: 0;
+}
+
+.esp-num-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.esp-bracket {
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: 1.1em;
+}
+
+.esp-multiply,
+.esp-equals {
+  font-weight: 500;
+  color: var(--color-text-muted);
+  padding: 0 0.2rem;
+}
+
+.esp-importe,
+.esp-total {
+  width: 100px;
+  text-align: right;
+}
+
+.esp-cantidad {
+  width: 60px;
+  text-align: center;
+}
+
+/* Botón eliminar línea */
+/*.btn-remove-esp-linea {
+  background-color: var(--color-danger-light);
+  padding: 0 10px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  height: 32px;
+  min-width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-normal);
+  flex-shrink: 0;
+}
+
+.btn-remove-esp-linea:hover {
+  background-color: var(--color-danger-hover);
+}
+
+.btn-remove-esp-linea:active {
+  transform: translateY(1px);
+}
+
+.btn-remove-esp-linea .btn-icon {
+  color: var(--color-danger);
+  font-weight: 700;
+  font-size: 1.2rem;
+  transform: rotate(45deg);
+}*/
+
+/* Resultado del desplazamiento especial */
+.esp-resultado {
+  margin-top: 1rem;
+}
+
+.esp-resultado:first-child {
+  margin-top: 0;
+}
+
+/*.esp-resultado .esp-calc-formula {
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+  margin-left: 0.5rem;
+}*/
+
+.esp-resultado .calc-total {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .esp-linea-normal {
+    flex-wrap: wrap;
+  }
+
+  .esp-linea-normal .esp-desc {
+    flex: 0 0 100%;
+    margin-bottom: 0.3rem;
+  }
+
+  .esp-num-wrapper {
+    flex: 1;
+  }
 }
