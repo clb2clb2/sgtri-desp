@@ -354,6 +354,11 @@
     const honorarios = getHonorarios();
     const gastosInscripcion = getGastosInscripcion();
 
+    // Obtener datos del desplazamiento especial (si existe)
+    const datosEspecial = global.uiDesplazamientoEspecial?.getDatosParaLiquidacion?.() || null;
+    const totalEspecial = datosEspecial?.total || 0;
+    const irpfEspecial = datosEspecial?.irpf || 0;
+
     // Descuentos por tipo específico (SIN el TOT que se aplica al final)
     const descuentosManutencion = descuentoCongreso + descuentosAgrupados.MNT;
     const descuentosAlojamiento = descuentosAgrupados.ALJ;
@@ -366,11 +371,12 @@
     const netoKilometraje = Math.max(0, totales.kilometraje - descuentosKilometraje);
     const netoOtrosGastos = Math.max(0, totales.otrosGastos - descuentosOtrosGastos);
 
-    // Total de la liquidación (incluye gastos inscripción y honorarios)
+    // Total de la liquidación (incluye gastos inscripción, honorarios y desplazamiento especial)
     // El descuento de tipo TOT se aplica al total final, incluyendo honorarios
+    // El desplazamiento especial NO se ve afectado por descuentos específicos (MNT, ALJ, KLM, OTR)
     let totalAntesFinanciacion = round2(
       netoManutencion + netoAlojamiento + netoKilometraje + netoOtrosGastos +
-      gastosInscripcion + honorarios - descuentosAgrupados.TOT
+      gastosInscripcion + honorarios + totalEspecial - descuentosAgrupados.TOT
     );
     totalAntesFinanciacion = Math.max(0, totalAntesFinanciacion);
 
@@ -388,16 +394,17 @@
     // - Descuentos de manutención del usuario (tipo MNT)
     const descuentosManut = descuentoCongreso + descuentosAgrupados.MNT;
     
-    // Descuentos que afectan al IRPF TOTAL (desplazamientos + honorarios):
+    // Descuentos que afectan al IRPF TOTAL (desplazamientos + honorarios + especial):
     // - Descuentos del total (tipo TOT)
     // - Descuento por financiación máxima
     const descuentosTotales = descuentosAgrupados.TOT + descuentoFinanciacionMaxima;
     
-    // IRPF de desplazamientos (restando descuentos de manutención)
+    // IRPF de desplazamientos normales (restando descuentos de manutención)
     const irpfDesplazamientos = Math.max(0, totales.irpfSujeto - descuentosManut);
     
-    // IRPF total antes de descuentos TOT (desplazamientos + honorarios)
-    const irpfAntesDescTot = irpfDesplazamientos + honorarios;
+    // IRPF total antes de descuentos TOT (desplazamientos + honorarios + especial)
+    // El IRPF del especial NO se ve afectado por descuentos específicos
+    const irpfAntesDescTot = irpfDesplazamientos + honorarios + irpfEspecial;
     
     // IRPF final (restando descuentos TOT y financiación máxima)
     const irpfTotal = round2(Math.max(0, irpfAntesDescTot - descuentosTotales));
@@ -411,6 +418,7 @@
       descuentoFinanciacionMaxima,
       honorarios,
       gastosInscripcion,
+      datosEspecial,
       netos: {
         manutencion: netoManutencion,
         alojamiento: netoAlojamiento,
@@ -491,6 +499,12 @@
     const datos = calcularResultado();
     const lines = [];
 
+    // --- Líneas del desplazamiento especial (al principio, sin total) ---
+    if (datos.datosEspecial && datos.datosEspecial.lineasHtml.length > 0) {
+      lines.push(...datos.datosEspecial.lineasHtml);
+      lines.push(espaciador());
+    }
+
     // --- Totales de desplazamientos (solo si > 0) ---
     if (datos.totales.manutencion > 0) {
       lines.push(lineaConLeader('Total manutención', datos.totales.manutencion));
@@ -555,7 +569,8 @@
                          datos.totales.kilometraje > 0 ||
                          datos.totales.otrosGastos > 0 ||
                          datos.gastosInscripcion > 0 ||
-                         datos.honorarios > 0;
+                         datos.honorarios > 0 ||
+                         (datos.datosEspecial && datos.datosEspecial.total > 0);
 
     if (!hayContenido) {
       container.innerHTML = '<div class="resultado-empty">Complete los datos del formulario para ver el resultado.</div>';
