@@ -196,127 +196,13 @@
           <form id="form-desplazamientos">
             <!-- Contenedor para los desplazamientos -->
             <div id="desplazamientos-container">
-              <!-- Template para un desplazamiento -->
-              <div class="desplazamiento-grupo" data-desplazamiento-id="1">
-                <h3 class="desplazamiento-titulo">Desplazamiento 1</h3>
-
-                <div class="form-row four-cols-25">
-                  <div class="form-group">
-                    <label for="fecha-ida-1">Salida el día:</label>
-                    <input type="text" class="input-fecha" id="fecha-ida-1" name="fecha-ida-1" placeholder="dd/mm/aa"
-                      required />
-                  </div>
-                  <div class="form-group">
-                    <label for="hora-ida-1">a las:</label>
-                    <input type="text" class="input-hora" id="hora-ida-1" name="hora-ida-1" placeholder="hh:mm"
-                      maxlength="5" required />
-                  </div>
-                  <div class="form-group">
-                    <label for="fecha-regreso-1">Regreso el día:</label>
-                    <input type="text" class="input-fecha" id="fecha-regreso-1" name="fecha-regreso-1"
-                      placeholder="dd/mm/aa" required />
-                  </div>
-                  <div class="form-group">
-                    <label for="hora-regreso-1">a las:</label>
-                    <input type="text" class="input-hora" id="hora-regreso-1" name="hora-regreso-1" placeholder="hh:mm"
-                      maxlength="5" required />
-                  </div>
-                </div>
-
-                <!-- Ticket Cena (oculto por defecto, se mostrará según tipo de proyecto) -->
-                <div class="ticket-cena-field conditional-row" id="ticket-cena-field-1" style="display: none;">
-                  <div class="form-group">
-                    <label>
-                      <input type="checkbox" id="ticket-cena-1" name="ticket-cena-1" />
-                      Aporta justificante de pago por la cena del último día.
-                    </label>
-                  </div>
-                </div>
-
-                <div class="form-row three-cols-33">
-                  <div class="form-group">
-                    <label for="origen-1">Origen:</label>
-                    <input type="text" id="origen-1" name="origen-1" class="general-text" maxlength="40" required />
-                  </div>
-                  <div class="form-group">
-                    <label for="destino-1">Destino:</label>
-                    <input type="text" id="destino-1" name="destino-1" class="general-text" maxlength="40" required />
-                  </div>
-                  <div class="form-group">
-                    <label for="pais-destino-1">País de Destino:</label>
-                    <select id="pais-destino-1" name="pais-destino-1" required>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- Campos de cruce de fronteras (ocultos por defecto) -->
-                <div class="fronteras-fields conditional-row" id="fronteras-fields-1" style="display: none;">
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label for="cruce-ida-1">Cruce de fronteras ida</label>
-                      <input type="text" class="input-fecha" id="cruce-ida-1" name="cruce-ida-1"
-                        placeholder="dd/mm/aa" />
-                    </div>
-                    <div class="form-group">
-                      <label for="cruce-vuelta-1">Cruce de fronteras vuelta</label>
-                      <input type="text" class="input-fecha" id="cruce-vuelta-1" name="cruce-vuelta-1"
-                        placeholder="dd/mm/aa" />
-                    </div>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="motivo-1">Motivo del desplazamiento:</label>
-                  <input type="text" id="motivo-1" name="motivo-1" class="general-text" maxlength="90" required />
-                </div>
-
-                <div class="form-row two-cols-50-50">
-                  <div class="form-group">
-                    <label for="km-1">Kilometraje en vehículo particular:</label>
-                    <input type="text" id="km-1" name="km-1" class="format-km" maxlength="12" placeholder="0 km" />
-                  </div>
-                  <div class="form-group">
-                    <label for="alojamiento-1">Alojamiento (€):</label>
-                    <input type="text" id="alojamiento-1" name="alojamiento-1" class="format-alojamiento" maxlength="12"
-                      placeholder="0,00 €" />
-                  </div>
-                </div>
-
-                <!-- Otros gastos: botón y contenedor -->
-                <div class="otros-gastos-wrapper">
-                  <div class="otros-gastos-row">
-                    <div class="otros-gastos-left">
-                      <label for="no-manutencion-1" class="no-manut-label"><input type="checkbox" id="no-manutencion-1"
-                          class="no-manutencion"> No incluir gastos de manutención:</label>
-                    </div>
-                    <div class="otros-gastos-right">
-                      <button type="button" class="btn-otros-gastos">
-                        <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
-                        Otros gastos
-                      </button>
-                      <span class="warn-wrapper" tabindex="0" aria-label="Información sobre otros gastos">
-                        <span class="warn-icon" aria-hidden="true">ℹ️</span>
-                        <span class="warn-tooltip">Recuerde comprobar que el gasto es elegible según el tipo de proyecto
-                          que financia esta liquidación</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div class="otros-gastos-container" id="otros-gastos-1"></div>
-                </div>
-
-                <button type="button" class="btn-eliminar-desplazamiento" style="display: none;"
-                  aria-label="Eliminar desplazamiento 1">
-                  <span class="btn-icon btn-icon-minus" aria-hidden="true">−</span>
-                  Eliminar
-                </button>
-              </div>
+              <!-- Los desplazamientos se añaden dinámicamente -->
             </div>
 
             <!-- Botón para añadir nuevo desplazamiento -->
             <button type="button" id="btn-add-desplazamiento" class="btn-add-desplazamiento">
               <span class="btn-icon btn-icon-add" aria-hidden="true">+</span>
-              Añadir otro desplazamiento
+              Añadir desplazamiento
             </button>
 
             <!-- Ficha para vehículo particular (se muestra dinámicamente si hay km > 0) -->

@@ -464,9 +464,8 @@
         return;
       }
 
-      // Crear desplazamientos adicionales si es necesario
-      // El primero ya existe (id=1), creamos los demás
-      for (let i = 1; i < desplazamientos.length; i++) {
+      // Crear todos los desplazamientos necesarios (ya no hay ninguno por defecto)
+      for (let i = 0; i < desplazamientos.length; i++) {
         if (uiDesp && uiDesp.crearNuevoDesplazamiento) {
           uiDesp.crearNuevoDesplazamiento();
         }
