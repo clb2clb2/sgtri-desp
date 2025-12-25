@@ -441,9 +441,9 @@ document.addEventListener('DOMContentLoaded', () => {
       applyWithCaret(el, (valOrg, selStart) => {
         const v = valOrg || '';
         if (selStart > 0 && v[selStart - 1] === '.') {
-          return v.replace(/[^A-Za-z0-9.]/g, '').toUpperCase().slice(0, 14);
+          return v.replace(/[^A-Za-z0-9.]/g, '').toUpperCase().slice(0, 20);
         }
-        const only = v.replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toUpperCase();
+        const only = v.replace(/[^A-Za-z0-9]/g, '').slice(0, 14).toUpperCase();
         const parts = only.match(/.{1,2}/g) || [];
         return parts.join('.');
       });
@@ -590,9 +590,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Orgánica blur: validar formato (2-7 pares de 2 caracteres separados por puntos, empezando por "18.")
     if (el.id === 'organica') {
       const warnWrapper = document.querySelector('.organica-warn');
-      const val = (el.value || '').trim();
-      // Si está vacío o es solo "18.", no marcar error (el usuario lo completará)
-      if (val === '' || val === '18.') {
+      let val = (el.value || '').trim();
+      // Si está vacío o incompleto, restaurar a "18."
+      if (val === '' || val === '18') {
+        el.value = '18.';
+        val = '18.';
+      }
+      // Si es solo "18.", no marcar error (el usuario lo completará)
+      if (val === '18.') {
         if (warnWrapper) warnWrapper.style.display = 'none';
         el.classList.remove('field-error');
         return;
@@ -604,6 +609,328 @@ document.addEventListener('DOMContentLoaded', () => {
         warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
       }
       if (esValida) {
+        el.classList.remove('field-error');
+      } else {
+        el.classList.add('field-error');
+      }
+      return;
+    }
+
+    // Número de tarjeta blur: validar formato (16-19 dígitos, con Luhn para 16 dígitos)
+    if (el.id === 'numero-tarjeta' || el.classList.contains('card-number')) {
+      const warnWrapper = document.querySelector('.tarjeta-warn');
+      const val = (el.value || '').replace(/\s/g, ''); // Eliminar espacios
+      // Si está vacío, no marcar error
+      if (val === '') {
+        if (warnWrapper) warnWrapper.style.display = 'none';
+        el.classList.remove('field-error');
+        return;
+      }
+      // Validar: solo dígitos y longitud entre 16 y 19
+      let esValida = /^\d{16,19}$/.test(val);
+      // Si tiene exactamente 16 dígitos, aplicar algoritmo de Luhn
+      if (esValida && val.length === 16) {
+        let suma = 0;
+        for (let i = 0; i < 16; i++) {
+          let digito = parseInt(val[i], 10);
+          // Duplicar cada segundo dígito desde la derecha (posiciones impares desde el final)
+          if ((16 - i) % 2 === 0) {
+            digito *= 2;
+            if (digito > 9) digito -= 9;
+          }
+          suma += digito;
+        }
+        esValida = (suma % 10 === 0);
+      }
+      if (warnWrapper) {
+        warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
+      }
+      if (esValida) {
+        el.classList.remove('field-error');
+      } else {
+        el.classList.add('field-error');
+      }
+      return;
+    }
+
+    // IBAN español blur: validar formato (20 dígitos CCC o 24 caracteres IBAN)
+    if (el.id === 'iban' || (el.classList.contains('iban') && el.id !== 'iban-ext')) {
+      const warnWrapper = document.querySelector('.iban-warn');
+      const val = (el.value || '').replace(/\s/g, '').toUpperCase(); // Eliminar espacios
+      // Si está vacío, no marcar error
+      if (val === '') {
+        if (warnWrapper) warnWrapper.style.display = 'none';
+        el.classList.remove('field-error');
+        return;
+      }
+
+      /**
+       * Calcula el dígito de control CCC usando módulo 11.
+       * @param {string} digits - 10 dígitos a validar
+       * @returns {number} Dígito de control (0-10, donde 10 se convierte en 0)
+       */
+      function calcularDigitoControlCCC(digits) {
+        const pesos = [1, 2, 4, 8, 5, 10, 9, 7, 3, 6];
+        let suma = 0;
+        for (let i = 0; i < 10; i++) {
+          suma += parseInt(digits[i], 10) * pesos[i];
+        }
+        const resto = suma % 11;
+        const digito = 11 - resto;
+        return digito === 11 ? 0 : (digito === 10 ? 0 : digito);
+      }
+
+      /**
+       * Valida los dígitos de control del CCC (20 dígitos).
+       * @param {string} ccc - 20 dígitos del CCC
+       * @returns {boolean} true si es válido
+       */
+      function validarCCC(ccc) {
+        if (!/^\d{20}$/.test(ccc)) return false;
+        const entidad = ccc.substring(0, 4);
+        const oficina = ccc.substring(4, 8);
+        const dc1 = parseInt(ccc[8], 10);
+        const dc2 = parseInt(ccc[9], 10);
+        const cuenta = ccc.substring(10, 20);
+
+        // Primer dígito de control: sobre "00" + entidad + oficina
+        const dc1Calc = calcularDigitoControlCCC('00' + entidad + oficina);
+        if (dc1 !== dc1Calc) return false;
+
+        // Segundo dígito de control: sobre número de cuenta
+        const dc2Calc = calcularDigitoControlCCC(cuenta);
+        if (dc2 !== dc2Calc) return false;
+
+        return true;
+      }
+
+      /**
+       * Valida el IBAN español (ES + 2 dígitos + 20 dígitos CCC).
+       * @param {string} iban - 24 caracteres del IBAN
+       * @returns {boolean} true si es válido
+       */
+      function validarIBANEspanol(iban) {
+        if (!/^ES\d{22}$/.test(iban)) return false;
+        const ccc = iban.substring(4, 24);
+        
+        // Primero validar el CCC
+        if (!validarCCC(ccc)) return false;
+
+        // Validar dígitos de control del IBAN (módulo 97)
+        // Mover los 4 primeros caracteres al final y convertir letras a números
+        const reordenado = iban.substring(4) + iban.substring(0, 4);
+        let numerico = '';
+        for (const char of reordenado) {
+          if (/\d/.test(char)) {
+            numerico += char;
+          } else {
+            // A=10, B=11, ..., Z=35
+            numerico += (char.charCodeAt(0) - 55).toString();
+          }
+        }
+        // Calcular módulo 97 (en partes para evitar overflow)
+        let resto = 0;
+        for (let i = 0; i < numerico.length; i++) {
+          resto = (resto * 10 + parseInt(numerico[i], 10)) % 97;
+        }
+        return resto === 1;
+      }
+
+      let esValida = false;
+      if (val.length === 20) {
+        // CCC de 20 dígitos
+        esValida = validarCCC(val);
+      } else if (val.length === 24) {
+        // IBAN español de 24 caracteres
+        esValida = validarIBANEspanol(val);
+      }
+      // Cualquier otra longitud es inválida
+
+      if (warnWrapper) {
+        warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
+      }
+      if (esValida) {
+        el.classList.remove('field-error');
+      } else {
+        el.classList.add('field-error');
+      }
+      return;
+    }
+
+    // IBAN internacional blur: validar formato (módulo 97)
+    if (el.id === 'iban-ext') {
+      const warnWrapper = document.querySelector('.iban-ext-warn');
+      const val = (el.value || '').replace(/\s/g, '').toUpperCase(); // Eliminar espacios
+      // Si está vacío, no marcar error
+      if (val === '') {
+        if (warnWrapper) warnWrapper.style.display = 'none';
+        el.classList.remove('field-error');
+        return;
+      }
+
+      /**
+       * Valida un IBAN internacional usando módulo 97 (ISO 13616).
+       * @param {string} iban - IBAN sin espacios
+       * @returns {boolean} true si es válido
+       */
+      function validarIBANInternacional(iban) {
+        // Mínimo 15 caracteres, máximo 34
+        if (iban.length < 15 || iban.length > 34) return false;
+        // Los dos primeros deben ser letras (código país)
+        if (!/^[A-Z]{2}/.test(iban)) return false;
+        // Los siguientes dos deben ser dígitos (dígitos de control)
+        if (!/^[A-Z]{2}\d{2}/.test(iban)) return false;
+        // El resto debe ser alfanumérico
+        if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) return false;
+
+        // Mover los 4 primeros caracteres al final y convertir letras a números
+        const reordenado = iban.substring(4) + iban.substring(0, 4);
+        let numerico = '';
+        for (const char of reordenado) {
+          if (/\d/.test(char)) {
+            numerico += char;
+          } else {
+            // A=10, B=11, ..., Z=35
+            numerico += (char.charCodeAt(0) - 55).toString();
+          }
+        }
+        // Calcular módulo 97 (en partes para evitar overflow)
+        let resto = 0;
+        for (let i = 0; i < numerico.length; i++) {
+          resto = (resto * 10 + parseInt(numerico[i], 10)) % 97;
+        }
+        return resto === 1;
+      }
+
+      const esValida = validarIBANInternacional(val);
+
+      if (warnWrapper) {
+        warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
+      }
+      if (esValida) {
+        el.classList.remove('field-error');
+      } else {
+        el.classList.add('field-error');
+      }
+      return;
+    }
+
+    // SWIFT/BIC blur: validar formato (8 u 11 caracteres)
+    if (el.id === 'swift' || el.classList.contains('swift')) {
+      const warnWrapper = document.querySelector('.swift-warn');
+      const val = (el.value || '').replace(/\s/g, '').toUpperCase(); // Eliminar espacios
+      // Si está vacío, no marcar error
+      if (val === '') {
+        if (warnWrapper) warnWrapper.style.display = 'none';
+        el.classList.remove('field-error');
+        return;
+      }
+
+      /**
+       * Valida el formato de un código SWIFT/BIC (ISO 9362).
+       * @param {string} swift - Código SWIFT sin espacios
+       * @returns {boolean} true si el formato es válido
+       */
+      function validarSWIFT(swift) {
+        // Debe tener 8 u 11 caracteres
+        if (swift.length !== 8 && swift.length !== 11) return false;
+        // Posiciones 1-4: código del banco (4 letras)
+        if (!/^[A-Z]{4}/.test(swift)) return false;
+        // Posiciones 5-6: código del país (2 letras)
+        if (!/^[A-Z]{4}[A-Z]{2}/.test(swift)) return false;
+        // Posiciones 7-8: código de localización (2 alfanuméricos)
+        if (!/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}/.test(swift)) return false;
+        // Posiciones 9-11 (opcional): código de sucursal (3 alfanuméricos)
+        if (swift.length === 11) {
+          if (!/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}[A-Z0-9]{3}$/.test(swift)) return false;
+        }
+        return true;
+      }
+
+      const esValida = validarSWIFT(val);
+
+      if (warnWrapper) {
+        warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
+      }
+      if (esValida) {
+        el.classList.remove('field-error');
+      } else {
+        el.classList.add('field-error');
+      }
+      return;
+    }
+
+    // DNI español blur: validar formato y letra de control
+    if (el.id === 'dni') {
+      const warnWrapper = document.querySelector('.dni-warn');
+      let val = (el.value || '').trim().toUpperCase();
+      // Si está vacío, no marcar error
+      if (val === '') {
+        if (warnWrapper) warnWrapper.style.display = 'none';
+        el.classList.remove('field-error');
+        return;
+      }
+
+      // Solo validar si empieza por número (DNI español)
+      // Si empieza por letra, es pasaporte u otro documento, no validamos
+      if (!/^\d/.test(val)) {
+        if (warnWrapper) warnWrapper.style.display = 'none';
+        el.classList.remove('field-error');
+        return;
+      }
+
+      /**
+       * Valida un DNI español.
+       * @param {string} dni - DNI introducido
+       * @returns {{valido: boolean, formateado: string}} Resultado de validación y DNI formateado
+       */
+      function validarDNIEspanol(dni) {
+        // Extraer solo dígitos y la letra final
+        const soloDigitos = dni.replace(/[^\d]/g, '');
+        const letras = dni.replace(/[^A-Z]/g, '');
+        
+        // Debe tener al menos 1 dígito y exactamente 1 letra al final
+        if (soloDigitos.length === 0 || soloDigitos.length > 8) {
+          return { valido: false, formateado: dni };
+        }
+        if (letras.length !== 1) {
+          return { valido: false, formateado: dni };
+        }
+        
+        // La letra debe estar al final
+        const letraUsuario = letras[0];
+        const posLetra = dni.lastIndexOf(letraUsuario);
+        const posUltimoDigito = dni.search(/\d[^\d]*$/);
+        if (posLetra < posUltimoDigito) {
+          return { valido: false, formateado: dni };
+        }
+
+        // Completar con ceros a la izquierda hasta 8 dígitos
+        const numeroCompleto = soloDigitos.padStart(8, '0');
+        
+        // Tabla de letras de control
+        const letrasControl = 'TRWAGMYFPDXBNJZSQVHLCKE';
+        const resto = parseInt(numeroCompleto, 10) % 23;
+        const letraCorrecta = letrasControl[resto];
+        
+        const formateado = numeroCompleto + letraCorrecta;
+        return { 
+          valido: letraUsuario === letraCorrecta, 
+          formateado: formateado 
+        };
+      }
+
+      const resultado = validarDNIEspanol(val);
+      
+      // Actualizar el campo con el DNI formateado (con ceros)
+      if (resultado.valido) {
+        el.value = resultado.formateado;
+      }
+
+      if (warnWrapper) {
+        warnWrapper.style.display = resultado.valido ? 'none' : 'inline-flex';
+      }
+      if (resultado.valido) {
         el.classList.remove('field-error');
       } else {
         el.classList.add('field-error');

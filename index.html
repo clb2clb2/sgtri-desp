@@ -87,7 +87,13 @@
                 <input type="text" id="nombre-benef" name="nombre-benef" maxlength="70" required />
               </div>
               <div class="form-group">
-                <label for="dni">DNI / Pasaporte:</label>
+                <label for="dni">DNI / Pasaporte:
+                  <span class="warn-wrapper dni-warn" tabindex="0" aria-label="Aviso de DNI"
+                    style="display: none;">
+                    <span class="warn-icon" aria-hidden="true">⚠️</span>
+                    <span class="warn-tooltip">Atención, ese número no parece un DNI español correcto.</span>
+                  </span>
+                </label>
                 <input type="text" id="dni" name="dni" maxlength="20" required />
               </div>
             </div>
@@ -157,7 +163,7 @@
                     <span class="warn-tooltip">Atención, esa orgánica no parece correcta.</span>
                   </span>
                 </label>
-                <input type="text" id="organica" name="organica" pattern="^18(\.[A-Za-z0-9]{2}){1,6}$" maxlength="21"
+                <input type="text" id="organica" name="organica" pattern="^18(\.[A-Za-z0-9]{2}){1,6}$" maxlength="20"
                   value="18." required />
               </div>
               <div class="form-group">

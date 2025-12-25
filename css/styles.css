@@ -1052,6 +1052,10 @@ input.num-spinner::-webkit-inner-spin-button {
   padding-top: 0.5rem;
 }
 
+.esp-calc-formula {
+    font-style: italic;
+}
+
 .calc-result-segment {
   padding-bottom: 0.6rem;
   margin-bottom: 0.6rem;
@@ -1138,6 +1142,31 @@ input.num-spinner::-webkit-inner-spin-button {
 }
 
 .warn-wrapper.organica-warn {
+  margin-left: 0.35rem;
+  margin-right: 0;
+}
+
+.warn-wrapper.tarjeta-warn {
+  margin-left: 0.35rem;
+  margin-right: 0;
+}
+
+.warn-wrapper.iban-warn {
+  margin-left: 0.35rem;
+  margin-right: 0;
+}
+
+.warn-wrapper.iban-ext-warn {
+  margin-left: 0.35rem;
+  margin-right: 0;
+}
+
+.warn-wrapper.swift-warn {
+  margin-left: 0.35rem;
+  margin-right: 0;
+}
+
+.warn-wrapper.dni-warn {
   margin-left: 0.35rem;
   margin-right: 0;
 }
