@@ -236,7 +236,7 @@
                class="imputacion-organica organica${fieldErrorClass}" 
                value="${escapeHtml(linea.organica)}"
                pattern="^18(\\.[A-Za-z0-9]{2}){1,6}$"
-               maxlength="21"
+               maxlength="20"
                ${readonlyAttr}${tabindexAttr}
                aria-label="Orgánica" />
       </div>
