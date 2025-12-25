@@ -16,12 +16,12 @@
   --color-danger-light: #f3ebeb;
   --color-danger-hover: #e1cdcd;
   --color-error: #c50909;
-  --color-error-shadow: rgba(197, 9, 9, 0.3);
+  --color-error-shadow: rgba(197, 9, 9, 0.5);
   --color-error-dark: #b23a3a;
 
   /* Colores de éxito/enfoque */
   --color-success: #1b7434;
-  --color-success-shadow: rgba(27, 116, 52, 0.3);
+  --color-success-shadow: rgba(27, 116, 52, 0.5);
 
   /* Colores de resultado/cálculo */
   --color-result-bg: #fffcd1;
@@ -148,6 +148,44 @@ body {
 
 .btn-header:active {
   background-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Barra de acciones debajo del header */
+.actions-bar {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+}
+
+.btn-action {
+  background-color: var(--color-success);
+  color: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--border-radius);
+  padding: 0.5rem 1.2rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color var(--transition-normal), transform var(--transition-fast);
+  font-family: var(--font-family-title);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-action:hover {
+  background-color: var(--color-success-dark);
+  transform: translateY(-1px);
+}
+
+.btn-action:active {
+  transform: translateY(0);
+}
+
+.btn-action.btn-comprobar {
+  background-color: #5a9bd5;
+}
+
+.btn-action.btn-comprobar:hover {
+  background-color: #4a8bc5;
 }
 
 /* Contenedor de secciones */
@@ -1316,6 +1354,86 @@ input.num-spinner::-webkit-inner-spin-button {
 
 .btn-confirm-yes:focus,
 .btn-confirm-no:focus {
+  outline: 2px solid var(--color-success-shadow);
+  outline-offset: 2px;
+}
+
+/* Modal de mensaje (alertas) */
+.message-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease-out, visibility 0.18s ease-out;
+}
+
+.message-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.message-dialog {
+  background: #fff;
+  padding: 1.4rem 1.6rem;
+  border-radius: var(--border-radius-lg);
+  min-width: 340px;
+  max-width: 90%;
+  box-shadow: var(--shadow-modal);
+  transform: translateY(8px) scale(0.995);
+  transition: transform 0.18s ease-out;
+  text-align: center;
+}
+
+.message-overlay.visible .message-dialog {
+  transform: translateY(0) scale(1);
+}
+
+.message-dialog.message-error .message-icon {
+  color: #dc3545;
+}
+
+.message-dialog.message-success .message-icon {
+  color: var(--color-success);
+}
+
+.message-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.message-body {
+  margin-bottom: 1.2rem;
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.message-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.btn-message-ok {
+  background: var(--color-success);
+  color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-message-ok:hover {
+  background: var(--color-success-dark);
+}
+
+.btn-message-ok:focus {
   outline: 2px solid var(--color-success-shadow);
   outline-offset: 2px;
 }
