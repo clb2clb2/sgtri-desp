@@ -1051,6 +1051,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return;
     }
+
+    // Handler genérico: quitar field-error si el campo tiene contenido
+    if (el.classList && el.classList.contains('field-error')) {
+      const valor = (el.value || '').trim();
+      if (valor !== '' && valor !== '18.') {
+        el.classList.remove('field-error');
+      }
+    }
   }, true);
 
   // =========================================================================
@@ -1131,6 +1139,250 @@ document.addEventListener('DOMContentLoaded', () => {
   window.formLogic = window.formLogic || {};
   if (ld.parseNumber) {
     window.formLogic.parseNumber = ld.parseNumber;
+  }
+
+  // =========================================================================
+  // MODAL DE MENSAJE
+  // =========================================================================
+
+  /**
+   * Muestra un modal de mensaje con un botón Aceptar.
+   * @param {string} mensaje - Texto a mostrar
+   * @param {boolean} esError - true si es error, false si es éxito
+   * @returns {Promise} Se resuelve cuando se cierra el modal
+   */
+  function mostrarMensaje(mensaje, esError = false) {
+    return new Promise((resolve) => {
+      // Crear overlay si no existe
+      let overlay = document.querySelector('.message-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'message-overlay';
+        overlay.innerHTML = `
+          <div class="message-dialog">
+            <div class="message-icon"></div>
+            <div class="message-body"></div>
+            <div class="message-actions">
+              <button type="button" class="btn-message-ok">Aceptar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+      }
+
+      const dialog = overlay.querySelector('.message-dialog');
+      const iconEl = overlay.querySelector('.message-icon');
+      const bodyEl = overlay.querySelector('.message-body');
+      const btnOk = overlay.querySelector('.btn-message-ok');
+
+      // Configurar contenido
+      dialog.className = 'message-dialog ' + (esError ? 'message-error' : 'message-success');
+      iconEl.textContent = esError ? '⚠️' : '✅';
+      bodyEl.textContent = mensaje;
+
+      // Mostrar
+      overlay.classList.add('visible');
+      btnOk.focus();
+
+      // Handler de cierre
+      const cerrar = () => {
+        overlay.classList.remove('visible');
+        btnOk.removeEventListener('click', cerrar);
+        overlay.removeEventListener('click', cerrarOverlay);
+        document.removeEventListener('keydown', cerrarEsc);
+        resolve();
+      };
+
+      const cerrarOverlay = (e) => {
+        if (e.target === overlay) cerrar();
+      };
+
+      const cerrarEsc = (e) => {
+        if (e.key === 'Escape') cerrar();
+      };
+
+      btnOk.addEventListener('click', cerrar);
+      overlay.addEventListener('click', cerrarOverlay);
+      document.addEventListener('keydown', cerrarEsc);
+    });
+  }
+
+  // =========================================================================
+  // COMPROBACIÓN DE DATOS OBLIGATORIOS
+  // =========================================================================
+
+  /**
+   * Expande una sección si está plegada.
+   * @param {HTMLElement} section - Elemento .form-section
+   */
+  function expandirSeccion(section) {
+    if (!section) return;
+    const toggle = section.querySelector('.toggle-section');
+    const wrapper = section.querySelector('.section-content-wrapper');
+    if (toggle && !toggle.classList.contains('open')) {
+      toggle.classList.add('open');
+      if (wrapper) {
+        wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
+        wrapper.style.opacity = '1';
+      }
+    }
+  }
+
+  /**
+   * Marca un campo como error y expande su sección.
+   * @param {HTMLElement} campo - Elemento input/select/textarea
+   * @returns {boolean} true si se marcó error
+   */
+  function marcarCampoError(campo) {
+    if (!campo) return false;
+    const valor = (campo.value || '').trim();
+    if (valor === '' || valor === '18.') {
+      campo.classList.add('field-error');
+      const seccion = campo.closest('.form-section');
+      if (seccion) expandirSeccion(seccion);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Comprueba todos los datos obligatorios del formulario.
+   */
+  function comprobarDatosObligatorios() {
+    let hayErrores = false;
+
+    // ---- SECCIÓN 1: Datos del beneficiario ----
+    const camposBeneficiario = ['nombre-benef', 'dni', 'entidad', 'categoria', 'tipo-pago'];
+    camposBeneficiario.forEach(id => {
+      const campo = document.getElementById(id);
+      if (marcarCampoError(campo)) hayErrores = true;
+    });
+
+    // Campos de pago según tipo seleccionado
+    const tipoPago = document.getElementById('tipo-pago');
+    if (tipoPago) {
+      const tipo = tipoPago.value;
+      if (tipo === 'CE' || tipo === 'CuentaEsp' || tipo === 'Cuenta Española') {
+        const iban = document.getElementById('iban');
+        if (marcarCampoError(iban)) hayErrores = true;
+      } else if (tipo === 'CI' || tipo === 'CuentaExtranjera' || tipo === 'Cuenta Extranjera') {
+        const ibanExt = document.getElementById('iban-ext');
+        const swift = document.getElementById('swift');
+        if (marcarCampoError(ibanExt)) hayErrores = true;
+        if (marcarCampoError(swift)) hayErrores = true;
+      } else if (tipo === 'TJ' || tipo === 'TarjetaUEx' || tipo === 'Tarjeta UEx') {
+        const tarjeta = document.getElementById('numero-tarjeta');
+        if (marcarCampoError(tarjeta)) hayErrores = true;
+      }
+    }
+
+    // ---- SECCIÓN 2: Datos del proyecto ----
+    const camposProyecto = ['tipoProyecto', 'responsable', 'organica', 'referencia'];
+    camposProyecto.forEach(id => {
+      const campo = document.getElementById(id);
+      if (marcarCampoError(campo)) hayErrores = true;
+    });
+
+    // ---- SECCIÓN 3: Desplazamientos ----
+    const desplazamientosNormales = document.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial)');
+    let hayKilometraje = false;
+
+    desplazamientosNormales.forEach(desp => {
+      const id = desp.getAttribute('data-desplazamiento-id');
+      
+      // Campos obligatorios de cada desplazamiento
+      const camposDesp = [
+        `fecha-ida-${id}`, `hora-ida-${id}`,
+        `fecha-regreso-${id}`, `hora-regreso-${id}`,
+        `origen-${id}`, `destino-${id}`,
+        `pais-destino-${id}`, `motivo-${id}`
+      ];
+      
+      camposDesp.forEach(campoId => {
+        const campo = document.getElementById(campoId);
+        if (marcarCampoError(campo)) hayErrores = true;
+      });
+
+      // Verificar si el país es diferente de España
+      const paisDestino = document.getElementById(`pais-destino-${id}`);
+      if (paisDestino && paisDestino.value && paisDestino.value !== 'España' && paisDestino.value !== 'ES') {
+        const cruceIda = document.getElementById(`cruce-ida-${id}`);
+        const cruceVuelta = document.getElementById(`cruce-vuelta-${id}`);
+        if (marcarCampoError(cruceIda)) hayErrores = true;
+        if (marcarCampoError(cruceVuelta)) hayErrores = true;
+      }
+
+      // Verificar kilometraje
+      const kmField = document.getElementById(`km-${id}`);
+      if (kmField) {
+        const kmVal = (kmField.value || '').replace(/[^0-9]/g, '');
+        if (kmVal && parseInt(kmVal, 10) > 0) {
+          hayKilometraje = true;
+        }
+      }
+    });
+
+    // Si hay kilometraje, los datos del vehículo son obligatorios
+    if (hayKilometraje) {
+      const vehiculoContainer = document.getElementById('vehiculo-particular-container');
+      if (vehiculoContainer && vehiculoContainer.innerHTML.trim() !== '') {
+        const camposVehiculo = ['veh-marca', 'veh-modelo', 'veh-matricula'];
+        camposVehiculo.forEach(id => {
+          const campo = document.getElementById(id);
+          if (marcarCampoError(campo)) hayErrores = true;
+        });
+      }
+    }
+
+    // ---- SECCIÓN 4: Asistencia a congresos ----
+    const eventGastos = document.getElementById('evento-gastos');
+    if (eventGastos) {
+      const gastosVal = (eventGastos.value || '').replace(/[^0-9,\.]/g, '').replace(',', '.');
+      const gastosNum = parseFloat(gastosVal) || 0;
+      if (gastosNum > 0) {
+        const camposCongreso = ['evento-nombre', 'evento-lugar', 'evento-del', 'evento-al'];
+        camposCongreso.forEach(id => {
+          const campo = document.getElementById(id);
+          if (marcarCampoError(campo)) hayErrores = true;
+        });
+      }
+    }
+
+    // ---- SECCIÓN 5: Honorarios ----
+    const honorariosImporte = document.getElementById('honorarios-importe');
+    if (honorariosImporte) {
+      const importeVal = (honorariosImporte.value || '').replace(/[^0-9,\.]/g, '').replace(',', '.');
+      const importeNum = parseFloat(importeVal) || 0;
+      if (importeNum > 0) {
+        const camposHonorarios = ['honorarios-importe', 'honorarios-beneficiario', 'honorarios-situacion', 'honorarios-concepto'];
+        camposHonorarios.forEach(id => {
+          const campo = document.getElementById(id);
+          if (marcarCampoError(campo)) hayErrores = true;
+        });
+      }
+    }
+
+    // ---- SECCIÓN 7: Imputación ----
+    const lineasImputacion = document.querySelectorAll('#imputacion-container .imputacion-linea');
+    lineasImputacion.forEach(linea => {
+      const organicaInput = linea.querySelector('.imputacion-organica');
+      const responsableInput = linea.querySelector('.imputacion-responsable');
+      if (marcarCampoError(organicaInput)) hayErrores = true;
+      if (marcarCampoError(responsableInput)) hayErrores = true;
+    });
+
+    // Mostrar mensaje
+    if (hayErrores) {
+      mostrarMensaje('¡Atención! Hay algunos datos obligatorios sin rellenar. Revise los campos marcados en rojo.', true);
+    } else {
+      mostrarMensaje('Todo parece correcto.', false);
+    }
+  }
+
+  // ---- Botón Comprobar ----
+  const btnComprobar = document.getElementById('btn-comprobar-datos');
+  if (btnComprobar) {
+    btnComprobar.addEventListener('click', comprobarDatosObligatorios);
   }
 
 });
