@@ -10,6 +10,12 @@
   'use strict';
 
   // =========================================================================
+  // DEPENDENCIAS
+  // =========================================================================
+
+  const showConfirm = global.showConfirm || ((msg) => Promise.resolve(confirm(msg)));
+
+  // =========================================================================
   // ESTADO DEL MÓDULO
   // =========================================================================
 
@@ -557,7 +563,10 @@
   /**
    * Elimina el desplazamiento especial.
    */
-  function eliminarDesplazamientoEspecial() {
+  async function eliminarDesplazamientoEspecial() {
+    const confirmed = await showConfirm('¿Eliminar Desplazamiento Especial?');
+    if (!confirmed) return;
+
     const grupo = document.getElementById('desplazamiento-especial');
     if (grupo) {
       grupo.remove();

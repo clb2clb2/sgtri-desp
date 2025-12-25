@@ -864,13 +864,17 @@
 
     // Delegación de eventos
     desplazamientosContainer.addEventListener('click', async (e) => {
-      // Eliminar desplazamiento
+      // Eliminar desplazamiento (excepto el especial, que tiene su propio handler)
       if (e.target.classList.contains('btn-eliminar-desplazamiento') ||
           e.target.closest('.btn-eliminar-desplazamiento')) {
         const btn = e.target.classList.contains('btn-eliminar-desplazamiento')
           ? e.target
           : e.target.closest('.btn-eliminar-desplazamiento');
         const grupo = btn.closest('.desplazamiento-grupo');
+        // El desplazamiento especial tiene su propio handler con confirmación
+        if (grupo && grupo.classList.contains('desplazamiento-especial')) {
+          return;
+        }
         await eliminarDesplazamiento(grupo);
         return;
       }
