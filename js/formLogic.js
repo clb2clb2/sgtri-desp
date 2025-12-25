@@ -334,6 +334,10 @@ document.addEventListener('DOMContentLoaded', () => {
     eventoSel.addEventListener('change', () => {
       computeDescuentoManutencion();
       recalcularTodosDesplazamientos();
+      // Revalidar fechas del evento al cambiar desplazamiento asociado
+      if (typeof validarFechasEvento === 'function') {
+        validarFechasEvento();
+      }
     });
   }
 
@@ -530,6 +534,112 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // =========================================================================
+  // VALIDACIÓN DE FECHAS DE EVENTO (CONGRESO)
+  // =========================================================================
+
+  /**
+   * Valida que las fechas del evento estén dentro del rango del desplazamiento asociado.
+   */
+  function validarFechasEvento() {
+    const warnWrapper = document.querySelector('.evento-fechas-warn');
+    const eventoDelEl = document.getElementById('evento-del');
+    const eventoAlEl = document.getElementById('evento-al');
+    const eventoDel = (eventoDelEl && eventoDelEl.value || '').trim();
+    const eventoAl = (eventoAlEl && eventoAlEl.value || '').trim();
+
+    // Si alguna fecha del evento está vacía, no validar
+    if (eventoDel === '' || eventoAl === '') {
+      if (warnWrapper) warnWrapper.style.display = 'none';
+      if (eventoDelEl) eventoDelEl.classList.remove('field-error');
+      if (eventoAlEl) eventoAlEl.classList.remove('field-error');
+      return;
+    }
+
+    // Obtener todos los desplazamientos normales (no especiales)
+    const desplazamientosNormales = document.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial)');
+    const eventoAsociadoEl = document.getElementById('evento-asociado');
+    let despId = null;
+
+    // Si hay varios desplazamientos y el selector tiene valor, usar el seleccionado
+    if (desplazamientosNormales.length > 1 && eventoAsociadoEl && eventoAsociadoEl.value) {
+      const match = eventoAsociadoEl.value.match(/desp(\d+)/);
+      if (match) {
+        const idxNormal = parseInt(match[1], 10);
+        if (desplazamientosNormales[idxNormal - 1]) {
+          despId = desplazamientosNormales[idxNormal - 1].getAttribute('data-desplazamiento-id');
+        }
+      }
+    }
+
+    // Si solo hay un desplazamiento o no se pudo obtener el ID, usar el primero
+    if (!despId && desplazamientosNormales.length > 0) {
+      despId = desplazamientosNormales[0].getAttribute('data-desplazamiento-id');
+    }
+
+    // Si no hay desplazamientos, no validar
+    if (!despId) {
+      if (warnWrapper) warnWrapper.style.display = 'none';
+      if (eventoDelEl) eventoDelEl.classList.remove('field-error');
+      if (eventoAlEl) eventoAlEl.classList.remove('field-error');
+      return;
+    }
+
+    // Obtener fechas del desplazamiento
+    const fechaIdaEl = document.getElementById(`fecha-ida-${despId}`);
+    const fechaRegresoEl = document.getElementById(`fecha-regreso-${despId}`);
+    const fechaIda = (fechaIdaEl && fechaIdaEl.value || '').trim();
+    const fechaRegreso = (fechaRegresoEl && fechaRegresoEl.value || '').trim();
+
+    // Si las fechas del desplazamiento están vacías, no podemos validar
+    if (fechaIda === '' || fechaRegreso === '') {
+      if (warnWrapper) warnWrapper.style.display = 'none';
+      if (eventoDelEl) eventoDelEl.classList.remove('field-error');
+      if (eventoAlEl) eventoAlEl.classList.remove('field-error');
+      return;
+    }
+
+    // Parsear fechas
+    const parseDateStrict = (ld && ld.parseDateStrict) || ((v) => {
+      const m = (v || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      if (!m) return null;
+      const d = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      let y = parseInt(m[3], 10);
+      if (y < 100) y += 2000;
+      const date = new Date(y, mo, d);
+      if (date.getDate() !== d || date.getMonth() !== mo) return null;
+      return date;
+    });
+
+    const fEventoDel = parseDateStrict(eventoDel);
+    const fEventoAl = parseDateStrict(eventoAl);
+    const fIda = parseDateStrict(fechaIda);
+    const fRegreso = parseDateStrict(fechaRegreso);
+
+    // Si alguna fecha no se pudo parsear, no validar
+    if (!fEventoDel || !fEventoAl || !fIda || !fRegreso) {
+      if (warnWrapper) warnWrapper.style.display = 'none';
+      if (eventoDelEl) eventoDelEl.classList.remove('field-error');
+      if (eventoAlEl) eventoAlEl.classList.remove('field-error');
+      return;
+    }
+
+    // Validar: evento debe empezar >= ida y terminar <= regreso
+    const esValido = fEventoDel >= fIda && fEventoAl <= fRegreso;
+
+    if (warnWrapper) {
+      warnWrapper.style.display = esValido ? 'none' : 'inline-flex';
+    }
+    if (esValido) {
+      if (eventoDelEl) eventoDelEl.classList.remove('field-error');
+      if (eventoAlEl) eventoAlEl.classList.remove('field-error');
+    } else {
+      if (eventoDelEl) eventoDelEl.classList.add('field-error');
+      if (eventoAlEl) eventoAlEl.classList.add('field-error');
+    }
+  }
+
+  // =========================================================================
   // DELEGACIÓN GLOBAL DE EVENTOS DE BLUR
   // =========================================================================
 
@@ -540,6 +650,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fecha blur
     if (el.classList && el.classList.contains('input-fecha')) {
       if (val.handleFechaBlur) val.handleFechaBlur(e);
+      // Después del formateo, validar fechas del evento si corresponde
+      if (el.id === 'evento-del' || el.id === 'evento-al') {
+        validarFechasEvento();
+      }
       return;
     }
 
