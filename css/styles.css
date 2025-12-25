@@ -1171,6 +1171,11 @@ input.num-spinner::-webkit-inner-spin-button {
   margin-right: 0;
 }
 
+.warn-wrapper.evento-fechas-warn {
+  margin-left: 0.35rem;
+  margin-right: 0;
+}
+
 .warn-wrapper .warn-icon {
   margin-left: 0;
 }

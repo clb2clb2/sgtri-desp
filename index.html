@@ -349,7 +349,13 @@
                 <input type="text" id="evento-lugar" name="evento-lugar" class="general-text" maxlength="50" />
               </div>
               <div class="form-group">
-                <label for="evento-del">Del día:</label>
+                <label for="evento-del">Del día:
+                  <span class="warn-wrapper evento-fechas-warn" tabindex="0" aria-label="Aviso de fechas"
+                    style="display: none;">
+                    <span class="warn-icon" aria-hidden="true">⚠️</span>
+                    <span class="warn-tooltip">Atención, las fechas de celebración del evento deben estar comprendidas entre las fechas de salida y regreso del desplazamiento asociado.</span>
+                  </span>
+                </label>
                 <input type="text" id="evento-del" name="evento-del" class="input-fecha" placeholder="dd/mm/aa" />
               </div>
               <div class="form-group">
