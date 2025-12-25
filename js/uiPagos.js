@@ -50,7 +50,13 @@
     if (tipo === 'CE' || tipo === 'Cuenta Española' || tipo === 'CuentaEsp') {
       setLayoutTwoCols();
       mid.innerHTML = `
-        <label for="iban">IBAN:</label>
+        <label for="iban">IBAN:
+          <span class="warn-wrapper iban-warn" tabindex="0" aria-label="Aviso de IBAN"
+            style="display: none;">
+            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-tooltip">Atención, ese número de cuenta no parece correcto.</span>
+          </span>
+        </label>
         <input type="text" id="iban" name="iban" class="iban" />
       `;
       // Configurar maxlength con separadores
@@ -69,7 +75,13 @@
     if (tipo === 'CI' || tipo === 'Cuenta Extranjera' || tipo === 'CuentaExtranjera') {
       setLayoutThreeCols();
       mid.innerHTML = `
-        <label for="iban-ext">IBAN:</label>
+        <label for="iban-ext">IBAN:
+          <span class="warn-wrapper iban-ext-warn" tabindex="0" aria-label="Aviso de IBAN"
+            style="display: none;">
+            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-tooltip">Atención, ese IBAN no parece correcto.</span>
+          </span>
+        </label>
         <input type="text" id="iban-ext" name="iban-ext" class="iban" />
       `;
       // Configurar maxlength para IBAN internacional
@@ -82,7 +94,13 @@
         inp.setAttribute('data-raw-max', String(rawMax));
       }
       right.innerHTML = `
-        <label for="swift">SWIFT/BIC:</label>
+        <label for="swift">SWIFT/BIC:
+          <span class="warn-wrapper swift-warn" tabindex="0" aria-label="Aviso de SWIFT"
+            style="display: none;">
+            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-tooltip">Atención, ese SWIFT/BIC no parece correcto.</span>
+          </span>
+        </label>
         <input type="text" id="swift" name="swift" class="swift" maxlength="11" />
       `;
       return;
@@ -92,7 +110,13 @@
     if (tipo === 'TJ' || tipo === 'Tarjeta UEx' || tipo === 'TarjetaUEx') {
       setLayoutTwoCols();
       mid.innerHTML = `
-        <label for="numero-tarjeta">Número de tarjeta:</label>
+        <label for="numero-tarjeta">Número de tarjeta:
+          <span class="warn-wrapper tarjeta-warn" tabindex="0" aria-label="Aviso de tarjeta"
+            style="display: none;">
+            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-tooltip">Atención, ese número de tarjeta no parece correcto.</span>
+          </span>
+        </label>
         <input type="text" id="numero-tarjeta" name="numero-tarjeta" class="card-number" maxlength="23" />
       `;
       // Aplicar formateo agrupado
@@ -112,7 +136,13 @@
 
     // Fallback: IBAN genérico
     mid.innerHTML = `
-      <label for="iban">IBAN:</label>
+      <label for="iban">IBAN:
+        <span class="warn-wrapper iban-warn" tabindex="0" aria-label="Aviso de IBAN"
+          style="display: none;">
+          <span class="warn-icon" aria-hidden="true">⚠️</span>
+          <span class="warn-tooltip">Atención, ese número de cuenta no parece correcto.</span>
+        </span>
+      </label>
       <input type="text" id="iban" name="iban" class="iban" maxlength="34" data-raw-max="34" />
     `;
   }

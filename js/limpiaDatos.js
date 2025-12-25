@@ -82,7 +82,7 @@
       const parts = only.match(/.{1,2}/g) || [];
       return parts.join('.');
     } catch (err) {
-      return String(value || '').slice(0, 21).toUpperCase();
+      return String(value || '').slice(0, 20).toUpperCase();
     }
   }
 
