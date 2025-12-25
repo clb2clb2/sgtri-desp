@@ -100,17 +100,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
-      // 6️⃣ Países: configurar datos y poblar select inicial
+      // 6️⃣ Países: configurar datos (el select inicial ya no existe, se pobla dinámicamente)
       const paisesData = (data.dietasPorPais && data.dietasPorPais.paises) ? data.dietasPorPais.paises : [];
       if (uiDesp.setPaisesData) uiDesp.setPaisesData(paisesData);
-
-      const primerSelectPais = document.getElementById('pais-destino-1');
-      if (primerSelectPais && paisesData.length > 0) {
-        if (uiDesp.poblarSelectPaises) uiDesp.poblarSelectPaises(primerSelectPais);
-        primerSelectPais.addEventListener('change', () => {
-          if (uiDesp.manejarCambioPais) uiDesp.manejarCambioPais(1);
-        });
-      }
 
       // =========================================================================
       // INICIALIZACIÓN DE MÓDULOS
