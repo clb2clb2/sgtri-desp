@@ -18,7 +18,7 @@
   const val = global.validaciones || {};
 
   // Estado del módulo
-  let desplazamientoCounter = 1;
+  let desplazamientoCounter = 0;
   let desplazamientosContainer = null;
   let btnAddDesplazamiento = null;
   let vehiculoContainer = null;
@@ -541,13 +541,6 @@
       });
     }
 
-    // Mostrar botón eliminar en el primero si es el segundo
-    if (desplazamientoCounter === 2) {
-      const primerDesplazamiento = desplazamientosContainer.querySelector('.desplazamiento-grupo');
-      const primerBotonEliminar = primerDesplazamiento?.querySelector('.btn-eliminar-desplazamiento');
-      if (primerBotonEliminar) primerBotonEliminar.style.display = 'block';
-    }
-
     actualizarNumerosDesplazamientos();
     actualizarBotonAddDesplazamiento();
 
@@ -592,25 +585,20 @@
       }
     });
 
-    // Mostrar/ocultar botones eliminar (si hay 2+ desplazamientos totales, incluyendo especial)
-    if (totalDesplazamientos > 1) {
-      let idxNormal = 0;
-      todosDesplazamientos.forEach((d) => {
-        const btn = d.querySelector('.btn-eliminar-desplazamiento');
-        if (btn) {
-          btn.style.display = 'block';
-          if (d.classList.contains('desplazamiento-especial')) {
-            btn.setAttribute('aria-label', 'Eliminar desplazamiento especial');
-          } else {
-            idxNormal++;
-            btn.setAttribute('aria-label', `Eliminar desplazamiento ${idxNormal}`);
-          }
+    // Mostrar botones eliminar en todos los desplazamientos (siempre visible)
+    let idxNormal = 0;
+    todosDesplazamientos.forEach((d) => {
+      const btn = d.querySelector('.btn-eliminar-desplazamiento');
+      if (btn) {
+        btn.style.display = 'block';
+        if (d.classList.contains('desplazamiento-especial')) {
+          btn.setAttribute('aria-label', 'Eliminar desplazamiento especial');
+        } else {
+          idxNormal++;
+          btn.setAttribute('aria-label', `Eliminar desplazamiento ${idxNormal}`);
         }
-      });
-    } else if (totalDesplazamientos === 1) {
-      const btn = todosDesplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
-      if (btn) btn.style.display = 'none';
-    }
+      }
+    });
 
     // Actualizar select de evento asociado (congresos) - solo desplazamientos normales
     try {
@@ -681,13 +669,6 @@
       // Callback externo
       if (typeof onDesplazamientoDeleted === 'function') {
         onDesplazamientoDeleted();
-      }
-
-      // Ocultar botón eliminar si solo queda uno
-      const desplazamientos = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo');
-      if (desplazamientos.length === 1) {
-        const botonEliminar = desplazamientos[0].querySelector('.btn-eliminar-desplazamiento');
-        if (botonEliminar) botonEliminar.style.display = 'none';
       }
 
       // Recalcular y evaluar vehículo
