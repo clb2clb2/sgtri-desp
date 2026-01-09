@@ -40,6 +40,22 @@
   --shadow-modal: 0 6px 24px rgba(0, 0, 0, 0.18);
   --shadow-tooltip: 0 6px 18px rgba(0, 0, 0, 0.25);
 
+  /* Degradado para tooltips */
+  --gradient-tooltip: linear-gradient(135deg,
+      rgba(76, 76, 76, 1) 0%,
+      rgba(89, 89, 89, 1) 12%,
+      rgba(102, 102, 102, 1) 25%,
+      rgba(71, 71, 71, 1) 39%,
+      rgba(44, 44, 44, 1) 50%,
+      rgba(0, 0, 0, 1) 51%,
+      rgba(17, 17, 17, 1) 60%,
+      rgba(43, 43, 43, 1) 76%,
+      rgba(28, 28, 28, 1) 91%,
+      rgba(19, 19, 19, 1) 100%);
+
+  /* Colores adicionales */
+  --color-success-dark: #156429;
+
   /* Bordes */
   --border-radius: 4px;
   --border-radius-lg: 8px;
@@ -188,6 +204,14 @@ body {
   background-color: #4a8bc5;
 }
 
+.btn-action.btn-pdf {
+  background-color: #d35400;
+}
+
+.btn-action.btn-pdf:hover {
+  background-color: #b34700;
+}
+
 /* Contenedor de secciones */
 .form-sections-wrapper {
   margin: 0 auto 2rem auto;
@@ -216,6 +240,86 @@ body {
 .section-title:active {
   outline: 3px solid rgba(106, 139, 69, 0.25);
   outline-offset: 2px;
+}
+
+/* Contenedor de acciones de sección (borrador + toggle) */
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Botón de borrar sección */
+.btn-clear-section {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  position: relative;
+}
+
+.btn-clear-section:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.btn-clear-section:active {
+  transform: scale(0.95);
+}
+
+.btn-clear-section .icon-eraser {
+  width: 18px;
+  height: 18px;
+  fill: white;
+}
+
+span.txt-eraser {
+  color: white;
+  padding-left: 0.7em;
+}
+
+/* Tooltip del botón de borrar sección (estilo warn) */
+.btn-clear-section .clear-tooltip {
+  position: absolute;
+  right: -36px;
+  bottom: calc(100% + 8px);
+  background: var(--gradient-tooltip);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: var(--border-radius);
+  font-size: 0.75rem;
+  font-weight: normal;
+  line-height: 1.25;
+  white-space: normal;
+  box-shadow: var(--shadow-tooltip);
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+  z-index: 99999;
+  min-width: 25ch;
+  max-width: min(40rem, calc(100vw - 3rem));
+}
+
+.btn-clear-section .clear-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 40px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(28, 28, 28, 0.96);
+}
+
+.btn-clear-section:hover .clear-tooltip,
+.btn-clear-section:focus .clear-tooltip {
+  opacity: 1;
 }
 
 .toggle-section {
@@ -1091,7 +1195,7 @@ input.num-spinner::-webkit-inner-spin-button {
 }
 
 .esp-calc-formula {
-    font-style: italic;
+  font-style: italic;
 }
 
 .calc-result-segment {
@@ -1179,36 +1283,12 @@ input.num-spinner::-webkit-inner-spin-button {
   z-index: 0;
 }
 
-.warn-wrapper.organica-warn {
-  margin-left: 0.35rem;
-  margin-right: 0;
-}
-
-.warn-wrapper.tarjeta-warn {
-  margin-left: 0.35rem;
-  margin-right: 0;
-}
-
-.warn-wrapper.iban-warn {
-  margin-left: 0.35rem;
-  margin-right: 0;
-}
-
-.warn-wrapper.iban-ext-warn {
-  margin-left: 0.35rem;
-  margin-right: 0;
-}
-
-.warn-wrapper.swift-warn {
-  margin-left: 0.35rem;
-  margin-right: 0;
-}
-
-.warn-wrapper.dni-warn {
-  margin-left: 0.35rem;
-  margin-right: 0;
-}
-
+.warn-wrapper.organica-warn,
+.warn-wrapper.tarjeta-warn,
+.warn-wrapper.iban-warn,
+.warn-wrapper.iban-ext-warn,
+.warn-wrapper.swift-warn,
+.warn-wrapper.dni-warn,
 .warn-wrapper.evento-fechas-warn {
   margin-left: 0.35rem;
   margin-right: 0;
@@ -1225,17 +1305,7 @@ input.num-spinner::-webkit-inner-spin-button {
   left: 50%;
   bottom: calc(100% + 8px);
   transform: translateX(calc(-50% - 25%)) translateY(0);
-  background: linear-gradient(135deg,
-      rgba(76, 76, 76, 1) 0%,
-      rgba(89, 89, 89, 1) 12%,
-      rgba(102, 102, 102, 1) 25%,
-      rgba(71, 71, 71, 1) 39%,
-      rgba(44, 44, 44, 1) 50%,
-      rgba(0, 0, 0, 1) 51%,
-      rgba(17, 17, 17, 1) 60%,
-      rgba(43, 43, 43, 1) 76%,
-      rgba(28, 28, 28, 1) 91%,
-      rgba(19, 19, 19, 1) 100%);
+  background: var(--gradient-tooltip);
   color: #fff;
   padding: 8px 14px;
   border-radius: var(--border-radius);
@@ -1679,7 +1749,7 @@ input.num-spinner::-webkit-inner-spin-button {
 }
 
 /* margin-bottom solo cuando hay líneas debajo */
-.desplazamiento-especial:has(.esp-lineas-container:not(:empty)) > .esp-botones-wrapper {
+.desplazamiento-especial:has(.esp-lineas-container:not(:empty))>.esp-botones-wrapper {
   margin-bottom: 1rem;
 }
 
@@ -1772,37 +1842,6 @@ input.num-spinner::-webkit-inner-spin-button {
   width: 60px;
   text-align: center;
 }
-
-/* Botón eliminar línea */
-/*.btn-remove-esp-linea {
-  background-color: var(--color-danger-light);
-  padding: 0 10px;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  height: 32px;
-  min-width: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color var(--transition-normal);
-  flex-shrink: 0;
-}
-
-.btn-remove-esp-linea:hover {
-  background-color: var(--color-danger-hover);
-}
-
-.btn-remove-esp-linea:active {
-  transform: translateY(1px);
-}
-
-.btn-remove-esp-linea .btn-icon {
-  color: var(--color-danger);
-  font-weight: 700;
-  font-size: 1.2rem;
-  transform: rotate(45deg);
-}*/
 
 /* Resultado del desplazamiento especial */
 .esp-resultado {

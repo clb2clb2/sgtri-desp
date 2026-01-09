@@ -1377,4 +1377,246 @@ document.addEventListener('DOMContentLoaded', () => {
     btnComprobar.addEventListener('click', comprobarDatosObligatorios);
   }
 
+  // =========================================================================
+  // BOTONES DE BORRAR SECCIÓN
+  // =========================================================================
+
+  /**
+   * Limpia el contenido de una sección específica.
+   * @param {string} sectionId - Identificador de la sección
+   */
+  async function limpiarSeccion(sectionId) {
+    const showConfirm = window.showConfirm || ((msg) => Promise.resolve(confirm(msg)));
+    
+    const confirmed = await showConfirm('¿Estás seguro de que quieres borrar el contenido de esta sección?', {
+      confirmText: 'Borrar',
+      cancelText: 'Cancelar'
+    });
+    
+    if (!confirmed) return;
+
+    switch (sectionId) {
+      case 'beneficiario':
+        limpiarSeccionBeneficiario();
+        break;
+      case 'proyecto':
+        limpiarSeccionProyecto();
+        break;
+      case 'desplazamientos':
+        limpiarSeccionDesplazamientos();
+        break;
+      case 'eventos':
+        limpiarSeccionEventos();
+        break;
+      case 'honorarios':
+        limpiarSeccionHonorarios();
+        break;
+      case 'ajustes':
+        limpiarSeccionAjustes();
+        break;
+    }
+
+    // Recalcular resultado
+    if (window.resultadoLiquidacion?.renderResultado) {
+      window.resultadoLiquidacion.renderResultado();
+    }
+  }
+
+  /**
+   * Limpia la sección de datos del beneficiario.
+   */
+  function limpiarSeccionBeneficiario() {
+    // Campos de texto
+    ['nombre-benef', 'dni'].forEach(id => {
+      const campo = document.getElementById(id);
+      if (campo) {
+        campo.value = '';
+        campo.classList.remove('field-error');
+      }
+    });
+
+    // Campo entidad: restaurar valor por defecto
+    const entidad = document.getElementById('entidad');
+    if (entidad) {
+      entidad.value = 'Universidad de Extremadura';
+      entidad.classList.remove('field-error');
+    }
+
+    // Select categoria (primer valor)
+    if (categoriaSelect) {
+      categoriaSelect.selectedIndex = 0;
+      categoriaSelect.classList.remove('field-error');
+    }
+
+    // Select tipo-pago: restaurar primera opción
+    if (tipoPagoSelect) {
+      tipoPagoSelect.selectedIndex = 0;
+      tipoPagoSelect.classList.remove('field-error');
+      // Disparar cambio para mostrar/ocultar campos de pago según la opción
+      tipoPagoSelect.dispatchEvent(new Event('change'));
+    }
+
+    // Limpiar campos de pago (se ocultan con el change de tipo-pago)
+    ['iban', 'iban-ext', 'swift', 'numero-tarjeta'].forEach(id => {
+      const campo = document.getElementById(id);
+      if (campo) {
+        campo.value = '';
+        campo.classList.remove('field-error');
+      }
+    });
+
+    // Ocultar warning de DNI
+    const dniWarn = document.querySelector('.dni-warn');
+    if (dniWarn) dniWarn.style.display = 'none';
+  }
+
+  /**
+   * Limpia la sección de datos del proyecto.
+   */
+  function limpiarSeccionProyecto() {
+    // Tipo de proyecto
+    if (tipoProyecto) {
+      tipoProyecto.selectedIndex = 0;
+      tipoProyecto.classList.remove('field-error');
+      // Disparar cambio para actualizar info decreto
+      tipoProyecto.dispatchEvent(new Event('change'));
+    }
+
+    // Campos de texto
+    ['responsable', 'referencia'].forEach(id => {
+      const campo = document.getElementById(id);
+      if (campo) {
+        campo.value = '';
+        campo.classList.remove('field-error');
+      }
+    });
+
+    // Orgánica: restaurar valor por defecto "18."
+    const organica = document.getElementById('organica');
+    if (organica) {
+      organica.value = '18.';
+      organica.classList.remove('field-error');
+    }
+  }
+
+  /**
+   * Limpia la sección de desplazamientos.
+   */
+  function limpiarSeccionDesplazamientos() {
+    // Eliminar todos los desplazamientos normales
+    const container = document.getElementById('desplazamientos-container');
+    if (container) {
+      const desplazamientos = container.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial)');
+      desplazamientos.forEach(d => d.remove());
+    }
+
+    // Eliminar desplazamiento especial si existe
+    if (window.uiDesplazamientoEspecial?.existe && window.uiDesplazamientoEspecial.existe()) {
+      const especial = document.getElementById('desplazamiento-especial');
+      if (especial) especial.remove();
+    }
+
+    // Ocultar ficha de vehículo
+    const vehiculoContainer = document.getElementById('vehiculo-particular-container');
+    if (vehiculoContainer) {
+      vehiculoContainer.innerHTML = '';
+      vehiculoContainer.style.display = 'none';
+    }
+
+    // Resetear contador de desplazamientos
+    if (uiDesp.resetCounter) {
+      uiDesp.resetCounter();
+    }
+
+    // Actualizar numeración y botón añadir
+    if (uiDesp.actualizarNumerosDesplazamientos) {
+      uiDesp.actualizarNumerosDesplazamientos();
+    }
+    if (uiDesp.actualizarBotonAddDesplazamiento) {
+      uiDesp.actualizarBotonAddDesplazamiento();
+    }
+  }
+
+  /**
+   * Limpia la sección de eventos/congresos.
+   */
+  function limpiarSeccionEventos() {
+    ['evento-nombre', 'evento-inicio', 'evento-fin', 'evento-ciudad', 'evento-inscripcion'].forEach(id => {
+      const campo = document.getElementById(id);
+      if (campo) {
+        campo.value = '';
+        campo.classList.remove('field-error');
+      }
+    });
+
+    // Ocultar el contenedor de evento asociado
+    const eventoAsociadoContainer = document.getElementById('evento-asociado-container');
+    if (eventoAsociadoContainer) {
+      eventoAsociadoContainer.style.display = 'none';
+    }
+  }
+
+  /**
+   * Limpia la sección de honorarios.
+   */
+  function limpiarSeccionHonorarios() {
+    // Campo importe
+    const importe = document.getElementById('honorarios-importe');
+    if (importe) {
+      importe.value = '';
+      importe.classList.remove('field-error');
+    }
+
+    // Select beneficiario: restaurar primera opción
+    const beneficiario = document.getElementById('honorarios-beneficiario');
+    if (beneficiario) {
+      beneficiario.selectedIndex = 0;
+      beneficiario.classList.remove('field-error');
+    }
+
+    // Select de situación
+    const situacion = document.getElementById('honorarios-situacion');
+    if (situacion) {
+      situacion.selectedIndex = 0;
+      situacion.classList.remove('field-error');
+    }
+  }
+
+  /**
+   * Limpia la sección de ajustes.
+   */
+  function limpiarSeccionAjustes() {
+    // Financiación máxima
+    const financiacion = document.getElementById('financiacion-maxima');
+    if (financiacion) {
+      financiacion.value = '';
+      financiacion.classList.remove('field-error');
+    }
+
+    // Eliminar líneas de otros descuentos
+    const descuentosContainer = document.getElementById('otros-descuentos-container');
+    if (descuentosContainer) {
+      descuentosContainer.innerHTML = '';
+    }
+
+    // Resetear módulo de ajustes si existe
+    if (window.uiAjustes?.reset) {
+      window.uiAjustes.reset();
+    }
+  }
+
+  // ---- Listener delegado para botones de borrar sección ----
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-clear-section');
+    if (!btn) return;
+
+    // Evitar que el clic propague al section-title (toggle)
+    e.stopPropagation();
+
+    const section = btn.closest('.form-section');
+    if (section && section.dataset.sectionId) {
+      limpiarSeccion(section.dataset.sectionId);
+    }
+  });
+
 });
