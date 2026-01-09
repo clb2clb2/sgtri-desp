@@ -937,6 +937,13 @@
     desplazamientoCounter = value;
   }
 
+  /**
+   * Resetea el contador de desplazamientos a 0.
+   */
+  function resetCounter() {
+    desplazamientoCounter = 0;
+  }
+
   // =========================================================================
   // EXPORTACIÓN
   // =========================================================================
@@ -974,7 +981,8 @@
     // Inicialización
     init,
     getCounter,
-    setCounter
+    setCounter,
+    resetCounter
   };
 
   global.uiDesplazamientos = uiDesplazamientos;

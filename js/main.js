@@ -93,7 +93,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Soporte para click y teclado
-        title.addEventListener('click', toggle);
+        title.addEventListener('click', (e) => {
+            // Ignorar si el clic fue en el botón de borrar sección
+            if (e.target.closest('.btn-clear-section')) return;
+            toggle();
+        });
         title.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
                 e.preventDefault();
