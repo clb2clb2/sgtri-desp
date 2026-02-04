@@ -22,7 +22,9 @@
     // A4 = 595.28pt × 841.89pt
     get anchoUtil() {
       return 595.28 - (this.page.margin * 2);
-    }
+    },
+    // Espaciado vertical entre tablas (1 cm = 28.35 pt)
+    espacioTablas: 28.35
   };
 
   // =========================================================================
@@ -37,6 +39,14 @@
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  }
+
+  /**
+   * Formatea importe en formato europeo con símbolo €.
+   * Ej: 1234.56 → "1.234,56 €"
+   */
+  function fmtEuro(n) {
+    return fmt(n) + ' €';
   }
 
   /**
@@ -75,20 +85,21 @@
   }
 
   // =========================================================================
-  // DATOS DE PRUEBA
+  // REFERENCIA AL MÓDULO DE SERIALIZACIÓN
   // =========================================================================
 
-  const datosPrueba = {
-    beneficiario: {
-      nombre: 'Víctor Manuel Viñuales Guillén',
-      dni: '03864429S',
-      entidad: 'Universidad de Extremadura',
-      categoria: 'IP'
-    },
-    proyecto: {
-      referencia: 'GR248959'
+  /**
+   * Obtiene los datos del formulario usando el módulo de serialización.
+   * @returns {Object} Datos serializados del formulario
+   */
+  function obtenerDatosFormulario() {
+    const serializar = window.serializacionDatos;
+    if (!serializar || typeof serializar.recopilarTodo !== 'function') {
+      console.error('[pdfGen] Módulo serializacionDatos no disponible');
+      return null;
     }
-  };
+    return serializar.recopilarTodo();
+  }
 
   // =========================================================================
   // CONSTRUCCIÓN DEL DOCUMENTO
@@ -99,8 +110,9 @@
    * @param {Object} datos - Datos de la liquidación
    * @param {string} logoBase64 - Logo en Base64 (PNG) o contenido SVG
    * @param {boolean} logoIsSVG - true si el logo es SVG
+   * @param {string} separadorSVG - Contenido SVG del separador
    */
-  function buildDocDefinition(datos, logoBase64, logoIsSVG = false) {
+  function buildDocDefinition(datos, logoBase64, logoIsSVG = false, separadorSVG = null) {
     const margin = PDF_CONFIG.page.margin;
 
     return {
@@ -124,25 +136,42 @@
       // ESTILOS
       // ─────────────────────────────────────────────────────────────────────
       defaultStyle: {
-        font: 'HelveticaNeue-MediumCondensed',
+        font: 'HelveticaNeue',
         fontSize: 10
       },
 
       styles: {
         titulo: {
-          font: 'HelveticaNeue-MediumCondensed',
+          font: 'HelveticaNeue-BoldCondensed',
           fontSize: 18,
-          color: [62, 124, 44]
+          color: '#407C2E'  // RGB(64,124,46)
         },
         version: {
           font: 'HelveticaNeue-MediumCondensed',
           fontSize: 10,
-          color: [153, 153, 153]  // Gris 60%
+          color: '#7c7c7c'  // Gris
         },
         versionSmall: {
           font: 'HelveticaNeue-MediumCondensed',
           fontSize: 8,
-          color: [153, 153, 153]  // Gris 60%
+          color: '#7c7c7c'  // Gris
+        },
+        // Estilos para tablas de datos
+        tablaEncabezado: {
+          font: 'HelveticaNeue',
+          bold: true,
+          fontSize: 10,
+          color: '#407C2E'  // RGB(64,124,46) - Verde
+        },
+        tablaEtiqueta: {
+          font: 'HelveticaNeue-MediumCondensed',
+          fontSize: 10,
+          color: '#7c7c7c'  // Gris
+        },
+        tablaDato: {
+          font: 'HelveticaNeue',
+          fontSize: 10,
+          color: '#000000'  // Negro
         }
       },
 
@@ -202,52 +231,304 @@
           layout: {
             defaultBorder: false,
           },
-          margin: [0, 0, 0, 20]
+          margin: [0, 0, 0, 10]
         },
 
         // ═══════════════════════════════════════════════════════════════════
-        // CONTENIDO TEMPORAL (para visualizar la prueba)
+        // LÍNEA SEPARADORA
         // ═══════════════════════════════════════════════════════════════════
-        {
-          text: '\n\n[Aquí irá el contenido de la liquidación]\n\n',
+        separadorSVG ? {
+          svg: separadorSVG,
+          width: PDF_CONFIG.anchoUtil,
           alignment: 'center',
-          color: '#888888',
-          italics: true,
-          margin: [0, 50, 0, 0]
-        },
+          margin: [0, 0, 0, 15]
+        } : {},
 
-        // Información de prueba
-        {
-          table: {
-            widths: ['30%', '*'],
-            body: [
-              [
-                { text: 'Configuración:', bold: true, colSpan: 2 },
-                {}
-              ],
-              [
-                { text: 'Márgenes:', italics: true },
-                { text: '15mm (43pt) en todos los lados' }
-              ],
-              [
-                { text: 'Ancho útil:', italics: true },
-                { text: `${PDF_CONFIG.anchoUtil.toFixed(2)} pt` }
-              ],
-              [
-                { text: 'Fuente título:', italics: true },
-                { text: 'HelveticaNeue-CondensedBlack 16pt' }
-              ],
-              [
-                { text: 'Fuente versión:', italics: true },
-                { text: 'HelveticaNeue-Medium 10pt' }
-              ]
-            ]
-          },
-          layout: 'lightHorizontalLines',
-          margin: [0, 30, 0, 0]
-        }
+        // ═══════════════════════════════════════════════════════════════════
+        // TABLAS DE DATOS
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Tabla: Datos del beneficiario
+        ...buildTablaBeneficiario(datos),
+
+        // Espaciador entre tablas
+        { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
+
+        // Tabla: Datos del proyecto
+        ...buildTablaProyecto(datos)
+
       ]
     };
+  }
+
+  // =========================================================================
+  // CONSTRUCTORES DE TABLAS
+  // =========================================================================
+
+  /**
+   * Construye un encabezado de sección con línea verde debajo.
+   * @param {string} texto - Texto del encabezado
+   * @returns {Array} Array con texto y canvas para la línea
+   */
+  function buildEncabezadoSeccion(texto) {
+    return [
+      { text: texto, style: 'tablaEncabezado', margin: [0, 0, 0, 2] },
+      {
+        canvas: [
+          {
+            type: 'line',
+            x1: 0, y1: 0,
+            x2: PDF_CONFIG.anchoUtil, y2: 0,
+            lineWidth: 1,
+            lineColor: '#407C2E'
+          }
+        ],
+        margin: [0, 0, 0, 0]
+      }
+    ];
+  }
+
+  /**
+   * Construye la tabla de datos del beneficiario.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con encabezado y tabla para pdfmake
+   */
+  function buildTablaBeneficiario(datos) {
+    const b = datos.beneficiario || {};
+    const pago = datos.pago || {};
+
+    // Construir fila de pago según el tipo
+    let filaPago;
+    if (pago.tipo === 'CE') {
+      filaPago = {
+        text: [
+          { text: 'Pago en cuenta española n.º: ', style: 'tablaEtiqueta' },
+          { text: pago.iban || '', style: 'tablaDato' }
+        ],
+        colSpan: 2
+      };
+    } else if (pago.tipo === 'TJ') {
+      filaPago = {
+        text: [
+          { text: 'Pagado con tarjeta de investigador n.º: ', style: 'tablaEtiqueta' },
+          { text: pago.tarjeta || '', style: 'tablaDato' }
+        ],
+        colSpan: 2
+      };
+    } else if (pago.tipo === 'CI') {
+      filaPago = {
+        text: [
+          { text: 'Pago en cuenta extranjera con IBAN: ', style: 'tablaEtiqueta' },
+          { text: pago.iban || '', style: 'tablaDato' },
+          { text: ' y SWIFT: ', style: 'tablaEtiqueta' },
+          { text: pago.swift || '', style: 'tablaDato' }
+        ],
+        colSpan: 2
+      };
+    } else {
+      filaPago = { text: '', colSpan: 2 };
+    }
+
+    // Encabezado con línea verde
+    const encabezado = buildEncabezadoSeccion('BENEFICIARIO:');
+    
+    // Tabla sin la fila de encabezado
+    const tabla = {
+      table: {
+        widths: ['50%', '*'],
+        body: [
+          // Fila 1: Nombre (50%) + DNI (50%)
+          [
+            {
+              text: [
+                { text: 'Nombre: ', style: 'tablaEtiqueta' },
+                { text: b.nombre || '', style: 'tablaDato' }
+              ]
+            },
+            {
+              text: [
+                { text: 'DNI/Pasaporte: ', style: 'tablaEtiqueta' },
+                { text: b.dni || '', style: 'tablaDato' }
+              ]
+            }
+          ],
+          // Fila 2: Entidad (50%) + Categoría (50%)
+          [
+            {
+              text: [
+                { text: 'Entidad contratante: ', style: 'tablaEtiqueta' },
+                { text: b.entidad || '', style: 'tablaDato' }
+              ]
+            },
+            {
+              text: [
+                { text: 'En calidad de: ', style: 'tablaEtiqueta' },
+                { text: b.categoriaNombre || b.categoria || '', style: 'tablaDato' }
+              ]
+            }
+          ],
+          // Fila 3: Datos de pago (100%)
+          [
+            filaPago,
+            {}
+          ]
+        ]
+      },
+      layout: {
+        hLineWidth: (i) => i === 0 ? 0 : 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => '#cccccc',
+        vLineColor: () => '#cccccc',
+        paddingTop: () => 5
+      },
+      margin: [0, 0, 0, 0]
+    };
+
+    return [...encabezado, tabla];
+  }
+
+  /**
+   * Construye la tabla de datos del proyecto.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con encabezado y tabla para pdfmake
+   */
+  function buildTablaProyecto(datos) {
+    const p = datos.proyecto || {};
+    const imputacion = datos.imputacion || [];
+
+    // Construir filas del body (4 columnas: 25%, 25%, 25%, 25%)
+    const bodyRows = [
+      // Fila 1: Tipo (50%) + Referencia (50%)
+      [
+        {
+          text: [
+            { text: 'Tipo: ', style: 'tablaEtiqueta' },
+            { text: p.tipoNombre || p.tipo || '', style: 'tablaDato' }
+          ],
+          colSpan: 2
+        },
+        {},
+        {
+          text: [
+            { text: 'Referencia: ', style: 'tablaEtiqueta' },
+            { text: p.referencia || '', style: 'tablaDato' }
+          ],
+          colSpan: 2
+        },
+        {}
+      ],
+      // Fila 2: Responsable (50%) + Orgánica (25%) + Importe (25%)
+      [
+        {
+          text: [
+            { text: 'Responsable: ', style: 'tablaEtiqueta' },
+            { text: p.responsable || '', style: 'tablaDato' }
+          ],
+          colSpan: 2
+        },
+        {},
+        {
+          text: [
+            { text: 'Orgánica: ', style: 'tablaEtiqueta' },
+            { text: p.organica || '', style: 'tablaDato' }
+          ]
+        },
+        {
+          text: [
+            { text: 'Importe: ', style: 'tablaEtiqueta' },
+            { text: fmtEuro(imputacion[0]?.importe), style: 'tablaDato' }
+          ]
+        }
+      ]
+    ];
+
+    // Añadir filas para imputaciones adicionales (desde índice 1)
+    for (let i = 1; i < imputacion.length; i++) {
+      const imp = imputacion[i];
+      const num = i + 1;
+      bodyRows.push([
+        {
+          text: [
+            { text: `Responsable${num}: `, style: 'tablaEtiqueta' },
+            { text: imp.responsable || '', style: 'tablaDato' }
+          ],
+          colSpan: 2
+        },
+        {},
+        {
+          text: [
+            { text: `Orgánica${num}: `, style: 'tablaEtiqueta' },
+            { text: imp.organica || '', style: 'tablaDato' }
+          ]
+        },
+        {
+          text: [
+            { text: 'Importe: ', style: 'tablaEtiqueta' },
+            { text: fmtEuro(imp.importe), style: 'tablaDato' }
+          ]
+        }
+      ]);
+    }
+
+    // Fila final: Normativa con enlace
+    let textoNormativa;
+    if (p.normativa === 'decreto') {
+      textoNormativa = {
+        text: [
+          { text: 'Cálculos efectuados en base al ', italics: true },
+          {
+            text: 'Decreto 42/2025',
+            italics: true,
+            link: 'https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o',
+            decoration: 'underline'
+          }
+        ],
+        font: 'HelveticaNeue',
+        fontSize: 10,
+        color: '#7c7c7c',
+        alignment: 'center',
+        colSpan: 4
+      };
+    } else {
+      textoNormativa = {
+        text: [
+          { text: 'Cálculos efectuados en base al ', italics: true },
+          {
+            text: 'RD 462/2002',
+            italics: true,
+            link: 'https://www.boe.es/buscar/act.php?id=BOE-A-2002-10337',
+            decoration: 'underline'
+          }
+        ],
+        font: 'HelveticaNeue',
+        fontSize: 10,
+        color: '#7c7c7c',
+        alignment: 'center',
+        colSpan: 4
+      };
+    }
+    bodyRows.push([textoNormativa, {}, {}, {}]);
+
+    // Encabezado con línea verde
+    const encabezado = buildEncabezadoSeccion('DATOS DEL PROYECTO:');
+
+    // Tabla sin la fila de encabezado
+    const tabla = {
+      table: {
+        widths: ['25%', '25%', '25%', '*'],
+        body: bodyRows
+      },
+      layout: {
+        hLineWidth: (i) => i === 0 ? 0 : 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => '#cccccc',
+        vLineColor: () => '#cccccc',
+        paddingTop: () => 5
+      },
+      margin: [0, 0, 0, 0]
+    };
+
+    return [...encabezado, tabla];
   }
 
   // =========================================================================
@@ -256,10 +537,16 @@
 
   /**
    * Genera y descarga el PDF.
-   * @param {Object} [datos] - Datos de la liquidación (usa datos de prueba si no se proporcionan)
+   * @param {Object} [datos] - Datos de la liquidación (si no se proporciona, se obtienen del formulario)
    */
   async function generar(datos) {
-    const d = datos || datosPrueba;
+    // Obtener datos del formulario si no se proporcionan
+    const d = datos || obtenerDatosFormulario();
+    
+    if (!d) {
+      alert('Error: No se pudieron obtener los datos del formulario.');
+      return;
+    }
 
     // Verificar que pdfMake está disponible
     if (typeof pdfMake === 'undefined') {
@@ -276,6 +563,7 @@
     }
 
     try {
+      console.log('[pdfGen] Datos del formulario:', d);
       console.log('[pdfGen] Cargando logo...');
 
       // Intentar cargar como SVG primero
@@ -298,8 +586,17 @@
         }
       }
 
+      // Cargar separador SVG
+      let separadorSVG = null;
+      try {
+        separadorSVG = await loadSVG('assets/img/separador.svg');
+        console.log('[pdfGen] Separador SVG cargado');
+      } catch (e) {
+        console.warn('[pdfGen] No se pudo cargar el separador SVG');
+      }
+
       console.log('[pdfGen] Generando PDF...');
-      const docDefinition = buildDocDefinition(d, logoData, isSVG);
+      const docDefinition = buildDocDefinition(d, logoData, isSVG, separadorSVG);
 
       pdfMake.createPdf(docDefinition).download(`Liquidacion_${d.proyecto?.referencia || 'borrador'}.pdf`);
       console.log('[pdfGen] PDF generado correctamente');
@@ -312,9 +609,16 @@
 
   /**
    * Abre el PDF en una nueva pestaña (previsualización).
+   * @param {Object} [datos] - Datos de la liquidación (si no se proporciona, se obtienen del formulario)
    */
   async function preview(datos) {
-    const d = datos || datosPrueba;
+    // Obtener datos del formulario si no se proporcionan
+    const d = datos || obtenerDatosFormulario();
+    
+    if (!d) {
+      alert('Error: No se pudieron obtener los datos del formulario.');
+      return;
+    }
 
     if (typeof pdfMake === 'undefined') {
       console.error('[pdfGen] pdfMake no está cargado');
@@ -337,7 +641,15 @@
         }
       }
 
-      const docDefinition = buildDocDefinition(d, logoData, isSVG);
+      // Cargar separador SVG
+      let separadorSVG = null;
+      try {
+        separadorSVG = await loadSVG('assets/img/separador.svg');
+      } catch {
+        // Continuar sin separador
+      }
+
+      const docDefinition = buildDocDefinition(d, logoData, isSVG, separadorSVG);
       pdfMake.createPdf(docDefinition).open();
 
     } catch (error) {
@@ -369,7 +681,7 @@
     generar,
     preview,
     PDF_CONFIG,
-    _datosPrueba: datosPrueba
+    obtenerDatosFormulario
   };
 
   // Auto-inicializar
