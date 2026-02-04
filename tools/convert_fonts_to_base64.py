@@ -20,6 +20,10 @@ OUTPUT_FILE = Path(__file__).parent.parent / "js" / "pdfFonts.js"
 # Fuentes a convertir (nombre_archivo: nombre_interno)
 FONTS_TO_CONVERT = {
     "HelveticaNeueLTStd-MdCn.otf": "HelveticaNeue-MediumCondensed",
+    "HelveticaNeueLTStd-Roman.otf": "HelveticaNeue",
+    "HelveticaNeueLTStd-Bd.otf": "HelveticaNeue-Bold",
+    "HelveticaNeueLTStd-It.otf": "HelveticaNeue-Italic",
+    "HelveticaNeueLTStd-BdCn.otf": "HelveticaNeue-BoldCondensed",
 }
 
 
@@ -77,10 +81,29 @@ def generate_vfs_js(fonts: dict[str, str]) -> str:
         "      bold: 'HelveticaNeue-MediumCondensed',",
         "      italics: 'HelveticaNeue-MediumCondensed',",
         "      bolditalics: 'HelveticaNeue-MediumCondensed'",
+        "    },",
+        "    'HelveticaNeue-BoldCondensed': {",
+        "      normal: 'HelveticaNeue-BoldCondensed',",
+        "      bold: 'HelveticaNeue-BoldCondensed',",
+        "      italics: 'HelveticaNeue-BoldCondensed',",
+        "      bolditalics: 'HelveticaNeue-BoldCondensed'",
+        "    },",
+        "    'HelveticaNeue': {",
+        "      normal: 'HelveticaNeue',",
+        "      bold: 'HelveticaNeue-Bold',",
+        "      italics: 'HelveticaNeue-Italic',",
+        "      bolditalics: 'HelveticaNeue-Bold'",
+        "    },",
+        "    // Roboto viene incluida en vfs_fonts.js del CDN",
+        "    'Roboto': {",
+        "      normal: 'Roboto-Regular.ttf',",
+        "      bold: 'Roboto-Medium.ttf',",
+        "      italics: 'Roboto-Italic.ttf',",
+        "      bolditalics: 'Roboto-MediumItalic.ttf'",
         "    }",
         "  });",
         "",
-        "  console.log('[pdfFonts] Fuentes Helvetica Neue cargadas correctamente');",
+        "  console.log('[pdfFonts] Fuentes Helvetica Neue y Roboto cargadas correctamente');",
         "",
         "})(typeof window !== 'undefined' ? window : this);",
         ""

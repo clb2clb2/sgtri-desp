@@ -83,11 +83,16 @@
    * @returns {Object}
    */
   function recopilarBeneficiario() {
+    const categoriaSelect = document.getElementById('categoria');
+    const categoriaValor = categoriaSelect ? categoriaSelect.value : '';
+    const categoriaNombre = categoriaSelect ? categoriaSelect.options[categoriaSelect.selectedIndex]?.text : '';
+    
     return {
       nombre: obtenerValorCampo('nombre-benef'),
       dni: obtenerValorCampo('dni'),
       entidad: obtenerValorCampo('entidad'),
-      categoria: obtenerValorCampo('categoria')
+      categoria: categoriaValor,
+      categoriaNombre: categoriaNombre
     };
   }
 
@@ -96,9 +101,13 @@
    * @returns {Object}
    */
   function recopilarPago() {
-    const tipoPago = obtenerValorCampo('tipo-pago');
+    const tipoPagoSelect = document.getElementById('tipo-pago');
+    const tipoPago = tipoPagoSelect ? tipoPagoSelect.value : '';
+    const tipoPagoNombre = tipoPagoSelect ? tipoPagoSelect.options[tipoPagoSelect.selectedIndex]?.text : '';
+    
     const datos = {
-      tipo: tipoPago
+      tipo: tipoPago,
+      tipoNombre: tipoPagoNombre
     };
 
     // IBAN según tipo de cuenta
@@ -122,8 +131,19 @@
    * @returns {Object}
    */
   function recopilarProyecto() {
+    const tipoSelect = document.getElementById('tipoProyecto');
+    const tipoValor = tipoSelect ? tipoSelect.value : '';
+    const tipoNombre = tipoSelect ? tipoSelect.options[tipoSelect.selectedIndex]?.text : '';
+    
+    // Determinar normativa aplicable según tipo de proyecto
+    const datos = window.__sgtriDatos;
+    const rdList = (datos && datos.normativasPorTipoProyecto && datos.normativasPorTipoProyecto.rd) || [];
+    const normativa = rdList.includes(tipoValor) ? 'rd' : 'decreto';
+    
     return {
-      tipo: obtenerValorCampo('tipoProyecto'),
+      tipo: tipoValor,
+      tipoNombre: tipoNombre,
+      normativa: normativa,
       responsable: obtenerValorCampo('responsable'),
       organica: obtenerValorCampo('organica'),
       referencia: obtenerValorCampo('referencia')
