@@ -21,7 +21,14 @@
    * Estructura:
    * {
    *   desplazamientos: {
-   *     '1': { manutencion, alojamiento, km, otrosGastos, irpfSujeto },
+   *     '1': {
+   *       manutencion, alojamiento, km, otrosGastos, irpfSujeto,
+   *       detalles: {
+   *         numManutenciones, precioManutencion, importeManutencion,
+   *         numNoches, importeMaxAlojamiento, importeAlojamientoUsuario, excedeMaxAlojamiento,
+   *         precioPorKm, importeKm
+   *       }
+   *     },
    *     '2': { ... }
    *   },
    *   honorarios: number,
@@ -49,15 +56,18 @@
    * Registra los totales de un desplazamiento.
    * @param {string|number} id - ID del desplazamiento
    * @param {Object} totales - Objeto con { manutencion, alojamiento, km, otrosGastos, irpfSujeto }
+   * @param {Object} [detalles] - Detalles adicionales para serialización
    */
-  function registrarDesplazamiento(id, totales) {
+  function registrarDesplazamiento(id, totales, detalles) {
     const reg = getRegistro();
     reg.desplazamientos[String(id)] = {
       manutencion: round2(totales.manutencion || 0),
       alojamiento: round2(totales.alojamientoUser || totales.alojamiento || 0),
       km: round2(totales.km || 0),
       otrosGastos: round2(totales.otrosGastos || 0),
-      irpfSujeto: round2(totales.irpfSujeto || 0)
+      irpfSujeto: round2(totales.irpfSujeto || 0),
+      // Detalles adicionales para serialización
+      detalles: detalles || null
     };
   }
 

@@ -456,7 +456,7 @@
 
     const { desde, hasta } = ui.nochesAmbiguasRango;
 
-    // Crear campo si no existe
+    // Crear campo si no existe, o actualizar el existente
     if (!existingField) {
       const justHtml = templates.justificarPernocta(id, desde, hasta);
       const ticketField = despEl.querySelector(`#ticket-cena-field-${id}`);
@@ -465,6 +465,17 @@
         ticketField.insertAdjacentHTML('afterend', justHtml);
       } else {
         despEl.insertAdjacentHTML('beforeend', justHtml);
+      }
+    } else {
+      // Actualizar el texto del label con las fechas actuales
+      const label = existingField.querySelector('label');
+      if (label) {
+        const chkExistente = existingField.querySelector(`#justificar-pernocta-${id}`);
+        const wasChecked = chkExistente?.checked || false;
+        label.innerHTML = `
+            <input type="checkbox" id="justificar-pernocta-${id}" ${wasChecked ? 'checked' : ''} />
+            Justifica haber pernoctado la noche del ${desde} al ${hasta}.
+          `;
       }
     }
 
