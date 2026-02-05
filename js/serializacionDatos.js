@@ -191,6 +191,10 @@
     grupos.forEach(grupo => {
       const id = parseInt(grupo.dataset.desplazamientoId, 10);
       
+      // Obtener detalles calculados del registro centralizado
+      const registro = global.__sgtriTotales?.desplazamientos?.[String(id)];
+      const detalles = registro?.detalles || null;
+      
       desplazamientos.push({
         id,
         fechaIda: obtenerValorCampo(`fecha-ida-${id}`),
@@ -207,7 +211,39 @@
         km: obtenerValorCampo(`km-${id}`),
         alojamiento: obtenerValorCampo(`alojamiento-${id}`),
         noManutencion: obtenerValorCampo(`no-manutencion-${id}`, 'checkbox'),
-        otrosGastos: recopilarOtrosGastos(id)
+        otrosGastos: recopilarOtrosGastos(id),
+        // Datos calculados (de salidaDesp)
+        datosCalculados: detalles ? {
+          // Manutención
+          numManutenciones: detalles.numManutenciones,
+          precioManutencion: detalles.precioManutencion,
+          importeManutencion: detalles.importeManutencion,
+          // Alojamiento
+          numNoches: detalles.numNoches,
+          precioNoche: detalles.precioNoche,
+          importeMaxAlojamiento: detalles.importeMaxAlojamiento,
+          excedeMaxAlojamiento: detalles.excedeMaxAlojamiento,
+          // Kilometraje
+          precioPorKm: detalles.precioPorKm,
+          importeKm: detalles.importeKm,
+          // Residencia eventual
+          residenciaEventual: detalles.residenciaEventual,
+          // IRPF
+          irpfSujeto: detalles.irpfSujeto,
+          // Total del desplazamiento
+          importeTotal: detalles.importeTotal,
+          // Segmentos (solo para desplazamientos internacionales)
+          segmentos: detalles.segmentos ? detalles.segmentos.map(seg => ({
+            titulo: seg.titulo,
+            pais: seg.pais,
+            numManutenciones: seg.numManutenciones,
+            precioManutencion: seg.precioManutencion,
+            importeManutencion: seg.importeManutencion,
+            numNoches: seg.numNoches,
+            precioNoche: seg.precioNoche,
+            importeMaxAlojamiento: seg.importeMaxAlojamiento
+          })) : null
+        } : null
       });
     });
 
@@ -484,7 +520,19 @@
         return;
       }
 
-      // Crear todos los desplazamientos necesarios (ya no hay ninguno por defecto)
+      // Eliminar todos los desplazamientos existentes antes de crear los nuevos
+      const gruposExistentes = contenedor.querySelectorAll('.desplazamiento-grupo');
+      gruposExistentes.forEach(grupo => {
+        const id = grupo.dataset.desplazamientoId;
+        // Eliminar del registro de totales
+        if (id && global.resultadoLiquidacion?.eliminarDesplazamiento) {
+          global.resultadoLiquidacion.eliminarDesplazamiento(id);
+        }
+        // Eliminar del DOM sin animación
+        grupo.remove();
+      });
+
+      // Crear todos los desplazamientos necesarios
       for (let i = 0; i < desplazamientos.length; i++) {
         if (uiDesp && uiDesp.crearNuevoDesplazamiento) {
           uiDesp.crearNuevoDesplazamiento();
