@@ -32,6 +32,19 @@
   // =========================================================================
 
   /**
+   * Parsea un string numérico en formato europeo (1.234,56) a número.
+   * @param {string|number} val - Valor a parsear
+   * @returns {number} Número parseado
+   */
+  function parseEuroNumber(val) {
+    if (typeof val === 'number') return val;
+    if (!val || typeof val !== 'string') return 0;
+    // Quitar símbolo €, espacios, puntos de miles, y reemplazar coma decimal por punto
+    const cleaned = val.replace(/€/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+    return Number(cleaned) || 0;
+  }
+
+  /**
    * Formatea número a string con 2 decimales y separador alemán.
    */
   function fmt(n) {
@@ -172,6 +185,12 @@
           font: 'HelveticaNeue',
           fontSize: 10,
           color: '#000000'  // Negro
+        },
+        tablaNotaSmall: {
+          font: 'HelveticaNeue',
+          fontSize: 8,
+          italics: true,
+          color: '#7c7c7c'  // Gris
         }
       },
 
@@ -255,7 +274,10 @@
         { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
 
         // Tabla: Datos del proyecto
-        ...buildTablaProyecto(datos)
+        ...buildTablaProyecto(datos),
+
+        // Tablas de desplazamientos nacionales
+        ...buildTablasDesplazamientos(datos)
 
       ]
     };
@@ -310,7 +332,7 @@
     } else if (pago.tipo === 'TJ') {
       filaPago = {
         text: [
-          { text: 'Pagado con tarjeta de investigador n.º: ', style: 'tablaEtiqueta' },
+          { text: 'Pagado con tarjeta de investigador: ', style: 'tablaEtiqueta' },
           { text: pago.tarjeta || '', style: 'tablaDato' }
         ],
         colSpan: 2
@@ -475,34 +497,28 @@
     if (p.normativa === 'decreto') {
       textoNormativa = {
         text: [
-          { text: 'Cálculos efectuados en base al ', italics: true },
+          { text: 'Cálculos efectuados en base al ' },
           {
             text: 'Decreto 42/2025',
-            italics: true,
             link: 'https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o',
             decoration: 'underline'
           }
         ],
-        font: 'HelveticaNeue',
-        fontSize: 10,
-        color: '#7c7c7c',
+        style: 'tablaNotaSmall',
         alignment: 'center',
         colSpan: 4
       };
     } else {
       textoNormativa = {
         text: [
-          { text: 'Cálculos efectuados en base al ', italics: true },
+          { text: 'Cálculos efectuados en base al ' },
           {
             text: 'RD 462/2002',
-            italics: true,
             link: 'https://www.boe.es/buscar/act.php?id=BOE-A-2002-10337',
             decoration: 'underline'
           }
         ],
-        font: 'HelveticaNeue',
-        fontSize: 10,
-        color: '#7c7c7c',
+        style: 'tablaNotaSmall',
         alignment: 'center',
         colSpan: 4
       };
@@ -529,6 +545,162 @@
     };
 
     return [...encabezado, tabla];
+  }
+
+  /**
+   * Construye las tablas de desplazamientos nacionales.
+   * Solo procesa desplazamientos con paisDestino = "España".
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con tablas para cada desplazamiento nacional
+   */
+  function buildTablasDesplazamientos(datos) {
+    const desplazamientos = datos.desplazamientos || [];
+    const result = [];
+
+    for (const desp of desplazamientos) {
+      // Solo desplazamientos nacionales (España)
+      if (desp.paisDestino !== 'España') {
+        continue;
+      }
+
+      const dc = desp.datosCalculados || {};
+
+      // Construir texto de fechas: "dd/mm/aa, hh:mm h — dd/mm/aa, hh:mm h" con posible ticket cena
+      const fechasText = [
+        { text: `${desp.fechaIda}, ${desp.horaIda} h — ${desp.fechaRegreso}, ${desp.horaRegreso} h`, style: 'tablaDato' }
+      ];
+      if (desp.ticketCena) {
+        fechasText.push({ text: '     [ticket cena]', style: 'tablaNotaSmall' });
+      }
+
+      // Encabezado con línea verde
+      const encabezado = buildEncabezadoSeccion(`DESPLAZAMIENTO #${desp.id}`);
+
+      // Factor de residencia eventual
+      const factorResEv = dc.residenciaEventual ? ' × 80%' : '';
+
+      // Tabla del desplazamiento
+      // Mapa de tipos de otros gastos
+      const TIPOS_OTROS_GASTOS = {
+        'AVN': 'Avión / Tren / Autobús',
+        'PJE': 'Peaje',
+        'TAX': 'Taxi',
+        'PRK': 'Aparcamiento',
+        'TRF': 'Transfer o Traslados',
+        'INS': 'Gastos de instalación',
+        'ALQ': 'Alquiler de coche',
+        'SAC': 'Seguro de accidentes',
+        'SME': 'Seguro médico',
+        'TTR': 'Tasa turística',
+        'TAG': 'Tasa agencia de viajes',
+        'OTR': 'Otros gastos'
+      };
+
+      // Construir filas base de la tabla
+      const bodyRows = [
+        // Fila 1: Fechas + Manutención
+        [
+          { text: fechasText },
+          {
+            text: `Manut. [ ${dc.numManutenciones || 0} × ${fmtEuro(dc.precioManutencion || 0)}${factorResEv} ]`,
+            style: 'tablaEtiqueta',
+            alignment: 'right'
+          },
+          {
+            text: fmtEuro(dc.importeManutencion || 0),
+            style: 'tablaDato',
+            alignment: 'right'
+          }
+        ],
+        // Fila 2: Origen/Destino + Alojamiento
+        [
+          {
+            text: `${desp.origen || ''} — ${desp.destino || ''}`,
+            style: 'tablaDato'
+          },
+          {
+            text: `Aloj. [ máx ${dc.numNoches || 0} × ${fmtEuro(dc.precioNoche || 0)}${factorResEv} = ${fmtEuro(dc.importeMaxAlojamiento || 0)} ]`,
+            style: 'tablaEtiqueta',
+            alignment: 'right'
+          },
+          {
+            text: fmtEuro(desp.alojamiento || 0),
+            style: 'tablaDato',
+            alignment: 'right'
+          }
+        ],
+        // Fila 3: Motivo + Kilometraje
+        [
+          {
+            text: [
+              { text: 'Motivo: ', style: 'tablaEtiqueta' },
+              { text: desp.motivo || '', style: 'tablaDato' }
+            ]
+          },
+          {
+            text: `Km. [ ${desp.km || 0} × ${fmtEuro(dc.precioPorKm || 0)} ]`,
+            style: 'tablaEtiqueta',
+            alignment: 'right'
+          },
+          {
+            text: fmtEuro(dc.importeKm || 0),
+            style: 'tablaDato',
+            alignment: 'right'
+          }
+        ]
+      ];
+
+      // Añadir filas de otros gastos si existen
+      const otrosGastos = desp.otrosGastos || [];
+      for (const gasto of otrosGastos) {
+        const nombreTipo = TIPOS_OTROS_GASTOS[gasto.tipo] || gasto.tipo || 'Otro';
+        const concepto = gasto.concepto || '';
+        
+        // Construir texto con estilos separados para tipo y concepto
+        const textoGasto = concepto 
+          ? [
+              { text: `${nombreTipo}: `, style: 'tablaEtiqueta' },
+              { text: concepto, style: 'tablaDato' }
+            ]
+          : { text: nombreTipo, style: 'tablaEtiqueta' };
+        
+        bodyRows.push([
+          {
+            text: textoGasto,
+            alignment: 'right',
+            colSpan: 2
+          },
+          {},
+          {
+            text: fmtEuro(parseEuroNumber(gasto.importe)),
+            style: 'tablaDato',
+            alignment: 'right'
+          }
+        ]);
+      }
+
+      const tabla = {
+        table: {
+          widths: ['50%', '38%', '*'],  // Primera 50%, segunda 38%, tercera el resto (~12%)
+          body: bodyRows
+        },
+        layout: {
+          hLineWidth: (i) => i === 0 ? 0 : 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => '#cccccc',
+          vLineColor: () => '#cccccc',
+          paddingTop: () => 5
+        },
+        margin: [0, 0, 0, 0]
+      };
+
+      // Añadir espaciador, encabezado y tabla
+      result.push({ text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] });
+      result.push(...encabezado);
+      result.push(tabla);
+    }
+
+    return result;
   }
 
   // =========================================================================

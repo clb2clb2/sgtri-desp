@@ -1284,7 +1284,9 @@ window.calculoDesp._daysBetween = daysBetween;
         alojamientoExcedeMax: alojamientoUser > totals.alojamientoMax,
         nochesAmbiguas: totals.hayNochesAmbiguas,
         nochesAmbiguasRango: totals.nochesAmbiguasRango,
-        precioNocheMedio: totals.noches > 0 ? round2(totals.alojamientoMax / totals.noches) : 0,
+        precioNocheMedio: totals.noches > 0 
+          ? round2(totals.alojamientoMax / totals.noches) 
+          : (canonical.precioNoche || 0),
         residenciaEventual: esResidenciaEventual,
         factorResidencia
       },
@@ -1403,7 +1405,39 @@ window.calculoDesp._daysBetween = daysBetween;
 
     // 9. Registrar totales en el registro centralizado
     if (window.resultadoLiquidacion?.registrarDesplazamiento) {
-      window.resultadoLiquidacion.registrarDesplazamiento(data.id, salidaData.totales);
+      // Construir detalles adicionales para serialización
+      const detallesSerializacion = {
+        // Manutención
+        numManutenciones: salidaData.detalles?.manutenciones || 0,
+        precioManutencion: salidaData.detalles?.precioManutencion || 0,
+        importeManutencion: salidaData.totales.manutencion || 0,
+        // Alojamiento
+        numNoches: salidaData.totales.noches || 0,
+        precioNoche: salidaData.ui?.precioNocheMedio || 0,
+        importeMaxAlojamiento: salidaData.totales.alojamientoMax || 0,
+        excedeMaxAlojamiento: salidaData.ui?.alojamientoExcedeMax || false,
+        // Kilometraje
+        precioPorKm: salidaData.detalles?.precioKm || salidaData._canonical?.precioKm || 0.26,
+        importeKm: salidaData.totales.km || 0,
+        // Residencia eventual
+        residenciaEventual: salidaData.ui?.residenciaEventual || false,
+        // IRPF
+        irpfSujeto: salidaData.totales.irpfSujeto || 0,
+        // Total del desplazamiento
+        importeTotal: salidaData.totales.total || 0,
+        // Segmentos (solo para desplazamientos internacionales)
+        segmentos: salidaData.segmentos ? salidaData.segmentos.map(seg => ({
+          titulo: seg.titulo || '',
+          pais: seg.pais || '',
+          numManutenciones: seg.manutenciones || 0,
+          precioManutencion: seg.precioManutencion || 0,
+          importeManutencion: seg.manutencionAmount || 0,
+          numNoches: seg.noches || 0,
+          precioNoche: seg.precioNoche || 0,
+          importeMaxAlojamiento: seg.nochesAmount || 0
+        })) : null
+      };
+      window.resultadoLiquidacion.registrarDesplazamiento(data.id, salidaData.totales, detallesSerializacion);
     }
 
     // 10. Actualizar resultado de la liquidación
