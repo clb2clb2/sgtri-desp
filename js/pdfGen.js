@@ -24,7 +24,7 @@
       return 595.28 - (this.page.margin * 2);
     },
     // Espaciado vertical entre tablas (1 cm = 28.35 pt)
-    espacioTablas: 28.35
+    espacioTablas: 14
   };
 
   // =========================================================================
@@ -179,6 +179,7 @@
         tablaEtiqueta: {
           font: 'HelveticaNeue-MediumCondensed',
           fontSize: 10,
+          italics: true,
           color: '#7c7c7c'  // Gris
         },
         tablaDato: {
@@ -597,12 +598,17 @@
       };
 
       // Construir filas base de la tabla
+      // Texto de manutención (si está excluida, mostrar "No incluida")
+      const manutText = desp.noManutencion
+        ? 'Manut. [ No incluida ]'
+        : `Manut. [ ${dc.numManutenciones || 0} × ${fmtEuro(dc.precioManutencion || 0)}${factorResEv} ]`;
+
       const bodyRows = [
         // Fila 1: Fechas + Manutención
         [
           { text: fechasText },
           {
-            text: `Manut. [ ${dc.numManutenciones || 0} × ${fmtEuro(dc.precioManutencion || 0)}${factorResEv} ]`,
+            text: manutText,
             style: 'tablaEtiqueta',
             alignment: 'right'
           },
@@ -619,15 +625,23 @@
             style: 'tablaDato'
           },
           {
-            text: `Aloj. [ máx ${dc.numNoches || 0} × ${fmtEuro(dc.precioNoche || 0)}${factorResEv} = ${fmtEuro(dc.importeMaxAlojamiento || 0)} ]`,
+            text: `Aloj. [ máx. ${dc.numNoches || 0} × ${fmtEuro(dc.precioNoche || 0)}${factorResEv} = ${fmtEuro(dc.importeMaxAlojamiento || 0)} ]`,
             style: 'tablaEtiqueta',
             alignment: 'right'
           },
-          {
-            text: fmtEuro(desp.alojamiento || 0),
-            style: 'tablaDato',
-            alignment: 'right'
-          }
+          dc.excedeMaxAlojamiento
+            ? {
+                text: `* ${fmtEuro(parseEuroNumber(desp.alojamiento))}`,
+                style: 'tablaDato',
+                alignment: 'right',
+                color: '#c50909',
+                italics: true
+              }
+            : {
+                text: fmtEuro(parseEuroNumber(desp.alojamiento)),
+                style: 'tablaDato',
+                alignment: 'right'
+              }
         ],
         // Fila 3: Motivo + Kilometraje
         [
@@ -652,9 +666,12 @@
 
       // Añadir filas de otros gastos si existen
       const otrosGastos = desp.otrosGastos || [];
+      let totalOtrosGastos = 0;
       for (const gasto of otrosGastos) {
         const nombreTipo = TIPOS_OTROS_GASTOS[gasto.tipo] || gasto.tipo || 'Otro';
         const concepto = gasto.concepto || '';
+        const importeGasto = parseEuroNumber(gasto.importe);
+        totalOtrosGastos += importeGasto;
         
         // Construir texto con estilos separados para tipo y concepto
         const textoGasto = concepto 
@@ -672,10 +689,63 @@
           },
           {},
           {
-            text: fmtEuro(parseEuroNumber(gasto.importe)),
+            text: fmtEuro(importeGasto),
             style: 'tablaDato',
             alignment: 'right'
           }
+        ]);
+      }
+
+      // Fila de TOTAL
+      const alojamientoUsuario = parseEuroNumber(desp.alojamiento);
+      const totalDesplazamiento = (dc.importeManutencion || 0) + alojamientoUsuario + (dc.importeKm || 0) + totalOtrosGastos;
+      const irpfSujeto = dc.irpfSujeto || 0;
+      const excedeMax = dc.excedeMaxAlojamiento;
+
+      // Celda del total (con formato especial si excede máximo alojamiento)
+      const celdaTotal = excedeMax
+        ? {
+            text: `* ${fmtEuro(totalDesplazamiento)}`,
+            style: 'tablaDato',
+            alignment: 'right',
+            bold: true,
+            color: '#c50909',
+            italics: true
+          }
+        : {
+            text: fmtEuro(totalDesplazamiento),
+            style: 'tablaDato',
+            alignment: 'right',
+            bold: true
+          };
+
+      if (irpfSujeto > 0) {
+        // IRPF > 0: tres celdas separadas
+        bodyRows.push([
+          {
+            text: [
+              { text: 'Sujeto a retención por IRPF: ', alignment: 'right', style: 'tablaEtiqueta' },
+              { text: fmtEuro(irpfSujeto), alignment: 'right', style: 'tablaDato' }
+            ]
+          },
+          {
+            text: 'TOTAL:',
+            style: 'tablaEtiqueta',
+            alignment: 'right'
+          },
+          celdaTotal
+        ]);
+      } else {
+        // IRPF = 0: unir primera y segunda celda
+        bodyRows.push([
+          {
+            text: 'TOTAL:',
+            style: 'tablaEtiqueta',
+            alignment: 'right',
+            colSpan: 2
+          },
+          {},
+          celdaTotal
         ]);
       }
 
