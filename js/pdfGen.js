@@ -26,6 +26,7 @@
     // Espaciado vertical entre tablas (1 cm = 28.35 pt)
     espacioTablas: 14
   };
+  
 
   // =========================================================================
   // UTILIDADES
@@ -204,7 +205,7 @@
         // ═══════════════════════════════════════════════════════════════════
         {
           table: {
-            widths: [40, '*', 40],
+            widths: [80, '*', 80],
             body: [
               [
                 // Celda 1: Logo
@@ -215,13 +216,13 @@
                     logoIsSVG
                       ? {
                         svg: logoBase64,
-                        height: 45,
+                        height: 145,
                         alignment: 'left',
                         margin: [0, 0, 0, 0]
                       }
                       : {
                         image: logoBase64,
-                        height: 45,
+                        height: 145,
                         alignment: 'left',
                         margin: [0, 0, 0, 0]
                       }
@@ -549,24 +550,65 @@
   }
 
   /**
-   * Construye las tablas de desplazamientos nacionales.
-   * Solo procesa desplazamientos con paisDestino = "España".
+   * Construye las tablas de desplazamientos (nacionales e internacionales).
    * @param {Object} datos - Datos del formulario
-   * @returns {Array} Array con tablas para cada desplazamiento nacional
+   * @returns {Array} Array con tablas para cada desplazamiento
    */
   function buildTablasDesplazamientos(datos) {
     const desplazamientos = datos.desplazamientos || [];
     const result = [];
 
+    // Mapa de tipos de otros gastos
+    const TIPOS_OTROS_GASTOS = {
+      'AVN': 'Avión / Tren / Autobús',
+      'PJE': 'Peaje',
+      'TAX': 'Taxi',
+      'PRK': 'Aparcamiento',
+      'TRF': 'Transfer o Traslados',
+      'INS': 'Gastos de instalación',
+      'ALQ': 'Alquiler de coche',
+      'SAC': 'Seguro de accidentes',
+      'SME': 'Seguro médico',
+      'TTR': 'Tasa turística',
+      'TAG': 'Tasa agencia de viajes',
+      'OTR': 'Otros gastos'
+    };
+
+    // Layout: bordes verticales + horizontales internos + borde inferior (sin borde superior)
+    const layoutSinBordeSuperior = {
+      hLineWidth: (i) => i === 0 ? 0 : 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
+    // Layout: solo borde inferior y laterales, sin bordes internos ni superior
+    const layoutSoloBordeInferior = {
+      hLineWidth: (i, node) => i === node.table.body.length ? 0.5 : 0,
+      vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 0.5 : 0,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
+    // Layout: borde inferior + laterales + línea horizontal interna (sin borde superior)
+    const layoutUltimaTabla = {
+      hLineWidth: (i, node) => i === 0 ? 0 : 0.5,
+      vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 0.5 : 0,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
     for (const desp of desplazamientos) {
-      // Solo desplazamientos nacionales (España)
-      if (desp.paisDestino !== 'España') {
-        continue;
-      }
-
       const dc = desp.datosCalculados || {};
+      const esInternacional = desp.paisDestino !== 'España';
 
-      // Construir texto de fechas: "dd/mm/aa, hh:mm h — dd/mm/aa, hh:mm h" con posible ticket cena
+      // ─── 1. Encabezado con línea verde ───────────────────────────────────
+      const encabezado = buildEncabezadoSeccion(`DESPLAZAMIENTO #${desp.id}`);
+
+      // ─── 2. Tabla de datos generales (2 filas, bordes completos) ─────────
       const fechasText = [
         { text: `${desp.fechaIda}, ${desp.horaIda} h — ${desp.fechaRegreso}, ${desp.horaRegreso} h`, style: 'tablaDato' }
       ];
@@ -574,138 +616,144 @@
         fechasText.push({ text: '     [ticket cena]', style: 'tablaNotaSmall' });
       }
 
-      // Encabezado con línea verde
-      const encabezado = buildEncabezadoSeccion(`DESPLAZAMIENTO #${desp.id}`);
+      const origenDestinoText = esInternacional
+        ? `${desp.origen || ''} — ${desp.destino || ''} (${desp.paisDestino})`
+        : `${desp.origen || ''} — ${desp.destino || ''}`;
 
-      // Factor de residencia eventual
-      const factorResEv = dc.residenciaEventual ? ' × 80%' : '';
-
-      // Tabla del desplazamiento
-      // Mapa de tipos de otros gastos
-      const TIPOS_OTROS_GASTOS = {
-        'AVN': 'Avión / Tren / Autobús',
-        'PJE': 'Peaje',
-        'TAX': 'Taxi',
-        'PRK': 'Aparcamiento',
-        'TRF': 'Transfer o Traslados',
-        'INS': 'Gastos de instalación',
-        'ALQ': 'Alquiler de coche',
-        'SAC': 'Seguro de accidentes',
-        'SME': 'Seguro médico',
-        'TTR': 'Tasa turística',
-        'TAG': 'Tasa agencia de viajes',
-        'OTR': 'Otros gastos'
+      const tablaDatosGenerales = {
+        table: {
+          widths: ['50%', '*'],
+          body: [
+            // Fila 1: Fechas | Origen — Destino
+            [
+              { text: fechasText },
+              { text: origenDestinoText, style: 'tablaDato' }
+            ],
+            // Fila 2: Motivo (colspan=2)
+            [
+              {
+                text: [
+                  { text: 'Motivo: ', style: 'tablaEtiqueta' },
+                  { text: desp.motivo || '', style: 'tablaDato' }
+                ],
+                colSpan: 2
+              },
+              {}
+            ]
+          ]
+        },
+        layout: layoutSinBordeSuperior,
+        margin: [0, 0, 0, 0]
       };
 
-      // Construir filas base de la tabla
-      // Texto de manutención (si está excluida, mostrar "No incluida")
-      const manutText = desp.noManutencion
-        ? 'Manut. [ No incluida ]'
-        : `Manut. [ ${dc.numManutenciones || 0} × ${fmtEuro(dc.precioManutencion || 0)}${factorResEv} ]`;
+      // ─── 3. Tablas de segmentos (solo internacional) ─────────────────────
+      const tablasSegmentos = [];
+      if (esInternacional && dc.segmentos && dc.segmentos.length > 0) {
+        for (const seg of dc.segmentos) {
+          tablasSegmentos.push({
+            table: {
+              widths: ['20%', '40%', '*'],
+              body: [
+                [
+                  {
+                    text: seg.titulo || '',
+                    style: 'tablaEtiqueta',
+                    color: '#407C2E'
+                  },
+                  {
+                    text: `Manut: ${seg.numManutenciones || 0} × ${fmtEuro(seg.precioManutencion || 0)} = ${fmtEuro(seg.importeManutencion || 0)}`,
+                    style: 'tablaEtiqueta'
+                  },
+                  {
+                    text: `Aloj. máx: ${seg.numNoches || 0} × ${fmtEuro(seg.precioNoche || 0)} = ${fmtEuro(seg.importeMaxAlojamiento || 0)}`,
+                    style: 'tablaEtiqueta'
+                  }
+                ]
+              ]
+            },
+            layout: layoutSoloBordeInferior,
+            margin: [0, 0, 0, 0]
+          });
+        }
+      }
 
-      const bodyRows = [
-        // Fila 1: Fechas + Manutención
-        [
-          { text: fechasText },
-          {
-            text: manutText,
-            style: 'tablaEtiqueta',
-            alignment: 'right'
-          },
-          {
-            text: fmtEuro(dc.importeManutencion || 0),
-            style: 'tablaDato',
-            alignment: 'right'
-          }
-        ],
-        // Fila 2: Origen/Destino + Alojamiento
-        [
-          {
-            text: `${desp.origen || ''} — ${desp.destino || ''}`,
-            style: 'tablaDato'
-          },
-          {
-            text: `Aloj. [ máx. ${dc.numNoches || 0} × ${fmtEuro(dc.precioNoche || 0)}${factorResEv} = ${fmtEuro(dc.importeMaxAlojamiento || 0)} ]`,
-            style: 'tablaEtiqueta',
-            alignment: 'right'
-          },
-          dc.excedeMaxAlojamiento
-            ? {
-                text: `* ${fmtEuro(parseEuroNumber(desp.alojamiento))}`,
-                style: 'tablaDato',
-                alignment: 'right',
-                color: '#c50909',
-                italics: true
-              }
-            : {
-                text: fmtEuro(parseEuroNumber(desp.alojamiento)),
-                style: 'tablaDato',
-                alignment: 'right'
-              }
-        ],
-        // Fila 3: Motivo + Kilometraje
-        [
-          {
-            text: [
-              { text: 'Motivo: ', style: 'tablaEtiqueta' },
-              { text: desp.motivo || '', style: 'tablaDato' }
-            ]
-          },
-          {
-            text: `Km. [ ${desp.km || 0} × ${fmtEuro(dc.precioPorKm || 0)} ]`,
-            style: 'tablaEtiqueta',
-            alignment: 'right'
-          },
-          {
-            text: fmtEuro(dc.importeKm || 0),
-            style: 'tablaDato',
-            alignment: 'right'
-          }
-        ]
-      ];
-
-      // Añadir filas de otros gastos si existen
+      // ─── 4. Tabla de importes (bordes solo exteriores) ───────────────────
+      const factorResEv = dc.residenciaEventual ? ' × 80%' : '';
       const otrosGastos = desp.otrosGastos || [];
-      let totalOtrosGastos = 0;
+
+      // 4.1 – Líneas de etiquetas e importes
+      const lineasEtiquetas = [];
+      const lineasImportes = [];
+
+      if (esInternacional) {
+        // 4.1B – Internacional
+        lineasEtiquetas.push({ text: 'Manutención total', style: 'tablaEtiqueta' });
+        lineasEtiquetas.push({ text: `Alojamiento [ máximo: ${fmtEuro(dc.importeMaxAlojamiento || 0)} ]`, style: 'tablaEtiqueta' });
+      } else {
+        // 4.1A – Nacional
+        const manutLabel = desp.noManutencion
+          ? 'Manutención [ No incluida ]'
+          : `Manutención [ ${dc.numManutenciones || 0} × ${fmtEuro(dc.precioManutencion || 0)}${factorResEv} ]`;
+        lineasEtiquetas.push({ text: manutLabel, style: 'tablaEtiqueta' });
+        lineasEtiquetas.push({
+          text: `Alojamiento [ máx. ${dc.numNoches || 0} × ${fmtEuro(dc.precioNoche || 0)}${factorResEv} = ${fmtEuro(dc.importeMaxAlojamiento || 0)} ]`,
+          style: 'tablaEtiqueta'
+        });
+      }
+
+      // Kilometraje (común)
+      lineasEtiquetas.push({ text: `Kilometraje [ ${desp.km || 0} × ${fmtEuro(dc.precioPorKm || 0)} ]`, style: 'tablaEtiqueta' });
+
+      // Importes correspondientes a las 3 líneas anteriores
+      const alojamientoUsuario = parseEuroNumber(desp.alojamiento);
+      const excedeMax = dc.excedeMaxAlojamiento;
+
+      lineasImportes.push({ text: fmtEuro(dc.importeManutencion || 0), style: 'tablaDato' });
+      lineasImportes.push(
+        excedeMax
+          ? { text: `* ${fmtEuro(alojamientoUsuario)}`, style: 'tablaDato', color: '#c50909', italics: true }
+          : { text: fmtEuro(alojamientoUsuario), style: 'tablaDato' }
+      );
+      lineasImportes.push({ text: fmtEuro(dc.importeKm || 0), style: 'tablaDato' });
+
+      // Otros gastos (una línea por cada uno)
       for (const gasto of otrosGastos) {
         const nombreTipo = TIPOS_OTROS_GASTOS[gasto.tipo] || gasto.tipo || 'Otro';
         const concepto = gasto.concepto || '';
         const importeGasto = parseEuroNumber(gasto.importe);
-        totalOtrosGastos += importeGasto;
-        
-        // Construir texto con estilos separados para tipo y concepto
-        const textoGasto = concepto 
-          ? [
+
+        if (concepto) {
+          lineasEtiquetas.push({
+            text: [
               { text: `${nombreTipo}: `, style: 'tablaEtiqueta' },
               { text: concepto, style: 'tablaDato' }
             ]
-          : { text: nombreTipo, style: 'tablaEtiqueta' };
-        
-        bodyRows.push([
-          {
-            text: textoGasto,
-            alignment: 'right',
-            colSpan: 2
-          },
-          {},
-          {
-            text: fmtEuro(importeGasto),
-            style: 'tablaDato',
-            alignment: 'right'
-          }
-        ]);
+          });
+        } else {
+          lineasEtiquetas.push({ text: nombreTipo, style: 'tablaEtiqueta' });
+        }
+
+        lineasImportes.push({ text: fmtEuro(importeGasto), style: 'tablaDato' });
       }
 
-      // Fila de TOTAL
-      const alojamientoUsuario = parseEuroNumber(desp.alojamiento);
-      const totalDesplazamiento = (dc.importeManutencion || 0) + alojamientoUsuario + (dc.importeKm || 0) + totalOtrosGastos;
+      // 4.2 – Fila de TOTAL
       const irpfSujeto = dc.irpfSujeto || 0;
-      const excedeMax = dc.excedeMaxAlojamiento;
+      const importeTotal = dc.importeTotal || 0;
+
+      const celdaIrpf = irpfSujeto > 0
+        ? {
+            text: [
+              { text: 'Sujeto a retención por IRPF: ', style: 'tablaEtiqueta' },
+              { text: fmtEuro(irpfSujeto), style: 'tablaDato' }
+            ],
+            alignment: 'left'
+          }
+        : { text: '' };
 
       // Celda del total (con formato especial si excede máximo alojamiento)
       const celdaTotal = excedeMax
         ? {
-            text: `* ${fmtEuro(totalDesplazamiento)}`,
+            text: `* ${fmtEuro(importeTotal)}`,
             style: 'tablaDato',
             alignment: 'right',
             bold: true,
@@ -713,61 +761,46 @@
             italics: true
           }
         : {
-            text: fmtEuro(totalDesplazamiento),
+            text: fmtEuro(importeTotal),
             style: 'tablaDato',
             alignment: 'right',
             bold: true
           };
 
-      if (irpfSujeto > 0) {
-        // IRPF > 0: tres celdas separadas
-        bodyRows.push([
-          {
-            text: [
-              { text: 'Sujeto a retención por IRPF: ', alignment: 'right', style: 'tablaEtiqueta' },
-              { text: fmtEuro(irpfSujeto), alignment: 'right', style: 'tablaDato' }
-            ]
-          },
-          {
-            text: 'TOTAL:',
-            style: 'tablaEtiqueta',
-            alignment: 'right'
-          },
-          celdaTotal
-        ]);
-      } else {
-        // IRPF = 0: unir primera y segunda celda
-        bodyRows.push([
-          {
-            text: 'TOTAL:',
-            style: 'tablaEtiqueta',
-            alignment: 'right',
-            colSpan: 2
-          },
-          {},
-          celdaTotal
-        ]);
-      }
-
-      const tabla = {
+      const tablaImportes = {
         table: {
-          widths: ['50%', '38%', '*'],  // Primera 50%, segunda 38%, tercera el resto (~12%)
-          body: bodyRows
+          widths: ['40%', '46%', '*'],
+          body: [
+            // Fila 1: Etiquetas (colspan=2) | Importes
+            [
+              { stack: lineasEtiquetas, alignment: 'right', colSpan: 2, lineHeight: 1.35 },
+              {},
+              { stack: lineasImportes, alignment: 'right', lineHeight: 1.35 }
+            ],
+            // Fila 2: IRPF | TOTAL | Importe total
+            [
+              celdaIrpf,
+              {
+                text: 'TOTAL:',
+                style: 'tablaEtiqueta',
+                alignment: 'right'
+              },
+              celdaTotal
+            ]
+          ]
         },
-        layout: {
-          hLineWidth: (i) => i === 0 ? 0 : 0.5,
-          vLineWidth: () => 0.5,
-          hLineColor: () => '#cccccc',
-          vLineColor: () => '#cccccc',
-          paddingTop: () => 5
-        },
+        layout: layoutUltimaTabla,
         margin: [0, 0, 0, 0]
       };
 
-      // Añadir espaciador, encabezado y tabla
+      // ─── Ensamblar resultado ─────────────────────────────────────────────
       result.push({ text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] });
       result.push(...encabezado);
-      result.push(tabla);
+      result.push(tablaDatosGenerales);
+      for (const tSeg of tablasSegmentos) {
+        result.push(tSeg);
+      }
+      result.push(tablaImportes);
     }
 
     return result;
@@ -909,7 +942,7 @@
     if (btnPDF) {
       btnPDF.addEventListener('click', () => {
         console.log('[pdfGen] Generando PDF...');
-        generar();
+        preview();
       });
     }
   }
