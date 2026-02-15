@@ -29,6 +29,7 @@
   "tiposProyecto": [
     [ "Contratos y convenios UEx", "UEX" ],
     [ "Ayudas a Grupos GR24", "G24" ],
+    [ "Ayudas a Proyectos IB24", "I24" ],
     [ "Plan Estatal de Investigación", "PEI" ],
     [ "Planes Complementarios", "PCO" ],
     [ "Otros proyectos R.D. 462/2002", "NAL" ],
@@ -77,7 +78,7 @@
     "ext": [48.08, 91.35]
   },
   "normativasPorTipoProyecto": {
-    "rd": ["G24","PEI","NAL"],
+    "rd": ["G24","I24","PEI","NAL"],
     "decreto": ["UEX","PCO","JEX"]
   }
 }
