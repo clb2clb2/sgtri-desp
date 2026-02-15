@@ -24,8 +24,31 @@
       return 595.28 - (this.page.margin * 2);
     },
     // Espaciado vertical entre tablas (1 cm = 28.35 pt)
-    espacioTablas: 14
+    espacioTablas: 14,
+    // Espacio base reservado en el margen inferior para el pie de página principal
+    footer: {
+      baseHeight: 132
+    }
   };
+
+  /**
+   * Calcula la altura del pie de página en función de los datos.
+   *  - Base: 152 pt
+   *  - +4 pt por cada elemento en imputacion[]
+   *  - +6 pt si se muestran logos (proyecto.tipo === 'G24' o 'I24')
+   * @param {Object} datos - Datos del formulario
+   * @returns {number} Altura en puntos
+   */
+  function calcularAlturaFooter(datos) {
+    let h = PDF_CONFIG.footer.baseHeight;
+    const imputacion = datos.imputacion || [];
+    h += imputacion.length * 12;
+    const tipo = datos.proyecto?.tipo;
+    if (tipo === 'G24' || tipo === 'I24') {
+      h += 14;
+    }
+    return h;
+  }
   
 
   // =========================================================================
@@ -125,9 +148,11 @@
    * @param {string} logoBase64 - Logo en Base64 (PNG) o contenido SVG
    * @param {boolean} logoIsSVG - true si el logo es SVG
    * @param {string} separadorSVG - Contenido SVG del separador
+   * @param {string|null} logosGr24Base64 - Imagen logos_gr24 en Base64 (para pie de página)
    */
-  function buildDocDefinition(datos, logoBase64, logoIsSVG = false, separadorSVG = null) {
+  function buildDocDefinition(datos, logoBase64, logoIsSVG = false, separadorSVG = null, logosGr24Base64 = null) {
     const margin = PDF_CONFIG.page.margin;
+    const footerHeight = calcularAlturaFooter(datos);
 
     return {
       // ─────────────────────────────────────────────────────────────────────
@@ -144,7 +169,17 @@
       // CONFIGURACIÓN DE PÁGINA
       // ─────────────────────────────────────────────────────────────────────
       pageSize: 'A4',
-      pageMargins: [margin, margin, margin, margin], // 15mm = 43pt en todos los lados
+      pageMargins: [margin, margin, margin, footerHeight],
+
+      // ─────────────────────────────────────────────────────────────────────
+      // IMÁGENES (para uso en footer)
+      // ─────────────────────────────────────────────────────────────────────
+      images: logosGr24Base64 ? { logosGr24: logosGr24Base64 } : {},
+
+      // ─────────────────────────────────────────────────────────────────────
+      // PIE DE PÁGINA (sección principal)
+      // ─────────────────────────────────────────────────────────────────────
+      footer: buildFooterPrincipal(datos, logosGr24Base64),
 
       // ─────────────────────────────────────────────────────────────────────
       // ESTILOS
@@ -206,31 +241,30 @@
         {
           table: {
             widths: [80, '*', 80],
+            heights: [42],
             body: [
               [
                 // Celda 1: Logo
                 {
-                  margin: [0, 0, 0, 0],
+                  margin: [0, -8, 0, 0],
                   alignment: 'left',
                   stack: [
                     logoIsSVG
                       ? {
                         svg: logoBase64,
-                        height: 145,
-                        alignment: 'left',
-                        margin: [0, 0, 0, 0]
+                        fit: [80, 50],
+                        alignment: 'left'
                       }
                       : {
                         image: logoBase64,
-                        height: 145,
-                        alignment: 'left',
-                        margin: [0, 0, 0, 0]
+                        fit: [80, 50],
+                        alignment: 'left'
                       }
                   ]
                 },
                 // Celda 2: Título
                 {
-                  margin: [0, 7.5, 0, 0],
+                  margin: [0, 3, 0, 0],
                   alignment: 'center',
                   stack: [
                     { text: 'Liquidación de Desplazamientos,', style: 'titulo' },
@@ -252,7 +286,7 @@
           layout: {
             defaultBorder: false,
           },
-          margin: [0, 0, 0, 10]
+          margin: [0, -4, 0, 4]
         },
 
         // ═══════════════════════════════════════════════════════════════════
@@ -262,7 +296,7 @@
           svg: separadorSVG,
           width: PDF_CONFIG.anchoUtil,
           alignment: 'center',
-          margin: [0, 0, 0, 15]
+          margin: [0, 0, 0, 10]
         } : {},
 
         // ═══════════════════════════════════════════════════════════════════
@@ -270,16 +304,19 @@
         // ═══════════════════════════════════════════════════════════════════
         
         // Tabla: Datos del beneficiario
-        ...buildTablaBeneficiario(datos),
+        { unbreakable: true, stack: buildTablaBeneficiario(datos) },
 
         // Espaciador entre tablas
         { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
 
         // Tabla: Datos del proyecto
-        ...buildTablaProyecto(datos),
+        { unbreakable: true, stack: buildTablaProyecto(datos) },
 
-        // Tablas de desplazamientos nacionales
-        ...buildTablasDesplazamientos(datos)
+        // Tablas de desplazamientos
+        ...buildTablasDesplazamientos(datos),
+
+        // Tabla de desplazamiento especial (si existe)
+        ...buildTablaDesplazamientoEspecial(datos)
 
       ]
     };
@@ -294,9 +331,19 @@
    * @param {string} texto - Texto del encabezado
    * @returns {Array} Array con texto y canvas para la línea
    */
-  function buildEncabezadoSeccion(texto) {
+  function buildEncabezadoSeccion(texto, notaDerecha = null) {
+    const headerRow = notaDerecha
+      ? {
+          columns: [
+            { text: texto, style: 'tablaEncabezado', width: 'auto' },
+            { text: notaDerecha.text, style: 'tablaNotaSmall', alignment: 'right', link: notaDerecha.link, decoration: notaDerecha.link ? 'underline' : undefined }
+          ],
+          margin: [0, 0, 0, 2]
+        }
+      : { text: texto, style: 'tablaEncabezado', margin: [0, 0, 0, 2] };
+
     return [
-      { text: texto, style: 'tablaEncabezado', margin: [0, 0, 0, 2] },
+      headerRow,
       {
         canvas: [
           {
@@ -320,6 +367,7 @@
   function buildTablaBeneficiario(datos) {
     const b = datos.beneficiario || {};
     const pago = datos.pago || {};
+    const v = datos.vehiculo || null;
 
     // Construir fila de pago según el tipo
     let filaPago;
@@ -357,9 +405,10 @@
     const encabezado = buildEncabezadoSeccion('BENEFICIARIO:');
     
     // Tabla sin la fila de encabezado
+    // Usar 4 columnas para soportar fila de vehículo; filas 1-3 usan colSpan
     const tabla = {
       table: {
-        widths: ['50%', '*'],
+        widths: ['25%', '25%', '25%', '*'],
         body: [
           // Fila 1: Nombre (50%) + DNI (50%)
           [
@@ -367,14 +416,18 @@
               text: [
                 { text: 'Nombre: ', style: 'tablaEtiqueta' },
                 { text: b.nombre || '', style: 'tablaDato' }
-              ]
+              ],
+              colSpan: 2
             },
+            {},
             {
               text: [
                 { text: 'DNI/Pasaporte: ', style: 'tablaEtiqueta' },
                 { text: b.dni || '', style: 'tablaDato' }
-              ]
-            }
+              ],
+              colSpan: 2
+            },
+            {}
           ],
           // Fila 2: Entidad (50%) + Categoría (50%)
           [
@@ -382,18 +435,50 @@
               text: [
                 { text: 'Entidad contratante: ', style: 'tablaEtiqueta' },
                 { text: b.entidad || '', style: 'tablaDato' }
-              ]
+              ],
+              colSpan: 2
             },
+            {},
             {
               text: [
                 { text: 'En calidad de: ', style: 'tablaEtiqueta' },
                 { text: b.categoriaNombre || b.categoria || '', style: 'tablaDato' }
+              ],
+              colSpan: 2
+            },
+            {}
+          ],
+          // Fila 3: Vehículo particular (solo si tiene datos reales)
+          ...(v && (v.marca || v.modelo || v.matricula) ? [[
+            {
+              text: [
+                { text: `Vehículo particular (${v.tipo || ''}): `, style: 'tablaEtiqueta' }
+              ]
+            },
+            {
+              text: [
+                { text: 'Marca: ', style: 'tablaEtiqueta' },
+                { text: v.marca || '', style: 'tablaDato' }
+              ]
+            },
+            {
+              text: [
+                { text: 'Modelo: ', style: 'tablaEtiqueta' },
+                { text: v.modelo || '', style: 'tablaDato' }
+              ]
+            },
+            {
+              text: [
+                { text: 'Matrícula: ', style: 'tablaEtiqueta' },
+                { text: v.matricula || '', style: 'tablaDato' }
               ]
             }
-          ],
-          // Fila 3: Datos de pago (100%)
+          ]] : []),
+          // Fila última: Datos de pago (100%)
           [
-            filaPago,
+            { ...filaPago, colSpan: 4 },
+            {},
+            {},
             {}
           ]
         ]
@@ -494,41 +579,22 @@
       ]);
     }
 
-    // Fila final: Normativa con enlace
-    let textoNormativa;
+    // Nota de normativa para el encabezado
+    let notaNormativa;
     if (p.normativa === 'decreto') {
-      textoNormativa = {
-        text: [
-          { text: 'Cálculos efectuados en base al ' },
-          {
-            text: 'Decreto 42/2025',
-            link: 'https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o',
-            decoration: 'underline'
-          }
-        ],
-        style: 'tablaNotaSmall',
-        alignment: 'center',
-        colSpan: 4
+      notaNormativa = {
+        text: 'Cálculos efectuados en base al Decreto 42/2025',
+        link: 'https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o'
       };
     } else {
-      textoNormativa = {
-        text: [
-          { text: 'Cálculos efectuados en base al ' },
-          {
-            text: 'RD 462/2002',
-            link: 'https://www.boe.es/buscar/act.php?id=BOE-A-2002-10337',
-            decoration: 'underline'
-          }
-        ],
-        style: 'tablaNotaSmall',
-        alignment: 'center',
-        colSpan: 4
+      notaNormativa = {
+        text: 'Cálculos efectuados en base al RD 462/2002',
+        link: 'https://www.boe.es/buscar/act.php?id=BOE-A-2002-10337'
       };
     }
-    bodyRows.push([textoNormativa, {}, {}, {}]);
 
-    // Encabezado con línea verde
-    const encabezado = buildEncabezadoSeccion('DATOS DEL PROYECTO:');
+    // Encabezado con línea verde + nota normativa a la derecha
+    const encabezado = buildEncabezadoSeccion('DATOS DEL PROYECTO:', notaNormativa);
 
     // Tabla sin la fila de encabezado
     const tabla = {
@@ -601,12 +667,13 @@
       paddingTop: () => 5
     };
 
-    for (const desp of desplazamientos) {
+    for (let despIdx = 0; despIdx < desplazamientos.length; despIdx++) {
+      const desp = desplazamientos[despIdx];
       const dc = desp.datosCalculados || {};
       const esInternacional = desp.paisDestino !== 'España';
 
       // ─── 1. Encabezado con línea verde ───────────────────────────────────
-      const encabezado = buildEncabezadoSeccion(`DESPLAZAMIENTO #${desp.id}`);
+      const encabezado = buildEncabezadoSeccion(`DESPLAZAMIENTO #${despIdx + 1}`);
 
       // ─── 2. Tabla de datos generales (2 filas, bordes completos) ─────────
       const fechasText = [
@@ -701,20 +768,31 @@
         });
       }
 
-      // Kilometraje (común)
-      lineasEtiquetas.push({ text: `Kilometraje [ ${desp.km || 0} × ${fmtEuro(dc.precioPorKm || 0)} ]`, style: 'tablaEtiqueta' });
-
-      // Importes correspondientes a las 3 líneas anteriores
+      // Importes correspondientes
       const alojamientoUsuario = parseEuroNumber(desp.alojamiento);
       const excedeMax = dc.excedeMaxAlojamiento;
+      const importeKm = dc.importeKm || 0;
 
+      // Manutención (siempre)
       lineasImportes.push({ text: fmtEuro(dc.importeManutencion || 0), style: 'tablaDato' });
-      lineasImportes.push(
-        excedeMax
-          ? { text: `* ${fmtEuro(alojamientoUsuario)}`, style: 'tablaDato', color: '#c50909', italics: true }
-          : { text: fmtEuro(alojamientoUsuario), style: 'tablaDato' }
-      );
-      lineasImportes.push({ text: fmtEuro(dc.importeKm || 0), style: 'tablaDato' });
+
+      // Alojamiento: ocultar si 0 € y destino es España
+      if (alojamientoUsuario > 0 || esInternacional) {
+        lineasImportes.push(
+          excedeMax
+            ? { text: `* ${fmtEuro(alojamientoUsuario)}`, style: 'tablaDato', color: '#c50909', italics: true }
+            : { text: fmtEuro(alojamientoUsuario), style: 'tablaDato' }
+        );
+      } else {
+        // Quitar la etiqueta de alojamiento ya añadida
+        lineasEtiquetas.pop();
+      }
+
+      // Kilometraje: ocultar si 0 €
+      if (importeKm > 0) {
+        lineasEtiquetas.push({ text: `Kilometraje [ ${desp.km || 0} × ${fmtEuro(dc.precioPorKm || 0)} ]`, style: 'tablaEtiqueta' });
+        lineasImportes.push({ text: fmtEuro(importeKm), style: 'tablaDato' });
+      }
 
       // Otros gastos (una línea por cada uno)
       for (const gasto of otrosGastos) {
@@ -793,17 +871,221 @@
         margin: [0, 0, 0, 0]
       };
 
-      // ─── Ensamblar resultado ─────────────────────────────────────────────
+      // ─── Ensamblar resultado (unbreakable) ───────────────────────────────
+      const despStack = [
+        ...encabezado,
+        tablaDatosGenerales,
+        ...tablasSegmentos,
+        tablaImportes
+      ];
       result.push({ text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] });
-      result.push(...encabezado);
-      result.push(tablaDatosGenerales);
-      for (const tSeg of tablasSegmentos) {
-        result.push(tSeg);
-      }
-      result.push(tablaImportes);
+      result.push({ unbreakable: true, stack: despStack });
     }
 
     return result;
+  }
+
+  /**
+   * Construye la tabla del desplazamiento especial.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con encabezado y tabla (vacío si no hay datos)
+   */
+  function buildTablaDesplazamientoEspecial(datos) {
+    const despEsp = datos.desplazamientoEspecial;
+    if (!despEsp || !despEsp.lineas || despEsp.lineas.length === 0) return [];
+
+    // Encabezado con línea verde
+    const encabezado = buildEncabezadoSeccion('DESPLAZAMIENTO ESPECIAL');
+
+    // Layout: solo borde inferior y laterales
+    const layoutSoloBordeInferior = {
+      hLineWidth: (i, node) => i === node.table.body.length ? 0.5 : 0,
+      vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 0.5 : 0,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
+    const bodyRows = [];
+
+    for (const linea of despEsp.lineas) {
+      if (linea.tipo === 'seccion') {
+        // Fila de sección: colspan=3, texto verde
+        bodyRows.push([
+          {
+            text: linea.descripcion || '',
+            style: 'tablaEtiqueta',
+            color: '#407C2E',
+            colSpan: 3
+          },
+          {},
+          {}
+        ]);
+      } else if (linea.tipo === 'normal') {
+        const totalVal = parseEuroNumber(linea.total);
+        const cantidad = (linea.cantidad || '').toString().trim();
+
+        // Etiqueta: descripción + [ importe × cantidad ] si hay cantidad
+        const labelText = cantidad !== ''
+          ? `${linea.descripcion || ''} [ ${linea.importe || ''} × ${cantidad} ]`
+          : (linea.descripcion || '');
+
+        bodyRows.push([
+          {
+            text: labelText,
+            style: 'tablaEtiqueta',
+            alignment: 'right',
+            colSpan: 2
+          },
+          {},
+          {
+            text: fmtEuro(totalVal),
+            style: 'tablaDato',
+            alignment: 'right'
+          }
+        ]);
+      }
+    }
+
+    // Fila de TOTAL + IRPF
+    const irpfVal = parseEuroNumber(despEsp.irpf);
+    const totalVal = typeof despEsp.total === 'number' ? despEsp.total : parseEuroNumber(despEsp.total);
+
+    const celdaIrpf = irpfVal > 0
+      ? {
+          text: [
+            { text: 'Sujeto a retención por IRPF: ', style: 'tablaEtiqueta' },
+            { text: fmtEuro(irpfVal), style: 'tablaDato' }
+          ],
+          alignment: 'left'
+        }
+      : { text: '' };
+
+    bodyRows.push([
+      celdaIrpf,
+      {
+        text: 'TOTAL:',
+        style: 'tablaEtiqueta',
+        alignment: 'right'
+      },
+      {
+        text: fmtEuro(totalVal),
+        style: 'tablaDato',
+        alignment: 'right',
+        bold: true
+      }
+    ]);
+
+    const tabla = {
+      table: {
+        widths: ['40%', '46%', '*'],
+        body: bodyRows
+      },
+      layout: layoutSoloBordeInferior,
+      margin: [0, 0, 0, 0]
+    };
+
+    return [
+      { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
+      { unbreakable: true, stack: [...encabezado, tabla] }
+    ];
+  }
+
+  // =========================================================================
+  // PIE DE PÁGINA (sección principal)
+  // =========================================================================
+
+  /**
+   * Construye la función footer para la sección principal del PDF.
+   * @param {Object} datos - Datos del formulario
+   * @param {string|null} logosGr24Base64 - Imagen logos_gr24 en Base64
+   * @returns {Function} Función footer(currentPage, pageCount) para pdfmake
+   */
+  function buildFooterPrincipal(datos, logosGr24Base64) {
+    const imputacion = datos.imputacion || [];
+    const beneficiario = datos.beneficiario || {};
+    const proyecto = datos.proyecto || {};
+
+    // Responsables únicos (sin repetir)
+    const responsablesUnicos = [...new Set(
+      imputacion.map(imp => imp.responsable).filter(Boolean)
+    )];
+
+    const textoFdoResponsable = responsablesUnicos.length > 1
+      ? 'Fdo: los/las responsables del gasto,'
+      : 'Fdo: el/la responsable del gasto,';
+
+    const mostrarLogos = (proyecto.tipo === 'G24' || proyecto.tipo === 'I24') && !!logosGr24Base64;
+
+    return function (currentPage, pageCount) {
+      const m = PDF_CONFIG.page.margin;
+
+      // Fila 4: logos (columnas 2-3) o vacía
+      const celdaLogos = mostrarLogos
+        ? { image: 'logosGr24', fit: [PDF_CONFIG.anchoUtil * 0.84, 28], alignment: 'center', colSpan: 2 }
+        : { text: '', colSpan: 2 };
+
+      return {
+        margin: [m, 0, m, 0],
+        table: {
+          widths: ['8%', '42%', '42%', '8%'],
+          // Reservar altura para la zona de firma (fila 1) y para la fila de logos/paginación (fila 3)
+          heights: (row) => row === 1 ? 56.7 : undefined,
+          body: [
+            // Fila 1: Conforme (colspan=4)
+            [
+              {
+                text: 'Conforme, en ______________ a ____ de ______________ de _______',
+                style: 'tablaDato',
+                alignment: 'center',
+                colSpan: 4
+              },
+              {},
+              {},
+              {}
+            ],
+            // Fila 2: espacio vacío (2 cm ≈ 56,7 pt — controlado por heights)
+            [
+              { text: '', colSpan: 4 },
+              {},
+              {},
+              {}
+            ],
+            // Fila 3: Fdo + nombres responsables (colspan=2) | Fdo + nombre beneficiario (colspan=2)
+            [
+              {
+                stack: [
+                  { text: textoFdoResponsable, style: 'tablaDato', alignment: 'center' },
+                  { text: responsablesUnicos.join('\n'), style: 'tablaDato', alignment: 'center' }
+                ],
+                lineHeight: 1.20,
+                colSpan: 2
+              },
+              {},
+              {
+                stack: [
+                  { text: 'Fdo.: el/la beneficiario/a,', style: 'tablaDato', alignment: 'center' },
+                  { text: beneficiario.nombre || '', style: 'tablaDato', alignment: 'center' }
+                ],
+                lineHeight: 1.20,
+                colSpan: 2
+              },
+              {}
+            ],
+            // Fila 4: vacía | logos (colspan=2) | Paginación
+            [
+              { text: '' },
+              celdaLogos,
+              {},
+              { text: `pág. ${currentPage}/${pageCount}`, style: 'tablaEtiqueta', alignment: 'right' }
+            ]
+          ]
+        },
+        layout: {
+          defaultBorder: false
+        }
+      };
+    };
   }
 
   // =========================================================================
@@ -870,8 +1152,17 @@
         console.warn('[pdfGen] No se pudo cargar el separador SVG');
       }
 
+      // Cargar logos GR24 (para pie de página)
+      let logosGr24Base64 = null;
+      try {
+        logosGr24Base64 = await loadImageAsBase64('assets/img/logos_gr24.png');
+        console.log('[pdfGen] Logos GR24 cargado');
+      } catch (e) {
+        console.warn('[pdfGen] No se pudo cargar logos_gr24.png');
+      }
+
       console.log('[pdfGen] Generando PDF...');
-      const docDefinition = buildDocDefinition(d, logoData, isSVG, separadorSVG);
+      const docDefinition = buildDocDefinition(d, logoData, isSVG, separadorSVG, logosGr24Base64);
 
       pdfMake.createPdf(docDefinition).download(`Liquidacion_${d.proyecto?.referencia || 'borrador'}.pdf`);
       console.log('[pdfGen] PDF generado correctamente');
@@ -924,7 +1215,15 @@
         // Continuar sin separador
       }
 
-      const docDefinition = buildDocDefinition(d, logoData, isSVG, separadorSVG);
+      // Cargar logos GR24 (para pie de página)
+      let logosGr24Base64 = null;
+      try {
+        logosGr24Base64 = await loadImageAsBase64('assets/img/logos_gr24.png');
+      } catch {
+        // Continuar sin logos
+      }
+
+      const docDefinition = buildDocDefinition(d, logoData, isSVG, separadorSVG, logosGr24Base64);
       pdfMake.createPdf(docDefinition).open();
 
     } catch (error) {
