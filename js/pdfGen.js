@@ -312,11 +312,24 @@
         // Tabla: Datos del proyecto
         { unbreakable: true, stack: buildTablaProyecto(datos) },
 
+        // Tabla de honorarios (si existe)
+        ...buildTablaHonorarios(datos),
+
         // Tablas de desplazamientos
         ...buildTablasDesplazamientos(datos),
 
         // Tabla de desplazamiento especial (si existe)
-        ...buildTablaDesplazamientoEspecial(datos)
+        ...buildTablaDesplazamientoEspecial(datos),
+
+        // Tabla de congresos (si existe y no está asociada a ningún desplazamiento)
+        ...(() => {
+          const evento = datos.evento || {};
+          const desplazamientoAsociado = evento.desplazamientoAsociado;
+          if (!desplazamientoAsociado) {
+            return buildTablaCongresos(datos);
+          }
+          return [];
+        })()
 
       ]
     };
@@ -402,7 +415,7 @@
     }
 
     // Encabezado con línea verde
-    const encabezado = buildEncabezadoSeccion('BENEFICIARIO:');
+    const encabezado = buildEncabezadoSeccion('BENEFICIARIO');
     
     // Tabla sin la fila de encabezado
     // Usar 4 columnas para soportar fila de vehículo; filas 1-3 usan colSpan
@@ -594,7 +607,7 @@
     }
 
     // Encabezado con línea verde + nota normativa a la derecha
-    const encabezado = buildEncabezadoSeccion('DATOS DEL PROYECTO:', notaNormativa);
+    const encabezado = buildEncabezadoSeccion('DATOS DEL PROYECTO', notaNormativa);
 
     // Tabla sin la fila de encabezado
     const tabla = {
@@ -616,12 +629,78 @@
   }
 
   /**
+   * Construye la tabla de honorarios.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con encabezado y tabla (vacío si no hay datos)
+   */
+  function buildTablaHonorarios(datos) {
+    const honorarios = datos.honorarios || {};
+    if (!honorarios.importe) return [];
+
+    // Encabezado con línea verde
+    const encabezado = buildEncabezadoSeccion('HONORARIOS');
+
+    // Layout: bordes horizontales sin borde superior
+    const layoutSinBordeSuperior = {
+      hLineWidth: (i) => i === 0 ? 0 : 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
+    const bodyRows = [
+      // Fila 1: En concepto de (colspan=2)
+      [
+        {
+          text: [
+            { text: 'En concepto de: ', style: 'tablaEtiqueta' },
+            { text: honorarios.concepto || '', style: 'tablaDato' }
+          ],
+          colSpan: 2
+        },
+        {}
+      ],
+      // Fila 2: IMPORTE HONORARIOS
+      [
+        {
+          text: 'IMPORTE HONORARIOS:',
+          style: 'tablaEtiqueta',
+          alignment: 'right'
+        },
+        {
+          text: fmtEuro(parseEuroNumber(honorarios.importe)),
+          style: 'tablaDato',
+          alignment: 'right',
+          bold: true
+        }
+      ]
+    ];
+
+    const tabla = {
+      table: {
+        widths: ['86%', '14%'],
+        body: bodyRows
+      },
+      layout: layoutSinBordeSuperior,
+      margin: [0, 0, 0, 0]
+    };
+
+    return [
+      { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
+      { unbreakable: true, stack: [...encabezado, tabla] }
+    ];
+  }
+
+  /**
    * Construye las tablas de desplazamientos (nacionales e internacionales).
    * @param {Object} datos - Datos del formulario
    * @returns {Array} Array con tablas para cada desplazamiento
    */
   function buildTablasDesplazamientos(datos) {
     const desplazamientos = datos.desplazamientos || [];
+    const evento = datos.evento || {};
+    const desplazamientoAsociado = evento.desplazamientoAsociado;
     const result = [];
 
     // Mapa de tipos de otros gastos
@@ -880,6 +959,19 @@
       ];
       result.push({ text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] });
       result.push({ unbreakable: true, stack: despStack });
+
+      // Si este desplazamiento está asociado al evento/congreso, agregar tabla de congresos
+      // Extraer número de "desp1" → 0, "desp2" → 1, o usar directamente si es número
+      let indiceAsociado = null;
+      if (desplazamientoAsociado) {
+        const match = String(desplazamientoAsociado).match(/\d+/);
+        if (match) {
+          indiceAsociado = parseInt(match[0]) - 1; // "desp1" → 0, "desp2" → 1
+        }
+      }
+      if (indiceAsociado !== null && indiceAsociado === despIdx) {
+        result.push(...buildTablaCongresos(datos));
+      }
     }
 
     return result;
@@ -897,9 +989,9 @@
     // Encabezado con línea verde
     const encabezado = buildEncabezadoSeccion('DESPLAZAMIENTO ESPECIAL');
 
-    // Layout: solo borde inferior y laterales
-    const layoutSoloBordeInferior = {
-      hLineWidth: (i, node) => i === node.table.body.length ? 0.5 : 0,
+    // Layout: todos los bordes horizontales excepto el superior
+    const layoutConBordesH = {
+      hLineWidth: (i, node) => i === 0 ? 0 : 0.5,
       vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 0.5 : 0,
       hLineColor: () => '#cccccc',
       vLineColor: () => '#cccccc',
@@ -907,10 +999,23 @@
     };
 
     const bodyRows = [];
+    let etiquetasActuales = [];
+    let importesActuales = [];
 
     for (const linea of despEsp.lineas) {
       if (linea.tipo === 'seccion') {
-        // Fila de sección: colspan=3, texto verde
+        // Si hay elementos acumulados, crear una fila con ellos
+        if (etiquetasActuales.length > 0) {
+          bodyRows.push([
+            { stack: etiquetasActuales, alignment: 'right', colSpan: 2, lineHeight: 1.35 },
+            {},
+            { stack: importesActuales, alignment: 'right', lineHeight: 1.35 }
+          ]);
+          etiquetasActuales = [];
+          importesActuales = [];
+        }
+
+        // Añadir la fila de sección
         bodyRows.push([
           {
             text: linea.descripcion || '',
@@ -930,21 +1035,26 @@
           ? `${linea.descripcion || ''} [ ${linea.importe || ''} × ${cantidad} ]`
           : (linea.descripcion || '');
 
-        bodyRows.push([
-          {
-            text: labelText,
-            style: 'tablaEtiqueta',
-            alignment: 'right',
-            colSpan: 2
-          },
-          {},
-          {
-            text: fmtEuro(totalVal),
-            style: 'tablaDato',
-            alignment: 'right'
-          }
-        ]);
+        etiquetasActuales.push({
+          text: labelText,
+          style: 'tablaEtiqueta'
+        });
+
+        importesActuales.push({
+          text: fmtEuro(totalVal),
+          style: 'tablaDato',
+          alignment: 'right'
+        });
       }
+    }
+
+    // Si quedan elementos acumulados al final, crear una fila
+    if (etiquetasActuales.length > 0) {
+      bodyRows.push([
+        { stack: etiquetasActuales, alignment: 'right', colSpan: 2, lineHeight: 1.35 },
+        {},
+        { stack: importesActuales, alignment: 'right', lineHeight: 1.35 }
+      ]);
     }
 
     // Fila de TOTAL + IRPF
@@ -981,7 +1091,104 @@
         widths: ['40%', '46%', '*'],
         body: bodyRows
       },
-      layout: layoutSoloBordeInferior,
+      layout: layoutConBordesH,
+      margin: [0, 0, 0, 0]
+    };
+
+    return [
+      { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
+      { unbreakable: true, stack: [...encabezado, tabla] }
+    ];
+  }
+
+  /**
+   * Construye la tabla de congresos u otros eventos.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con encabezado y tabla (vacío si no hay datos)
+   */
+  function buildTablaCongresos(datos) {
+    const evento = datos.evento;
+    if (!evento || (!evento.nombre && !evento.gastosInscripcion)) return [];
+
+    // Encabezado con línea verde
+    const encabezado = buildEncabezadoSeccion('CONGRESOS U OTROS EVENTOS');
+
+    // Layout: todos los bordes horizontales excepto el superior
+    const layoutConBordesH = {
+      hLineWidth: (i, node) => i === 0 ? 0 : 0.5,
+      vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 0.5 : 0,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
+    const bodyRows = [];
+
+    // Fila 1: Nombre del evento (colspan=3)
+    bodyRows.push([
+      {
+        text: [
+          { text: 'Nombre del evento: ', style: 'tablaEtiqueta' },
+          { text: evento.nombre || '', style: 'tablaDato' }
+        ],
+        alignment: 'left',
+        colSpan: 3
+      },
+      {},
+      {}
+    ]);
+
+    // Fila 2: Celebrado + Comidas incluidas
+    const lugar = evento.lugar || '';
+    const fechaDesde = evento.fechaDesde || '';
+    const fechaHasta = evento.fechaHasta || '';
+    const celebradoText = lugar
+      ? `en ${lugar}, del ${fechaDesde} al ${fechaHasta}`
+      : `del ${fechaDesde} al ${fechaHasta}`;
+
+    bodyRows.push([
+      {
+        text: [
+          { text: 'Celebrado: ', style: 'tablaEtiqueta' },
+          { text: celebradoText, style: 'tablaDato' }
+        ],
+        alignment: 'left'
+      },
+      {
+        text: [
+          { text: 'Número de comidas o cenas incluidas: ', style: 'tablaEtiqueta' },
+          { text: evento.comidasIncluidas || '0', style: 'tablaDato' }
+        ],
+        alignment: 'left',
+        colSpan: 2
+      },
+      {}
+    ]);
+
+    // Fila 3: Gastos de inscripción
+    const gastosInscripcion = parseEuroNumber(evento.gastosInscripcion);
+    bodyRows.push([
+      {
+        text: 'GASTOS DE INSCRIPCIÓN:',
+        style: 'tablaEtiqueta',
+        alignment: 'right',
+        colSpan: 2
+      },
+      {},
+      {
+        text: fmtEuro(gastosInscripcion),
+        style: 'tablaDato',
+        alignment: 'right',
+        bold: true
+      }
+    ]);
+
+    const tabla = {
+      table: {
+        widths: ['50%', '36%', '14%'],
+        body: bodyRows
+      },
+      layout: layoutConBordesH,
       margin: [0, 0, 0, 0]
     };
 
