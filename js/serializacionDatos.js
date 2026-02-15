@@ -351,12 +351,35 @@
   }
 
   /**
-   * Recopila los datos del desplazamiento especial
+   * Parsea un string numérico en formato europeo (1.234,56 €) a número.
+   * @param {string|number} val
+   * @returns {number}
+   */
+  function parseEuroStr(val) {
+    if (typeof val === 'number') return val;
+    if (!val || typeof val !== 'string') return 0;
+    const cleaned = val.replace(/€/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+    return Number(cleaned) || 0;
+  }
+
+  /**
+   * Recopila los datos del desplazamiento especial.
+   * Calcula y añade el campo `total` (suma de lineas[n].total).
    * @returns {Object|null}
    */
   function recopilarDesplazamientoEspecial() {
     if (global.uiDesplazamientoEspecial && typeof global.uiDesplazamientoEspecial.recopilarDatos === 'function') {
-      return global.uiDesplazamientoEspecial.recopilarDatos();
+      const datos = global.uiDesplazamientoEspecial.recopilarDatos();
+      if (datos && datos.lineas) {
+        let suma = 0;
+        for (const linea of datos.lineas) {
+          if (linea.tipo === 'normal' && linea.total) {
+            suma += parseEuroStr(linea.total);
+          }
+        }
+        datos.total = Math.round(suma * 100) / 100;
+      }
+      return datos;
     }
     return null;
   }
@@ -531,6 +554,11 @@
         // Eliminar del DOM sin animación
         grupo.remove();
       });
+
+      // Resetear el contador para que los nuevos IDs empiecen desde 1
+      if (uiDesp && uiDesp.resetCounter) {
+        uiDesp.resetCounter();
+      }
 
       // Crear todos los desplazamientos necesarios
       for (let i = 0; i < desplazamientos.length; i++) {
