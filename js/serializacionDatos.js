@@ -279,7 +279,8 @@
       fechaHasta: obtenerValorCampo('evento-al'),
       gastosInscripcion: obtenerValorCampo('evento-gastos'),
       comidasIncluidas: obtenerValorCampo('evento-num-comidas', 'number'),
-      desplazamientoAsociado: obtenerValorCampo('evento-asociado')
+      desplazamientoAsociado: obtenerValorCampo('evento-asociado'),
+      descuentoComidas: obtenerValorCampo('descuento-manut-congreso', 'number')
     };
   }
 
@@ -329,6 +330,24 @@
   }
 
   /**
+   * Recopila los datos del resultado de la liquidación.
+   * @returns {Object} { totalLiquidacion, irpfTotal }
+   */
+  function recopilarResultadoLiquidacion() {
+    if (!global.resultadoLiquidacion || typeof global.resultadoLiquidacion.calcularResultado !== 'function') {
+      return {
+        totalLiquidacion: 0,
+        irpfTotal: 0
+      };
+    }
+    const resultado = global.resultadoLiquidacion.calcularResultado();
+    return {
+      totalLiquidacion: resultado.totalLiquidacion || 0,
+      irpfTotal: resultado.irpfTotal || 0
+    };
+  }
+
+  /**
    * Recopila todos los datos del formulario
    * @returns {Object} Objeto con todos los datos serializados
    */
@@ -346,7 +365,8 @@
       evento: recopilarEvento(),
       honorarios: recopilarHonorarios(),
       imputacion: recopilarImputacion(),
-      ajustes: recopilarAjustes()
+      ajustes: recopilarAjustes(),
+      resultadoLiquidacion: recopilarResultadoLiquidacion()
     };
   }
 
@@ -639,6 +659,7 @@
     establecerValorCampo('evento-al', datos.fechaHasta);
     establecerValorCampo('evento-gastos', datos.gastosInscripcion);
     establecerValorCampo('evento-num-comidas', datos.comidasIncluidas);
+    establecerValorCampo('descuento-manut-congreso', datos.descuentoComidas);
     
     // Usar el mapeo de IDs si existe
     let desplazamientoAsociado = datos.desplazamientoAsociado;
@@ -783,6 +804,17 @@
   }
 
   /**
+   * Restaura los datos del resultado de la liquidación.
+   * Nota: Los valores son calculados automáticamente, esta función es un placeholder.
+   * @param {Object} datos
+   */
+  function restaurarResultadoLiquidacion(datos) {
+    // Los valores de resultado de liquidación se calculan automáticamente
+    // por resultadoLiquidacion.js cuando se actualiza cualquier campo
+    // Esta función es un placeholder para mantener consistencia
+  }
+
+  /**
    * Restaura todos los datos del formulario
    * @param {Object} datos - Objeto con todos los datos
    * @returns {Promise<boolean>} true si se restauró correctamente
@@ -825,6 +857,9 @@
     if (datos.desplazamientoEspecial && global.uiDesplazamientoEspecial?.restaurarDatos) {
       global.uiDesplazamientoEspecial.restaurarDatos(datos.desplazamientoEspecial);
     }
+
+    // Restaurar resultado de liquidación (recalculará automáticamente)
+    restaurarResultadoLiquidacion(datos.resultadoLiquidacion);
 
     // Tareas post-restauración
     setTimeout(() => {
