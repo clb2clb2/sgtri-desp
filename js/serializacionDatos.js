@@ -837,6 +837,11 @@
       if (!continuar) return false;
     }
 
+    // Limpiar formulario completo antes de restaurar
+    if (global.formLogic?.limpiarFormularioCompleto) {
+      global.formLogic.limpiarFormularioCompleto();
+    }
+
     // Restaurar cada sección (orden importante)
     restaurarBeneficiario(datos.beneficiario);
     restaurarPago(datos.pago);

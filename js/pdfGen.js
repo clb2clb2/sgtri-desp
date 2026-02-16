@@ -1261,7 +1261,7 @@
           ]
         });
         importesDescuentos.push({
-          text: fmtEuro(descuentoComidas),
+          text: '-' + fmtEuro(descuentoComidas),
           style: 'tablaDato',
           alignment: 'right'
         });
@@ -1277,7 +1277,7 @@
           ]
         });
         importesDescuentos.push({
-          text: fmtEuro(parseEuroNumber(d.importe)),
+          text: '-' + fmtEuro(parseEuroNumber(d.importe)),
           style: 'tablaDato',
           alignment: 'right'
         });
@@ -1356,7 +1356,7 @@
         body: [
           [
             {
-              text: 'RESULTADO DE LA LIQUIDACIÓN:',
+              text: 'IMPORTE TOTAL A IMPUTAR:',
               bold: true,
               alignment: 'right',
               colSpan: 2,
@@ -1459,8 +1459,7 @@
                   ]
                 }
               ],
-              alignment: 'center',
-              margin: [0, 1, 0, -2]
+              alignment: 'center'
             },
             {
               stack: [
@@ -1471,8 +1470,7 @@
                   ]
                 }
               ],
-              alignment: 'center',
-              margin: [0, 1, 0, -2]
+              alignment: 'center'
             },
             {
               stack: [
@@ -1483,8 +1481,7 @@
                   ]
                 }
               ],
-              alignment: 'center',
-              margin: [0, 1, 0, -2]
+              alignment: 'center'
             },
             {
               stack: [
@@ -1495,8 +1492,7 @@
                   ]
                 }
               ],
-              alignment: 'center',
-              margin: [0, 1, 0, -2]
+              alignment: 'center'
             }
           ]
         ]

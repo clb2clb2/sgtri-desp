@@ -196,6 +196,14 @@ body {
   transform: translateY(0);
 }
 
+.btn-action.btn-borrar {
+  background-color: #c0392b;
+}
+
+.btn-action.btn-borrar:hover {
+  background-color: #a93226;
+}
+
 .btn-action.btn-comprobar {
   background-color: #5a9bd5;
 }
