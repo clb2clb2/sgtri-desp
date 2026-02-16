@@ -1286,7 +1286,7 @@
         },
         {
           stack: lineasDescuentos,
-          alignment: 'left',
+          alignment: 'right',
           lineHeight: 1.35
         },
         {
