@@ -577,7 +577,7 @@
       bodyRows.push([
         {
           text: [
-            { text: `Responsable${num}: `, style: 'tablaEtiqueta' },
+            { text: `Responsable ${num}: `, style: 'tablaEtiqueta' },
             { text: imp.responsable || '', style: 'tablaDato' }
           ],
           colSpan: 2
@@ -585,7 +585,7 @@
         {},
         {
           text: [
-            { text: `Orgánica${num}: `, style: 'tablaEtiqueta' },
+            { text: `Orgánica ${num}: `, style: 'tablaEtiqueta' },
             { text: imp.organica || '', style: 'tablaDato' }
           ]
         },
@@ -936,9 +936,9 @@
           body: [
             // Fila 1: Etiquetas (colspan=2) | Importes
             [
-              { stack: lineasEtiquetas, alignment: 'right', colSpan: 2, lineHeight: 1.35 },
+              { stack: lineasEtiquetas, alignment: 'right', colSpan: 2, lineHeight: 1.35, margin: [0, 1, 0, -2] },
               {},
-              { stack: lineasImportes, alignment: 'right', lineHeight: 1.35 }
+              { stack: lineasImportes, alignment: 'right', lineHeight: 1.35, margin: [0, 1, 0, -2] }
             ],
             // Fila 2: IRPF | TOTAL | Importe total
             [
@@ -1013,9 +1013,9 @@
         // Si hay elementos acumulados, crear una fila con ellos
         if (etiquetasActuales.length > 0) {
           bodyRows.push([
-            { stack: etiquetasActuales, alignment: 'right', colSpan: 2, lineHeight: 1.35 },
+            { stack: etiquetasActuales, alignment: 'right', colSpan: 2, lineHeight: 1.35, margin: [0, 1, 0, -2] },
             {},
-            { stack: importesActuales, alignment: 'right', lineHeight: 1.35 }
+            { stack: importesActuales, alignment: 'right', lineHeight: 1.35, margin: [0, 1, 0, -2] }
           ]);
           etiquetasActuales = [];
           importesActuales = [];
@@ -1057,9 +1057,9 @@
     // Si quedan elementos acumulados al final, crear una fila
     if (etiquetasActuales.length > 0) {
       bodyRows.push([
-        { stack: etiquetasActuales, alignment: 'right', colSpan: 2, lineHeight: 1.35 },
+        { stack: etiquetasActuales, alignment: 'right', colSpan: 2, lineHeight: 1.35, margin: [0, 1, 0, -2] },
         {},
-        { stack: importesActuales, alignment: 'right', lineHeight: 1.35 }
+        { stack: importesActuales, alignment: 'right', lineHeight: 1.35, margin: [0, 1, 0, -2] }
       ]);
     }
 
@@ -1292,12 +1292,14 @@
         {
           stack: lineasDescuentos,
           alignment: 'right',
-          lineHeight: 1.35
+          lineHeight: 1.35,
+          margin: [0, 1, 0, -2]
         },
         {
           stack: importesDescuentos,
           alignment: 'right',
-          lineHeight: 1.35
+          lineHeight: 1.35,
+          margin: [0, 1, 0, -2]
         }
       ]);
     }
@@ -1457,7 +1459,8 @@
                   ]
                 }
               ],
-              alignment: 'center'
+              alignment: 'center',
+              margin: [0, 1, 0, -2]
             },
             {
               stack: [
@@ -1468,7 +1471,8 @@
                   ]
                 }
               ],
-              alignment: 'center'
+              alignment: 'center',
+              margin: [0, 1, 0, -2]
             },
             {
               stack: [
@@ -1479,7 +1483,8 @@
                   ]
                 }
               ],
-              alignment: 'center'
+              alignment: 'center',
+              margin: [0, 1, 0, -2]
             },
             {
               stack: [
@@ -1490,7 +1495,8 @@
                   ]
                 }
               ],
-              alignment: 'center'
+              alignment: 'center',
+              margin: [0, 1, 0, -2]
             }
           ]
         ]
@@ -1575,7 +1581,8 @@
                   { text: responsablesUnicos.join('\n'), style: 'tablaDato', alignment: 'center' }
                 ],
                 lineHeight: 1.20,
-                colSpan: 2
+                colSpan: 2,
+                margin: [0, 1, 0, -2]
               },
               {},
               {
@@ -1584,7 +1591,8 @@
                   { text: beneficiario.nombre || '', style: 'tablaDato', alignment: 'center' }
                 ],
                 lineHeight: 1.20,
-                colSpan: 2
+                colSpan: 2,
+                margin: [0, 1, 0, -2]
               },
               {}
             ],

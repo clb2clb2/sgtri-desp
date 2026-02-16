@@ -783,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const resto = suma % 11;
         const digito = 11 - resto;
-        return digito === 11 ? 0 : (digito === 10 ? 0 : digito);
+        return digito === 11 ? 0 : (digito === 10 ? 1 : digito);
       }
 
       /**
