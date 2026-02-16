@@ -60,6 +60,4 @@
     }
   });
 
-  console.log('[pdfFonts] Fuentes Helvetica Neue y Roboto cargadas correctamente');
-
 })(typeof window !== 'undefined' ? window : this);

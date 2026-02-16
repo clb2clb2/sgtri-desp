@@ -522,8 +522,6 @@
     setupEventDelegation();
     setupProyectoListeners();
     renderLineas();
-
-    console.log('[uiImputacion] Módulo inicializado');
   }
 
   /**
