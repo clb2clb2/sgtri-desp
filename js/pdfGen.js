@@ -332,7 +332,10 @@
         })(),
 
         // Tabla de resultado de liquidación (si hay descuentos o financiación)
-        ...buildTablaResultadoLiquidacion(datos)
+        ...buildTablaResultadoLiquidacion(datos),
+
+        // Tabla de IRPF
+        ...buildTablaIRPF(datos)
 
       ]
     };
@@ -1204,20 +1207,22 @@
   /**
    * Construye la tabla del resultado de la liquidación.
    * @param {Object} datos - Datos del formulario
-   * @returns {Array} Array con encabezado y tabla (vacío si no hay datos relevantes)
+   * @returns {Array} Array con encabezado y tabla (vacío si no hay totalLiquidacion)
    */
   function buildTablaResultadoLiquidacion(datos) {
     const ajustes = datos.ajustes || {};
     const evento = datos.evento || {};
     const resultadoLiquidacion = datos.resultadoLiquidacion || {};
     
-    // Verificar si hay contenido a mostrar
+    // Solo mostrar si hay totalLiquidacion mayor que 0
+    const totalLiquidacion = parseEuroNumber(resultadoLiquidacion.totalLiquidacion);
+    if (totalLiquidacion <= 0) return [];
+    
+    // Verificar si hay descuentos o financiación para mostrar
     const descuentos = ajustes.descuentos || [];
     const descuentoComidas = parseEuroNumber(evento.descuentoComidas);
     const tieneDescuentos = descuentoComidas > 0 || descuentos.length > 0;
     const tieneFinanciacion = ajustes.financiacionMaxima && parseEuroNumber(ajustes.financiacionMaxima) > 0;
-    
-    if (!tieneDescuentos && !tieneFinanciacion) return [];
 
     // Encabezado con línea verde
     const encabezado = buildEncabezadoSeccion('RESULTADO DE LA LIQUIDACIÓN');
@@ -1343,7 +1348,6 @@
     }
 
     // Tabla 2: Resultado de la liquidación (siempre presente con bordes verdes)
-    const totalLiquidacion = resultadoLiquidacion.totalLiquidacion || 0;
     const tablaResultado = {
       table: {
         widths: ['30%', '56%', '14%'],
@@ -1382,9 +1386,130 @@
     ];
   }
 
-  // =========================================================================
-  // PIE DE PÁGINA (sección principal)
-  // =========================================================================
+  /**
+   * Construye la tabla de IRPF (dos tablas unidas visualmente).
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con las dos tablas (vacío si no hay datos de IRPF)
+   */
+  function buildTablaIRPF(datos) {
+    const resultadoLiquidacion = datos.resultadoLiquidacion || {};
+    
+    // Solo mostrar si irpfTotal es mayor que 0
+    const irpfTotal = parseEuroNumber(resultadoLiquidacion.irpfTotal);
+    if (irpfTotal <= 0) {
+      return [];
+    }
+
+    const baseExenta = (resultadoLiquidacion.totalLiquidacion || 0) - (resultadoLiquidacion.irpfTotal || 0);
+    const baseSujeta = resultadoLiquidacion.irpfTotal || 0;
+
+    // Tabla 1: Sin bordes, 2 columnas al 50%
+    const tabla1 = {
+      table: {
+        widths: ['50%', '*'],
+        body: [
+          [
+            {
+              text: [
+                {
+                  text: 'LIQUIDACIÓN IRPF',
+                  bold: true,
+                  fontSize: 9,
+                  color: '#407C2E',
+                  font: 'HelveticaNeue'
+                },
+                { text: '  ' },
+                {
+                  text: '[ no rellenar ]',
+                  fontSize: 8,
+                  italics: true,
+                  color: '#7c7c7c'
+                }
+              ],
+              alignment: 'left'
+            },
+            {
+              text: [
+                { text: 'Líquido a pagar: ', style: 'tablaEtiqueta', color: '#407C2E' },
+                { text: '______________', style: 'tablaEtiqueta', color: '#407C2E' }
+              ],
+              alignment: 'right'
+            }
+          ]
+        ]
+      },
+      layout: { defaultBorder: false },
+      margin: [0, 0, 0, 0]
+    };
+
+    // Tabla 2: Con bordes verdes, 4 columnas al 25%
+    const tabla2 = {
+      table: {
+        widths: ['25%', '25%', '25%', '*'],
+        body: [
+          [
+            {
+              stack: [
+                {
+                  text: [
+                    { text: 'Base exenta: ', style: 'tablaEtiqueta', color: '#407C2E' },
+                    { text: fmtEuro(baseExenta), style: 'tablaDato', color: '#407C2E' }
+                  ]
+                }
+              ],
+              alignment: 'center'
+            },
+            {
+              stack: [
+                {
+                  text: [
+                    { text: 'Base sujeta: ', style: 'tablaEtiqueta', color: '#407C2E' },
+                    { text: fmtEuro(baseSujeta), style: 'tablaDato', color: '#407C2E' }
+                  ]
+                }
+              ],
+              alignment: 'center'
+            },
+            {
+              stack: [
+                {
+                  text: [
+                    { text: 'Tipo: ', style: 'tablaEtiqueta', color: '#407C2E' },
+                    { text: '________ %', style: 'tablaDato', color: '#407C2E' }
+                  ]
+                }
+              ],
+              alignment: 'center'
+            },
+            {
+              stack: [
+                {
+                  text: [
+                    { text: 'Cuota: ', style: 'tablaEtiqueta', color: '#407C2E' },
+                    { text: '______________', style: 'tablaDato', color: '#407C2E' }
+                  ]
+                }
+              ],
+              alignment: 'center'
+            }
+          ]
+        ]
+      },
+      layout: {
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => '#407C2E',
+        vLineColor: () => '#407C2E',
+        paddingTop: () => 5
+      },
+      margin: [0, 0, 0, 0]
+    };
+
+    return [
+      { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
+      { unbreakable: true, stack: [tabla1, tabla2] }
+    ];
+  }
 
   /**
    * Construye la función footer para la sección principal del PDF.
@@ -1426,7 +1551,7 @@
             // Fila 1: Conforme (colspan=4)
             [
               {
-                text: 'Conforme, en ______________ a ____ de ______________ de _______',
+                text: 'Conforme, en __________________________ a ____ de ______________ de _______',
                 style: 'tablaDato',
                 alignment: 'center',
                 colSpan: 4
