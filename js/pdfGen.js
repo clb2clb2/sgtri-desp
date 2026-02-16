@@ -1317,37 +1317,68 @@
       ]);
     }
 
-    // Fila 3: Resultado de la liquidación (siempre presente)
-    const totalLiquidacion = resultadoLiquidacion.totalLiquidacion || 0;
-    bodyRows.push([
-      {
-        text: 'RESULTADO DE LA LIQUIDACIÓN:',
-        style: 'tablaEtiqueta',
-        bold: true,
-        alignment: 'right',
-        colSpan: 2
-      },
-      {},
-      {
-        text: fmtEuro(totalLiquidacion),
-        style: 'tablaDato',
-        bold: true,
-        alignment: 'right'
-      }
-    ]);
+    // Layout para la tabla de resultado final (bordes externos verdes sin bordes internos)
+    const layoutResultadoFinal = {
+      hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0,
+      vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 1 : 0,
+      hLineColor: () => '#407C2E',
+      vLineColor: () => '#407C2E',
+      paddingTop: () => 5
+    };
 
-    const tabla = {
+    // Construir tablas
+    let tablas = [];
+
+    // Tabla 1: Descuentos y/o Financiación (si los hay)
+    if (bodyRows.length > 0) {
+      const tabla1 = {
+        table: {
+          widths: ['30%', '56%', '14%'],
+          body: bodyRows
+        },
+        layout: layoutConBordesH,
+        margin: [0, 0, 0, 0]
+      };
+      tablas.push(tabla1);
+    }
+
+    // Tabla 2: Resultado de la liquidación (siempre presente con bordes verdes)
+    const totalLiquidacion = resultadoLiquidacion.totalLiquidacion || 0;
+    const tablaResultado = {
       table: {
         widths: ['30%', '56%', '14%'],
-        body: bodyRows
+        body: [
+          [
+            {
+              text: 'RESULTADO DE LA LIQUIDACIÓN:',
+              bold: true,
+              alignment: 'right',
+              colSpan: 2,
+              color: '#000000',
+              fontSize: 10,
+              font: 'HelveticaNeue-MediumCondensed'
+            },
+            {},
+            {
+              text: fmtEuro(totalLiquidacion),
+              style: 'tablaDato',
+              bold: true,
+              alignment: 'right'
+            }
+          ]
+        ]
       },
-      layout: layoutConBordesH,
+      layout: layoutResultadoFinal,
       margin: [0, 0, 0, 0]
     };
+    tablas.push(tablaResultado);
+
+    // Ensamblar: encabezado + todas las tablas en un stack
+    const contenido = [...encabezado, ...tablas];
 
     return [
       { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
-      { unbreakable: true, stack: [...encabezado, tabla] }
+      { unbreakable: true, stack: contenido }
     ];
   }
 
