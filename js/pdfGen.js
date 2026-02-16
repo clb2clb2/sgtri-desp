@@ -329,7 +329,10 @@
             return buildTablaCongresos(datos);
           }
           return [];
-        })()
+        })(),
+
+        // Tabla de resultado de liquidación (si hay descuentos o financiación)
+        ...buildTablaResultadoLiquidacion(datos)
 
       ]
     };
@@ -1186,6 +1189,156 @@
     const tabla = {
       table: {
         widths: ['50%', '36%', '14%'],
+        body: bodyRows
+      },
+      layout: layoutConBordesH,
+      margin: [0, 0, 0, 0]
+    };
+
+    return [
+      { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
+      { unbreakable: true, stack: [...encabezado, tabla] }
+    ];
+  }
+
+  /**
+   * Construye la tabla del resultado de la liquidación.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con encabezado y tabla (vacío si no hay datos relevantes)
+   */
+  function buildTablaResultadoLiquidacion(datos) {
+    const ajustes = datos.ajustes || {};
+    const evento = datos.evento || {};
+    const resultadoLiquidacion = datos.resultadoLiquidacion || {};
+    
+    // Verificar si hay contenido a mostrar
+    const descuentos = ajustes.descuentos || [];
+    const descuentoComidas = parseEuroNumber(evento.descuentoComidas);
+    const tieneDescuentos = descuentoComidas > 0 || descuentos.length > 0;
+    const tieneFinanciacion = ajustes.financiacionMaxima && parseEuroNumber(ajustes.financiacionMaxima) > 0;
+    
+    if (!tieneDescuentos && !tieneFinanciacion) return [];
+
+    // Encabezado con línea verde
+    const encabezado = buildEncabezadoSeccion('RESULTADO DE LA LIQUIDACIÓN');
+
+    // Layout: todos los bordes horizontales excepto el superior
+    const layoutConBordesH = {
+      hLineWidth: (i, node) => i === 0 ? 0 : 0.5,
+      vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 0.5 : 0,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
+    // Mapa de tipos de descuento
+    const tiposDescuento = {
+      'TOT': 'Total',
+      'MNT': 'Manutención',
+      'ALJ': 'Alojamiento',
+      'KLM': 'Kilometraje',
+      'OTR': 'Otros gastos'
+    };
+
+    const bodyRows = [];
+
+    // Fila 1: Descuentos (si los hay)
+    if (tieneDescuentos) {
+      const lineasDescuentos = [];
+      const importesDescuentos = [];
+
+      // Añadir descuento de comidas de congreso si existe
+      if (descuentoComidas > 0) {
+        lineasDescuentos.push({
+          text: [
+            { text: 'Manutención: ', style: 'tablaEtiqueta' },
+            { text: 'Comidas incluidas en congreso', style: 'tablaDato' }
+          ]
+        });
+        importesDescuentos.push({
+          text: fmtEuro(descuentoComidas),
+          style: 'tablaDato',
+          alignment: 'right'
+        });
+      }
+
+      // Añadir descuentos del array ajustes
+      descuentos.forEach(d => {
+        const tipoNombre = tiposDescuento[d.tipo] || d.tipo;
+        lineasDescuentos.push({
+          text: [
+            { text: `${tipoNombre}: `, style: 'tablaEtiqueta' },
+            { text: d.motivo || '', style: 'tablaDato' }
+          ]
+        });
+        importesDescuentos.push({
+          text: fmtEuro(parseEuroNumber(d.importe)),
+          style: 'tablaDato',
+          alignment: 'right'
+        });
+      });
+
+      bodyRows.push([
+        {
+          text: 'Descuentos',
+          style: 'tablaEtiqueta',
+          color: '#407C2E'
+        },
+        {
+          stack: lineasDescuentos,
+          alignment: 'left',
+          lineHeight: 1.35
+        },
+        {
+          stack: importesDescuentos,
+          alignment: 'right',
+          lineHeight: 1.35
+        }
+      ]);
+    }
+
+    // Fila 2: Financiación máxima (si existe)
+    if (tieneFinanciacion) {
+      const financiacion = parseEuroNumber(ajustes.financiacionMaxima);
+      bodyRows.push([
+        {
+          text: 'Financiación Máxima concedida',
+          style: 'tablaEtiqueta',
+          color: '#407C2E',
+          alignment: 'left',
+          colSpan: 2
+        },
+        {},
+        {
+          text: fmtEuro(financiacion),
+          style: 'tablaDato',
+          alignment: 'right'
+        }
+      ]);
+    }
+
+    // Fila 3: Resultado de la liquidación (siempre presente)
+    const totalLiquidacion = resultadoLiquidacion.totalLiquidacion || 0;
+    bodyRows.push([
+      {
+        text: 'RESULTADO DE LA LIQUIDACIÓN:',
+        style: 'tablaEtiqueta',
+        bold: true,
+        alignment: 'right',
+        colSpan: 2
+      },
+      {},
+      {
+        text: fmtEuro(totalLiquidacion),
+        style: 'tablaDato',
+        bold: true,
+        alignment: 'right'
+      }
+    ]);
+
+    const tabla = {
+      table: {
+        widths: ['30%', '56%', '14%'],
         body: bodyRows
       },
       layout: layoutConBordesH,
