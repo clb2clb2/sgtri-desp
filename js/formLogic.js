@@ -149,6 +149,20 @@ document.addEventListener('DOMContentLoaded', () => {
           serializar.abrirDialogoImportar();
         });
       }
+
+      // Configurar botón de borrar todo
+      const btnBorrarTodo = document.getElementById('btn-borrar-todo');
+      if (btnBorrarTodo) {
+        btnBorrarTodo.addEventListener('click', async () => {
+          const confirmed = await window.showConfirm(
+            '¿Estás seguro de que quieres borrar todo el contenido del formulario?',
+            { confirmText: 'Borrar' }
+          );
+          if (confirmed) {
+            limpiarFormularioCompleto();
+          }
+        });
+      }
     })
     .catch(error => console.error('Error cargando datos del JSON:', error));
 
@@ -1510,10 +1524,9 @@ document.addEventListener('DOMContentLoaded', () => {
       desplazamientos.forEach(d => d.remove());
     }
 
-    // Eliminar desplazamiento especial si existe
-    if (window.uiDesplazamientoEspecial?.existe && window.uiDesplazamientoEspecial.existe()) {
-      const especial = document.getElementById('desplazamiento-especial');
-      if (especial) especial.remove();
+    // Eliminar desplazamiento especial si existe (DOM + estado interno)
+    if (window.uiDesplazamientoEspecial?.reset) {
+      window.uiDesplazamientoEspecial.reset();
     }
 
     // Ocultar ficha de vehículo
@@ -1541,7 +1554,8 @@ document.addEventListener('DOMContentLoaded', () => {
    * Limpia la sección de eventos/congresos.
    */
   function limpiarSeccionEventos() {
-    ['evento-nombre', 'evento-inicio', 'evento-fin', 'evento-ciudad', 'evento-inscripcion'].forEach(id => {
+    // Campos de texto
+    ['evento-nombre', 'evento-lugar', 'evento-del', 'evento-al', 'evento-gastos'].forEach(id => {
       const campo = document.getElementById(id);
       if (campo) {
         campo.value = '';
@@ -1549,11 +1563,46 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    // Spinner de número de comidas (restablecer a 0)
+    const numComidas = document.getElementById('evento-num-comidas');
+    if (numComidas) {
+      numComidas.value = '0';
+      numComidas.classList.remove('field-error');
+    }
+
+    // Select de evento asociado (restablecer a primera opción)
+    const eventoAsociado = document.getElementById('evento-asociado');
+    if (eventoAsociado) {
+      eventoAsociado.selectedIndex = 0;
+      eventoAsociado.classList.remove('field-error');
+    }
+
     // Ocultar el contenedor de evento asociado
     const eventoAsociadoContainer = document.getElementById('evento-asociado-container');
     if (eventoAsociadoContainer) {
       eventoAsociadoContainer.style.display = 'none';
     }
+
+    // Ocultar mensaje de descuento por manutención
+    const descuentoMsg = document.getElementById('descuento-manut-message');
+    if (descuentoMsg) {
+      descuentoMsg.style.display = 'none';
+    }
+    const descuentoAmount = document.getElementById('descuento-manut-amount');
+    if (descuentoAmount) {
+      descuentoAmount.textContent = '0,00 €';
+    }
+
+    // Resetear hidden input de descuento congreso
+    const descuentoHidden = document.getElementById('descuento-manut-congreso');
+    if (descuentoHidden) {
+      descuentoHidden.value = '0.00';
+    }
+
+    // Ocultar aviso de fechas
+    document.querySelectorAll('.evento-fechas-warn').forEach(w => {
+      w.style.display = 'none';
+    });
   }
 
   /**
@@ -1580,6 +1629,13 @@ document.addEventListener('DOMContentLoaded', () => {
       situacion.selectedIndex = 0;
       situacion.classList.remove('field-error');
     }
+
+    // Textarea de concepto
+    const concepto = document.getElementById('honorarios-concepto');
+    if (concepto) {
+      concepto.value = '';
+      concepto.classList.remove('field-error');
+    }
   }
 
   /**
@@ -1604,6 +1660,84 @@ document.addEventListener('DOMContentLoaded', () => {
       window.uiAjustes.reset();
     }
   }
+
+  // =========================================================================
+  // LIMPIAR FORMULARIO COMPLETO
+  // =========================================================================
+
+  /**
+   * Limpia todo el formulario (equivale a recargar la página).
+   * Llama a todas las funciones limpiarSeccion* sin pedir confirmación,
+   * resetea el estado interno de todos los módulos y colapsa las secciones.
+   */
+  function limpiarFormularioCompleto() {
+    // 1. Limpiar cada sección (campos DOM + estado parcial)
+    limpiarSeccionBeneficiario();
+    limpiarSeccionProyecto();
+    limpiarSeccionDesplazamientos();
+    limpiarSeccionEventos();
+    limpiarSeccionHonorarios();
+    limpiarSeccionAjustes();
+
+    // 2. Resetear estado interno del desplazamiento especial
+    if (window.uiDesplazamientoEspecial?.reset) {
+      window.uiDesplazamientoEspecial.reset();
+    }
+
+    // 3. Resetear registro centralizado de totales
+    if (window.resultadoLiquidacion?.resetTotales) {
+      window.resultadoLiquidacion.resetTotales();
+    }
+
+    // 4. Resetear módulo de imputación
+    if (window.uiImputacion?.reset) {
+      window.uiImputacion.reset();
+    }
+
+    // 5. Limpiar residuos de mapeo temporal
+    delete window.__tempMapeoDesplazamientos;
+
+    // 6. Renderizar resultado vacío
+    if (window.resultadoLiquidacion?.renderResultado) {
+      window.resultadoLiquidacion.renderResultado();
+    }
+
+    // 7. Restaurar estado inicial de las secciones:
+    //    - Las que tienen data-start-collapsed="true" se colapsan
+    //    - Las demás se abren (beneficiario, proyecto, desplazamientos)
+    document.querySelectorAll('.section-title').forEach(title => {
+      if (title.classList.contains('no-collapse')) return;
+      const wrapper = title.nextElementSibling;
+      if (!wrapper) return;
+      const icon = title.querySelector('.toggle-section');
+      const debeEstarColapsada = title.dataset?.startCollapsed === 'true';
+      const estaColapsada = wrapper.classList.contains('collapsed') ||
+                            wrapper.style.maxHeight === '0px';
+
+      if (debeEstarColapsada && !estaColapsada) {
+        // Colapsar secciones que arrancan cerradas
+        wrapper.style.maxHeight = '0px';
+        wrapper.classList.add('collapsed');
+        wrapper.setAttribute('aria-hidden', 'true');
+        title.setAttribute('aria-expanded', 'false');
+        if (icon) icon.classList.remove('open');
+      } else if (!debeEstarColapsada && estaColapsada) {
+        // Abrir secciones que arrancan abiertas
+        const content = wrapper.querySelector('.section-content');
+        wrapper.style.maxHeight = (content ? content.scrollHeight : 1000) + 'px';
+        wrapper.classList.remove('collapsed');
+        wrapper.setAttribute('aria-hidden', 'false');
+        title.setAttribute('aria-expanded', 'true');
+        if (icon) icon.classList.add('open');
+      }
+    });
+
+    console.log('[formLogic] Formulario limpiado completamente');
+  }
+
+  // Exponer en window.formLogic
+  window.formLogic = window.formLogic || {};
+  window.formLogic.limpiarFormularioCompleto = limpiarFormularioCompleto;
 
   // ---- Listener delegado para botones de borrar sección ----
   document.addEventListener('click', (e) => {

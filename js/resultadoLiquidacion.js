@@ -698,6 +698,21 @@
     renderResultado();
   }
 
+  /**
+   * Resetea el registro centralizado de totales a su estado inicial.
+   * Pensado para ser llamado desde limpiarFormularioCompleto().
+   */
+  function resetTotales() {
+    global.__sgtriTotales = {
+      desplazamientos: {},
+      honorarios: 0,
+      gastosInscripcion: 0,
+      descuentoCongreso: 0,
+      financiacionMaxima: 0,
+      descuentosAjustes: []
+    };
+  }
+
   // =========================================================================
   // EXPORTACIÓN
   // =========================================================================
@@ -725,6 +740,9 @@
     // Renderizado
     renderResultado,
     calcularResultado,
+    
+    // Reset
+    resetTotales,
     
     // Utilidades
     fmt,

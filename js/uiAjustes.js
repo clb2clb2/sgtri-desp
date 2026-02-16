@@ -177,13 +177,22 @@
   // EXPORTACIÓN
   // =========================================================================
 
+  /**
+   * Resetea el estado interno del módulo (contador a 0).
+   * El vaciado del DOM (#otros-descuentos-container) se hace en formLogic.
+   */
+  function reset() {
+    descuentoCounter = 0;
+  }
+
   const uiAjustes = {
     init,
     agregarDescuento,
     crearLineaDescuento,
     actualizarBotonAddDescuento,
     getDescuentoCounter: () => descuentoCounter,
-    setDescuentoCounter: (val) => { descuentoCounter = val; }
+    setDescuentoCounter: (val) => { descuentoCounter = val; },
+    reset
   };
 
   global.uiAjustes = uiAjustes;

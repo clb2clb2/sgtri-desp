@@ -567,16 +567,7 @@
     const confirmed = await showConfirm('¿Eliminar Desplazamiento Especial?');
     if (!confirmed) return;
 
-    const grupo = document.getElementById('desplazamiento-especial');
-    if (grupo) {
-      grupo.remove();
-    }
-    
-    especialCreado = false;
-    contenedorLineas = null;
-    contenedorResultado = null;
-    lineaCounter = 0;
-    seccionCounter = 0;
+    resetDesplazamientoEspecial();
 
     // Evaluar si debe ocultarse la ficha de vehículo
     if (global.uiDesplazamientos?.evaluarKmParaMostrarFicha) {
@@ -592,6 +583,24 @@
     if (global.resultadoLiquidacion?.renderResultado) {
       global.resultadoLiquidacion.renderResultado();
     }
+  }
+
+  /**
+   * Resetea el estado interno del desplazamiento especial sin pedir
+   * confirmación. Elimina el DOM y limpia todas las variables del módulo.
+   * Pensado para ser llamado desde limpiarFormularioCompleto().
+   */
+  function resetDesplazamientoEspecial() {
+    const grupo = document.getElementById('desplazamiento-especial');
+    if (grupo) {
+      grupo.remove();
+    }
+
+    especialCreado = false;
+    contenedorLineas = null;
+    contenedorResultado = null;
+    lineaCounter = 0;
+    seccionCounter = 0;
   }
 
   /**
@@ -765,6 +774,7 @@
   const uiDesplazamientoEspecial = {
     crear: crearDesplazamientoEspecial,
     eliminar: eliminarDesplazamientoEspecial,
+    reset: resetDesplazamientoEspecial,
     existe: existeDesplazamientoEspecial,
     recopilarDatos,
     restaurarDatos,
