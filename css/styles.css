@@ -1341,6 +1341,12 @@ input.num-spinner::-webkit-inner-spin-button {
   box-shadow: 0 0 0 2px var(--color-error-shadow);
 }
 
+.field-error:focus {
+  color: #333333;
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 2px var(--color-success-shadow);
+}
+
 .dt-order-error {
   color: var(--color-error);
   font-weight: 600;
