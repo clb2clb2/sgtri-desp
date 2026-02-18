@@ -687,6 +687,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
+  // DELEGACIÓN GLOBAL DE EVENTOS DE FOCUS
+  // =========================================================================
+  /**
+   * Remover la clase field-error cuando el usuario hace focus en un campo erróneo.
+   */
+  document.addEventListener('focus', (e) => {
+    const el = e.target;
+    if (el && el.classList && el.classList.contains('field-error')) {
+      el.classList.remove('field-error');
+    }
+  }, true); // Usar captura para asegurar que se ejecute antes que otros listeners
+
+  // =========================================================================
   // DELEGACIÓN GLOBAL DE EVENTOS DE BLUR
   // =========================================================================
   // LISTENERS DE BLUR (validaciones, formatos)
