@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnBorrarTodo.addEventListener('click', async () => {
           const confirmed = await window.showConfirm(
             '¿Estás seguro de que quieres borrar todo el contenido del formulario?',
-            { confirmText: 'Borrar' }
+            { confirmText: 'Borrar', icon: '⚠️' }
           );
           if (confirmed) {
             limpiarFormularioCompleto();
@@ -1419,7 +1419,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const importeVal = (honorariosImporte.value || '').replace(/[^0-9,\.]/g, '').replace(',', '.');
       const importeNum = parseFloat(importeVal) || 0;
       if (importeNum > 0) {
-        const camposHonorarios = ['honorarios-importe', 'honorarios-beneficiario', 'honorarios-situacion', 'honorarios-concepto'];
+        const camposHonorarios = ['honorarios-importe', 'honorarios-beneficiario', 'honorarios-situacion', 'honorarios-domicilio', 'honorarios-concepto'];
         camposHonorarios.forEach(id => {
           const campo = document.getElementById(id);
           if (marcarCampoError(campo)) hayErrores = true;
