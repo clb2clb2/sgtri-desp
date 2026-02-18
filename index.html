@@ -67,23 +67,27 @@
   </header>
 
   <!-- Barra de acciones -->
-  <div class="actions-bar">
-    <button type="button" id="btn-cargar-datos" class="btn-action" title="Cargar borrador">
-      📂 Cargar
-    </button>
-    <button type="button" id="btn-guardar-datos" class="btn-action" title="Guardar borrador">
-      💾 Guardar
-    </button>
-    <button type="button" id="btn-borrar-todo" class="btn-action btn-borrar" title="Borrar todo el formulario">
-      🗑️ Borrar todo
-    </button>
-    <button type="button" id="btn-comprobar-datos" class="btn-action btn-comprobar" title="Comprobar datos obligatorios">
-      ✅ Comprobar
-    </button>
-    <button type="button" id="btn-generar-pdf" class="btn-action btn-pdf" title="Generar PDF (prueba)">
-      📄 PDF
-    </button>
-  </div>
+  <nav class="actions-bar">
+    <div class="menu-left">
+      <button type="button" id="btn-cargar-datos" class="menu-item" title="Cargar borrador">
+        📂 <span class="menu-text">Cargar datos</span>
+      </button>
+      <button type="button" id="btn-guardar-datos" class="menu-item" title="Guardar borrador">
+        💾 <span class="menu-text">Guardar datos</span>
+      </button>
+      <button type="button" id="btn-comprobar-datos" class="menu-item" title="Comprobar datos obligatorios">
+        ✅ <span class="menu-text">Comprobar</span>
+      </button>
+      <button type="button" id="btn-generar-pdf" class="menu-item" title="Generar PDF">
+        📋 <span class="menu-text">Crear PDF</span>
+      </button>
+    </div>
+    <div class="menu-right">
+      <button type="button" id="btn-borrar-todo" class="menu-item menu-danger" title="Borrar todo el formulario">
+        ❌ <span class="menu-text">Borrar todo</span>
+      </button>
+    </div>
+  </nav>
 
   <!-- Contenedor único para todas las secciones -->
   <div class="form-sections-wrapper">
