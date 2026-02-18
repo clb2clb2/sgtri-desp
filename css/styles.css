@@ -169,55 +169,62 @@ body {
 /* Barra de acciones debajo del header */
 .actions-bar {
   display: flex;
-  justify-content: center;
-  gap: 0.75rem;
-  padding-bottom: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+  margin: 0 auto 1.5rem auto;
+  width: min(90%, 800px);
 }
 
-.btn-action {
-  background-color: var(--color-success);
-  color: white;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: var(--border-radius);
-  padding: 0.5rem 1.2rem;
-  font-size: 0.9rem;
+.menu-left {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.menu-right {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.menu-item {
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 0.95rem;
   cursor: pointer;
-  transition: background-color var(--transition-normal), transform var(--transition-fast);
+  transition: color var(--transition-normal);
   font-family: var(--font-family-title);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 0;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
 }
 
-.btn-action:hover {
-  background-color: var(--color-success-dark);
-  transform: translateY(-1px);
+.menu-item:hover {
+  color: #000;
 }
 
-.btn-action:active {
-  transform: translateY(0);
+.menu-item:hover .menu-text {
+  text-decoration: underline;
+  text-decoration-offset: 0.3em;
 }
 
-.btn-action.btn-borrar {
-  background-color: #c0392b;
+.menu-item:active {
+  opacity: 0.7;
 }
 
-.btn-action.btn-borrar:hover {
-  background-color: #a93226;
+.menu-item.menu-danger {
+  color: #666;
 }
 
-.btn-action.btn-comprobar {
-  background-color: #5a9bd5;
-}
-
-.btn-action.btn-comprobar:hover {
-  background-color: #4a8bc5;
-}
-
-.btn-action.btn-pdf {
-  background-color: #d35400;
-}
-
-.btn-action.btn-pdf:hover {
-  background-color: #b34700;
+.menu-item.menu-danger:hover {
+  color: #c0392b;
 }
 
 /* Contenedor de secciones */
