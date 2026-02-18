@@ -472,6 +472,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Campos de texto extendido (permite puntuación adicional)
+    if (el.classList.contains('extended-text')) {
+      if (ld.sanitizeExtendedText) applyWithCaret(el, (v) => ld.sanitizeExtendedText(v, 90));
+      return;
+    }
+
     // Orgánica
     if (el.classList.contains('organica') || el.id === 'organica' || /^organica-/.test(el.id || '')) {
       applyWithCaret(el, (valOrg, selStart) => {

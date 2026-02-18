@@ -190,7 +190,7 @@
             <!-- Campos del proyecto -->
             <div class="form-group">
               <label for="responsable">Responsable:</label>
-              <input type="text" id="responsable" name="responsable" maxlength="70" required />
+              <input type="text" id="responsable" name="responsable" class="general-text" maxlength="70" required />
             </div>
             <div class="form-row two-cols-50-50">
               <div class="form-group">
@@ -280,7 +280,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label for="evento-nombre">Nombre del evento:</label>
-                <input type="text" id="evento-nombre" name="evento-nombre" class="general-text" maxlength="120" />
+                <input type="text" id="evento-nombre" name="evento-nombre" class="extended-text" maxlength="120" />
               </div>
             </div>
 
@@ -398,14 +398,14 @@
             <div class="form-row full-width">
               <div class="form-group">
                 <label for="honorarios-concepto">En concepto de:</label>
-                <textarea id="honorarios-concepto" name="honorarios-concepto" rows="3" maxlength="255"></textarea>
+                <textarea id="honorarios-concepto" name="honorarios-concepto" class="extended-text" rows="3" maxlength="255"></textarea>
               </div>
             </div>
             <!-- Línea 3: Domicilio (100%) -->
             <div class="form-row full-width">
               <div class="form-group">
                 <label for="honorarios-domicilio">Domicilio del beneficiario:</label>
-                <input type="text" id="honorarios-domicilio" name="honorarios-domicilio" class="general-text" maxlength="150" />
+                <input type="text" id="honorarios-domicilio" name="honorarios-domicilio" class="extended-text" maxlength="150" />
               </div>
             </div>
           </form>
@@ -496,7 +496,7 @@
             <div id="fecha-firma-campos" style="display: none;">
               <div class="form-row-centrada">
                 <label for="fecha-firma-ciudad">En</label>
-                <input type="text" id="fecha-firma-ciudad" name="fecha-firma-ciudad" list="ciudades-lista" style="width: 20em;" />
+                <input type="text" id="fecha-firma-ciudad" name="fecha-firma-ciudad" class="extended-text" list="ciudades-lista" style="width: 20em;" />
                 <datalist id="ciudades-lista">
                   <option value="Badajoz"></option>
                   <option value="Cáceres"></option>
