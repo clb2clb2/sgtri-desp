@@ -8,10 +8,10 @@
   },
   "categorias": [
     ["Investigador/a principal", "IP"],
+    ["Miembro del equipo investigador", "ME"],
     ["Director/a del convenio/contrato", "DC"],
     ["Director/a del Departamento", "DD"],
     ["Coordinador/a del grupo", "CG"],
-    ["Miembro del equipo investigador", "ME"],
     ["Colaborador", "CO"],
     ["Técnico de apoyo", "TA"],
     ["Gestor de proyectos", "GP"],

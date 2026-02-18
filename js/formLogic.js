@@ -1286,7 +1286,11 @@ document.addEventListener('DOMContentLoaded', () => {
   /**
    * Comprueba todos los datos obligatorios del formulario.
    */
-  function comprobarDatosObligatorios() {
+  /**
+   * Valida datos obligatorios sin mostrar mensaje.
+   * @returns {boolean} true si hay errores, false si todo está correcto
+   */
+  function validarDatos() {
     let hayErrores = false;
 
     // ---- SECCIÓN 1: Datos del beneficiario ----
@@ -1409,7 +1413,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (marcarCampoError(responsableInput)) hayErrores = true;
     });
 
-    // Mostrar mensaje
+    return hayErrores;
+  }
+
+  function comprobarDatosObligatorios() {
+    const hayErrores = validarDatos();
     if (hayErrores) {
       mostrarMensaje('¡Atención! Hay algunos datos obligatorios sin rellenar. Revise los campos marcados en rojo.', true);
     } else {
@@ -1807,6 +1815,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Exponer en window.formLogic
   window.formLogic = window.formLogic || {};
+  window.formLogic.validarDatos = validarDatos;
   window.formLogic.limpiarFormularioCompleto = limpiarFormularioCompleto;
 
   // ---- Listener delegado para botones de borrar sección ----
