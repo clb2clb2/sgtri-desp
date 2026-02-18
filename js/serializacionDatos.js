@@ -293,7 +293,8 @@
       importe: obtenerValorCampo('honorarios-importe'),
       beneficiario: obtenerValorCampo('honorarios-beneficiario'),
       situacion: obtenerValorCampo('honorarios-situacion'),
-      concepto: obtenerValorCampo('honorarios-concepto')
+      concepto: obtenerValorCampo('honorarios-concepto'),
+      domicilio: obtenerValorCampo('honorarios-domicilio')
     };
   }
 
@@ -348,6 +349,23 @@
   }
 
   /**
+   * Recopila los datos de la fecha de firma
+   * @returns {Object}
+   */
+  function recopilarFechaFirma() {
+    const tipo = document.querySelector('input[name="fecha-firma-tipo"]:checked')?.value || 'momento';
+    const fechado = tipo === 'fijar';
+    
+    const resultado = {
+      fechado: fechado,
+      ciudad: fechado ? obtenerValorCampo('fecha-firma-ciudad') : '',
+      fecha: fechado ? obtenerValorCampo('fecha-firma-fecha') : ''
+    };
+    
+    return resultado;
+  }
+
+  /**
    * Recopila todos los datos del formulario
    * @returns {Object} Objeto con todos los datos serializados
    */
@@ -366,7 +384,8 @@
       honorarios: recopilarHonorarios(),
       imputacion: recopilarImputacion(),
       ajustes: recopilarAjustes(),
-      resultadoLiquidacion: recopilarResultadoLiquidacion()
+      resultadoLiquidacion: recopilarResultadoLiquidacion(),
+      fechaFirma: recopilarFechaFirma()
     };
   }
 
@@ -682,6 +701,7 @@
     establecerValorCampo('honorarios-beneficiario', datos.beneficiario);
     establecerValorCampo('honorarios-situacion', datos.situacion);
     establecerValorCampo('honorarios-concepto', datos.concepto);
+    establecerValorCampo('honorarios-domicilio', datos.domicilio);
   }
 
   /**
@@ -732,6 +752,42 @@
       }
       if (global.resultadoLiquidacion.renderResultado) {
         global.resultadoLiquidacion.renderResultado();
+      }
+    }
+  }
+
+  /**
+   * Restaura los datos de la fecha de firma
+   * @param {Object} datos
+   */
+  function restaurarFechaFirma(datos) {
+    if (!datos) return;
+    
+    // Restaurar tipo de fecha de firma basado en el booleano 'fechado'
+    const fechado = datos.fechado === true;
+    const radioMomento = document.getElementById('fecha-firma-momento');
+    const radioFijar = document.getElementById('fecha-firma-fijar');
+    
+    if (fechado && radioFijar) {
+      radioFijar.checked = true;
+    } else if (!fechado && radioMomento) {
+      radioMomento.checked = true;
+    }
+    
+    // Restaurar campos de fecha fija si es necesario
+    if (fechado) {
+      establecerValorCampo('fecha-firma-ciudad', datos.ciudad);
+      establecerValorCampo('fecha-firma-fecha', datos.fecha);
+      // Mostrar los campos
+      const camposDiv = document.getElementById('fecha-firma-campos');
+      if (camposDiv) {
+        camposDiv.style.display = '';
+      }
+    } else {
+      // Ocultar los campos si es momento
+      const camposDiv = document.getElementById('fecha-firma-campos');
+      if (camposDiv) {
+        camposDiv.style.display = 'none';
       }
     }
   }
@@ -865,6 +921,9 @@
 
     // Restaurar resultado de liquidación (recalculará automáticamente)
     restaurarResultadoLiquidacion(datos.resultadoLiquidacion);
+
+    // Restaurar fecha de firma
+    restaurarFechaFirma(datos.fechaFirma);
 
     // Tareas post-restauración
     setTimeout(() => {

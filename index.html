@@ -401,6 +401,13 @@
                 <textarea id="honorarios-concepto" name="honorarios-concepto" rows="3" maxlength="255"></textarea>
               </div>
             </div>
+            <!-- Línea 3: Domicilio (100%) -->
+            <div class="form-row full-width">
+              <div class="form-group">
+                <label for="honorarios-domicilio">Domicilio del beneficiario:</label>
+                <input type="text" id="honorarios-domicilio" name="honorarios-domicilio" class="general-text" maxlength="150" />
+              </div>
+            </div>
           </form>
         </div>
       </div>
@@ -466,6 +473,40 @@
             </div>
             <div id="imputacion-container">
               <!-- Las líneas de imputación se renderizan dinámicamente aquí -->
+            </div>
+          </div>
+          <div id="fecha-firma-section">
+            <div class="imputacion-header">
+              <h3 class="desplazamiento-titulo imputacion-titulo">Fecha de firma:</h3>
+            </div>
+            <div class="form-row-radios">
+              <div class="form-group">
+                <label>
+                  <input type="radio" id="fecha-firma-momento" name="fecha-firma-tipo" value="momento" checked />
+                  Fechar en el momento de la firma
+                </label>
+              </div>
+              <div class="form-group">
+                <label>
+                  <input type="radio" id="fecha-firma-fijar" name="fecha-firma-tipo" value="fijar" />
+                  Fijar ahora la fecha de firma
+                </label>
+              </div>
+            </div>
+            <div id="fecha-firma-campos" style="display: none;">
+              <div class="form-row-centrada">
+                <label for="fecha-firma-ciudad">En</label>
+                <input type="text" id="fecha-firma-ciudad" name="fecha-firma-ciudad" list="ciudades-lista" style="width: 20em;" />
+                <datalist id="ciudades-lista">
+                  <option value="Badajoz"></option>
+                  <option value="Cáceres"></option>
+                  <option value="Mérida"></option>
+                  <option value="Plasencia"></option>
+                </datalist>
+                <span>,</span>
+                <label for="fecha-firma-fecha">a</label>
+                <input type="text" id="fecha-firma-fecha" name="fecha-firma-fecha" class="input-fecha" placeholder="dd/mm/aa" style="width: 10em;" />
+              </div>
             </div>
           </div>
         </div>
