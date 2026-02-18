@@ -367,7 +367,10 @@
         ...buildTablaResultadoLiquidacion(datos),
 
         // Tabla de IRPF
-        ...buildTablaIRPF(datos)
+        ...buildTablaIRPF(datos),
+
+        // Tabla de declaración responsable de honorarios (si existe)
+        ...buildTablaDeclaracionHonorarios(datos)
 
       ]
     };
@@ -727,6 +730,83 @@
     return [
       { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
       { unbreakable: true, stack: [...encabezado, tabla] }
+    ];
+  }
+
+  /**
+   * Construye la tabla de declaración responsable para honorarios.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con tabla (vacío si no hay honorarios)
+   */
+  function buildTablaDeclaracionHonorarios(datos) {
+    const honorarios = datos.honorarios || {};
+    const beneficiario = datos.beneficiario || {};
+    
+    if (!honorarios.importe) return [];
+
+    // Determinar textouex según beneficiario
+    let textouex = '';
+    if (honorarios.beneficiario === 'SIUEX') {
+      textouex = 'perteneciente a la UEx, ';
+    } else if (honorarios.beneficiario === 'NOUEX') {
+      textouex = 'ajeno a la UEx, ';
+    }
+
+    // Línea 2: Beneficiario
+    const lineaBeneficiario = `El beneficiario, D./D.ª ${beneficiario.nombre || ''}, con N.I.F. n.º ${beneficiario.dni || ''} y domicilio en ${honorarios.domicilio || ''}, ${textouex}`;
+
+    // Línea 4: Texto según situación
+    let textoSituacion = '';
+    switch (honorarios.situacion) {
+      case 'PDIAC':
+        textoSituacion = 'No superar, junto con el resto de retribuciones percibidas por este concepto, el límite señalado en el artículo 75 de la Ley Orgánica 2/2023, de 22 de marzo, del Sistema Universitario.';
+        break;
+      case 'NOPDI':
+        textoSituacion = 'Que la presente actividad no tiene carácter permanente o habitual, ni supone junto con las ya desarrolladas en el presente ejercicio económico más de 75 horas/año, en virtud del artículo 19, apartado b), de la Ley 53/1984, de 26 de diciembre, de Incompatibilidades del Personal al Servicio de las Administraciones Públicas.';
+        break;
+      case 'NOEMP':
+        textoSituacion = 'Que no se encuentra sujeto a ninguno de los supuestos contemplados en la Ley 53/1984, de 26 de diciembre, de Incompatibilidades del Personal al Servicio de las Administraciones Públicas.';
+        break;
+      case 'PDIJU':
+        textoSituacion = 'No superar, el límite retributivo máximo establecido en el artículo 6 del Real Decreto 1086/1989, de 28 de agosto, sobre retribuciones del profesorado universitario, o en las normas que, en su caso, delimiten la compatibilidad de la pensión de jubilación con otras retribuciones.';
+        break;
+    }
+
+    // Líneas del stack
+    const lineas = [
+      { text: 'DECLARACIÓN RESPONSABLE PARA LIQUIDACIÓN DE HONORARIOS', style: 'tablaDato', decoration: 'underline', color: '#444', bold: true, alignment: 'center' },
+      { text: '', margin: [0, 0, 0, 15] }, // espaciador
+      { text: lineaBeneficiario, color: '#444', lineHeight: 1.35, style: 'tablaDato' },
+      { text: '', margin: [0, 0, 0, 15] }, // espaciador
+      { text: 'DECLARA BAJO SU RESPONSABILIDAD', style: 'tablaDato', fontSize: 9, color: '#444', bold: true, alignment: 'center' },
+      { text: '', margin: [0, 0, 0, 15] }, // espaciador
+      { text: textoSituacion, color: '#444', lineHeight: 1.35, style: 'tablaDato' }
+    ];
+
+    const tabla = {
+      table: {
+        widths: ['100%'],
+        body: [
+          [
+            {
+              stack: lineas,
+              margin: [15, 15, 15, 15]
+            }
+          ]
+        ]
+      },
+      layout: {
+        hLineWidth: () => 1,
+        vLineWidth: () => 1,
+        hLineColor: () => '#444',
+        vLineColor: () => '#444'
+      },
+      margin: [0, 0, 0, 0]
+    };
+
+    return [
+      { text: '', margin: [0, PDF_CONFIG.espacioTablas+15, 0, 0] },
+      { unbreakable: true, stack: [tabla] }
     ];
   }
 
