@@ -1816,9 +1816,7 @@
   function init() {
     const btnPDF = document.getElementById('btn-generar-pdf');
     if (btnPDF) {
-      btnPDF.addEventListener('click', async () => {
-        console.log('[pdfGen] Validando datos antes de generar PDF...');
-        
+      btnPDF.addEventListener('click', async () => {       
         // Llamar a la función de validación
         const hayErrores = window.formLogic?.validarDatos?.();
         
@@ -1829,16 +1827,15 @@
             '¡Atención! Hay algunos datos obligatorios sin rellenar.\n¿Está seguro de que desea continuar?',
             {
               confirmText: 'Revisar el formulario',
-              cancelText: 'Generar PDF'
+              cancelText: 'Generar PDF',
+              icon: '⚠️'
             }
           );
           if (revisarFormulario) {
-            console.log('[pdfGen] Usuario optó por revisar el formulario');
             return;
           }
         }
-        
-        console.log('[pdfGen] Generando PDF...');
+      
         preview();
       });
     }

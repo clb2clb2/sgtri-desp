@@ -31,15 +31,18 @@
         confirmText = 'Eliminar',
         cancelText = 'Cancelar',
         confirmClass = 'btn-confirm-yes',
-        cancelClass = 'btn-confirm-no'
+        cancelClass = 'btn-confirm-no',
+        icon = ''
       } = options;
 
       // Crear overlay
       const overlay = document.createElement('div');
       overlay.className = 'confirm-overlay';
       overlay.tabIndex = -1;
+      const iconHtml = icon ? `<div class="confirm-icon">${icon}</div>` : '';
       overlay.innerHTML = `
         <div class="confirm-dialog" role="dialog" aria-modal="true">
+          ${iconHtml}
           <div class="confirm-body">${message}</div>
           <div class="confirm-actions">
             <button class="${confirmClass}">${confirmText}</button>
