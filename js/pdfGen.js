@@ -87,6 +87,38 @@
   }
 
   /**
+   * Convierte una fecha en formato "DD/MM/YYYY" a texto largo en español.
+   * Ej: "23/09/2026" → "23 de septiembre de 2026"
+   * @param {string} fechaStr - Fecha en formato DD/MM/YYYY
+   * @returns {string} Fecha formateada o cadena vacía si no es válida
+   */
+  function formatearFechaEspañol(fechaStr) {
+    if (!fechaStr || fechaStr.trim() === '') return '';
+    
+    const partes = fechaStr.split('/');
+    if (partes.length !== 3) return '';
+    
+    const dia = parseInt(partes[0], 10);
+    const mes = parseInt(partes[1], 10) - 1; // JavaScript months are 0-indexed
+    let año = parseInt(partes[2], 10);
+    
+    // Si el año tiene 2 dígitos, asumir siglo 21 (agregar "20")
+    if (partes[2].length === 2) {
+      año += 2000;
+    }
+    
+    const fecha = new Date(año, mes, dia);
+    if (isNaN(fecha.getTime())) return '';
+    
+    const meses = [
+      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ];
+    
+    return `${dia} de ${meses[mes]} de ${año}`;
+  }
+
+  /**
    * Carga una imagen y la convierte a Base64.
    * @param {string} url - URL de la imagen
    * @returns {Promise<string>} Data URL en base64
@@ -1523,6 +1555,7 @@
     const imputacion = datos.imputacion || [];
     const beneficiario = datos.beneficiario || {};
     const proyecto = datos.proyecto || {};
+    const fechaFirma = datos.fechaFirma || {};
 
     // Responsables únicos (sin repetir)
     const responsablesUnicos = [...new Set(
@@ -1532,6 +1565,29 @@
     const textoFdoResponsable = responsablesUnicos.length > 1
       ? 'Fdo: los/las responsables del gasto,'
       : 'Fdo: el/la responsable del gasto,';
+
+    // Construir texto "Conforme" basado en fechaFirma
+    let textoConforme = 'Conforme, en ';
+    if (fechaFirma.fechado === true) {
+      // Añadir ciudad si está disponible
+      if (fechaFirma.ciudad && fechaFirma.ciudad.trim() !== '') {
+        textoConforme += fechaFirma.ciudad;
+      } else {
+        textoConforme += '__________________________';
+      }
+      
+      textoConforme += ' a ';
+      
+      // Añadir fecha si está disponible
+      if (fechaFirma.fecha && fechaFirma.fecha.trim() !== '') {
+        textoConforme += formatearFechaEspañol(fechaFirma.fecha);
+      } else {
+        textoConforme += '____ de ______________ de _______';
+      }
+    } else {
+      // Si no está fechado, usar el formato original
+      textoConforme += '__________________________ a ____ de ______________ de _______';
+    }
 
     const mostrarLogos = (proyecto.tipo === 'G24' || proyecto.tipo === 'I24') && !!logosGr24Base64;
 
@@ -1553,7 +1609,7 @@
             // Fila 1: Conforme (colspan=4)
             [
               {
-                text: 'Conforme, en __________________________ a ____ de ______________ de _______',
+                text: textoConforme,
                 style: 'tablaDato',
                 alignment: 'center',
                 colSpan: 4

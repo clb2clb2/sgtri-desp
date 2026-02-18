@@ -163,6 +163,32 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
       }
+
+      // Configurar radio buttons de fecha de firma
+      const radiosFechaFirma = document.querySelectorAll('input[name="fecha-firma-tipo"]');
+      if (radiosFechaFirma.length > 0) {
+        radiosFechaFirma.forEach(radio => {
+          radio.addEventListener('change', (e) => {
+            const camposDiv = document.getElementById('fecha-firma-campos');
+            if (!camposDiv) return;
+
+            if (e.target.value === 'fijar') {
+              camposDiv.style.display = '';
+              // Establecer fecha actual por defecto si está vacía
+              const inputFecha = document.getElementById('fecha-firma-fecha');
+              if (inputFecha && !inputFecha.value) {
+                const today = new Date();
+                const day = String(today.getDate()).padStart(2, '0');
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const year = String(today.getFullYear()).slice(-2);
+                inputFecha.value = `${day}/${month}/${year}`;
+              }
+            } else {
+              camposDiv.style.display = 'none';
+            }
+          });
+        });
+      }
     })
     .catch(error => console.error('Error cargando datos del JSON:', error));
 
@@ -1636,6 +1662,13 @@ document.addEventListener('DOMContentLoaded', () => {
       concepto.value = '';
       concepto.classList.remove('field-error');
     }
+
+    // Campo de domicilio
+    const domicilio = document.getElementById('honorarios-domicilio');
+    if (domicilio) {
+      domicilio.value = '';
+      domicilio.classList.remove('field-error');
+    }
   }
 
   /**
@@ -1661,6 +1694,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  /**
+   * Limpia la sección de fecha de firma.
+   */
+  function limpiarFechaFirma() {
+    // Restablecer a "Fechar en el momento de la firma"
+    const radioMomento = document.getElementById('fecha-firma-momento');
+    if (radioMomento) {
+      radioMomento.checked = true;
+    }
+
+    // Limpiar campos de fecha fija
+    const inputCiudad = document.getElementById('fecha-firma-ciudad');
+    if (inputCiudad) {
+      inputCiudad.value = '';
+      inputCiudad.classList.remove('field-error');
+    }
+
+    const inputFecha = document.getElementById('fecha-firma-fecha');
+    if (inputFecha) {
+      inputFecha.value = '';
+      inputFecha.classList.remove('field-error');
+    }
+
+    // Ocultar campos de fecha fija
+    const camposDiv = document.getElementById('fecha-firma-campos');
+    if (camposDiv) {
+      camposDiv.style.display = 'none';
+    }
+  }
+
   // =========================================================================
   // LIMPIAR FORMULARIO COMPLETO
   // =========================================================================
@@ -1678,6 +1741,7 @@ document.addEventListener('DOMContentLoaded', () => {
     limpiarSeccionEventos();
     limpiarSeccionHonorarios();
     limpiarSeccionAjustes();
+    limpiarFechaFirma();
 
     // 2. Resetear estado interno del desplazamiento especial
     if (window.uiDesplazamientoEspecial?.reset) {
