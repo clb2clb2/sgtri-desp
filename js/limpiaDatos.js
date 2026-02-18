@@ -28,6 +28,22 @@
   }
 
   /**
+   * Sanea texto extendido: permite caracteres adicionales como !"@#$%¿?*+;;<>ªº\/
+   * Usado para campos como "Domicilio del beneficiario" y "Nombre del evento"
+   * @param {string} value - Valor a sanear
+   * @param {number} [maxLen] - Longitud máxima opcional
+   * @returns {string} Valor saneado
+   */
+  function sanitizeExtendedText(value, maxLen) {
+    try {
+      // Permite: números, letras, acentos, espacio, y puntuación extendida: !"@#$%¿?*+;;<>ªº.,\-()&'\/
+      return String(value || '').replace(/[^0-9A-Za-z\u00C0-\u017F\u0180-\u024F !"@#$%¿\?\*\+;;<>ªº.,\-()&'\\\/]/g, '').slice(0, maxLen || undefined);
+    } catch (err) {
+      return String(value || '').slice(0, maxLen || undefined);
+    }
+  }
+
+  /**
    * Sanea referencias de proyecto: permite letras, números, barras y puntuación básica.
    * @param {string} value - Valor a sanear
    * @param {number} [maxLen] - Longitud máxima opcional
@@ -320,6 +336,7 @@
   const limpiaDatos = {
     // Sanitizadores
     sanitizeGeneralText,
+    sanitizeExtendedText,
     sanitizeReferencia,
     sanitizeIBAN,
     sanitizeDNI,
