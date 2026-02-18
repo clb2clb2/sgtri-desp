@@ -662,8 +662,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Validar: evento debe empezar >= ida y terminar <= regreso
-    const esValido = fEventoDel >= fIda && fEventoAl <= fRegreso;
+    // Validar: evento debe empezar <= fin del evento
+    // Y evento debe estar dentro de rango: fecha-ida - 4 días hasta fecha-regreso + 4 días
+    const fIdaMenos4 = new Date(fIda);
+    fIdaMenos4.setDate(fIdaMenos4.getDate() - 4);
+    
+    const fRegreseMas4 = new Date(fRegreso);
+    fRegreseMas4.setDate(fRegreseMas4.getDate() + 4);
+    
+    const esValido = (fEventoDel <= fEventoAl) && 
+                     (fEventoDel >= fIdaMenos4) && 
+                     (fEventoAl <= fRegreseMas4);
 
     if (warnWrapper) {
       warnWrapper.style.display = esValido ? 'none' : 'inline-flex';
@@ -680,7 +689,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
   // DELEGACIÓN GLOBAL DE EVENTOS DE BLUR
   // =========================================================================
-
+  // LISTENERS DE BLUR (validaciones, formatos)
+  // =========================================================================
+  // Nota: blur no burbujea, necesitar usar true para capturar en la fase de captura
   document.addEventListener('blur', (e) => {
     const el = e.target;
     if (!el) return;
@@ -768,25 +779,36 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Número de tarjeta blur: validar formato (16-19 dígitos, con Luhn para 16 dígitos)
+    // Número de tarjeta blur: validar formato (15-19 dígitos, con Luhn)
     if (el.id === 'numero-tarjeta' || el.classList.contains('card-number')) {
-      const warnWrapper = document.querySelector('.tarjeta-warn');
+      // Buscar el warning - está en el label anterior al input
+      const allWarnings = document.querySelectorAll('.tarjeta-warn');
+      let warnWrapper = null;
+      if (allWarnings.length > 0) {
+        // Usar el primer/último warning encontrado si existe
+        warnWrapper = allWarnings[0];
+      }
+      
       const val = (el.value || '').replace(/\s/g, ''); // Eliminar espacios
+      
       // Si está vacío, no marcar error
       if (val === '') {
         if (warnWrapper) warnWrapper.style.display = 'none';
         el.classList.remove('field-error');
         return;
       }
-      // Validar: solo dígitos y longitud entre 16 y 19
-      let esValida = /^\d{16,19}$/.test(val);
-      // Si tiene exactamente 16 dígitos, aplicar algoritmo de Luhn
-      if (esValida && val.length === 16) {
+      
+      // Validar: solo dígitos y longitud entre 15 y 19
+      let esValida = /^\d{15,19}$/.test(val);
+      
+      // Aplicar algoritmo de Luhn a todos los números válidos
+      if (esValida) {
         let suma = 0;
-        for (let i = 0; i < 16; i++) {
-          let digito = parseInt(val[i], 10);
-          // Duplicar cada segundo dígito desde la derecha (posiciones impares desde el final)
-          if ((16 - i) % 2 === 0) {
+        // Iterar desde la derecha hacia la izquierda
+        for (let i = 0; i < val.length; i++) {
+          let digito = parseInt(val[val.length - 1 - i], 10);
+          // Duplicar cada segundo dígito desde la derecha
+          if (i % 2 === 1) {
             digito *= 2;
             if (digito > 9) digito -= 9;
           }
@@ -794,6 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         esValida = (suma % 10 === 0);
       }
+      
       if (warnWrapper) {
         warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
       }
@@ -1809,8 +1832,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (icon) icon.classList.add('open');
       }
     });
-
-    console.log('[formLogic] Formulario limpiado completamente');
   }
 
   // Exponer en window.formLogic
