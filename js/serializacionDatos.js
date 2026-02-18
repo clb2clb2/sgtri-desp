@@ -968,7 +968,6 @@
       // 8. Limpiar mapeo temporal
       delete global.__tempMapeoDesplazamientos;
       
-      console.log('[serializacionDatos] Datos restaurados y recalculados correctamente');
     }, 300);
 
     return true;
