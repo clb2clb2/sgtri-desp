@@ -1815,6 +1815,29 @@ input.num-spinner::-webkit-inner-spin-button {
 
 .desplazamiento-especial .esp-titulo {
   color: var(--color-primary);
+  width: 30rem;
+}
+
+/* Input editable para el título del desplazamiento especial */
+.esp-titulo-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-family-title);
+  font-weight: 500;
+  color: var(--color-primary);
+  font-size: 1rem;
+  padding: 0;
+  margin: 0;
+}
+
+.esp-titulo-input:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.esp-titulo-input:focus {
+  background-color: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid var(--color-primary);
 }
 
 .desplazamiento-especial .btn-eliminar-desplazamiento {
