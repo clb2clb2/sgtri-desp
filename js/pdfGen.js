@@ -1024,8 +1024,9 @@
     const despEsp = datos.desplazamientoEspecial;
     if (!despEsp || !despEsp.lineas || despEsp.lineas.length === 0) return [];
 
-    // Encabezado con línea verde
-    const encabezado = buildEncabezadoSeccion('DESPLAZAMIENTO ESPECIAL');
+    // Encabezado con línea verde (título personalizable)
+    const tituloPDF = (despEsp.titulo || 'Desplazamiento especial').toUpperCase();
+    const encabezado = buildEncabezadoSeccion(tituloPDF);
 
     // Layout: todos los bordes horizontales excepto el superior
     const layoutConBordesH = {

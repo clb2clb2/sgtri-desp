@@ -456,9 +456,14 @@
     const header = document.createElement('div');
     header.className = 'esp-header';
 
-    const titulo = document.createElement('h3');
-    titulo.className = 'desplazamiento-titulo esp-titulo';
-    titulo.textContent = 'Desplazamiento Especial';
+    const titulo = document.createElement('input');
+    titulo.type = 'text';
+    titulo.id = 'esp-titulo-input';
+    titulo.className = 'desplazamiento-titulo esp-titulo esp-titulo-input general-text';
+    titulo.value = 'Desplazamiento especial';
+    titulo.maxLength = 80;
+    titulo.placeholder = 'Desplazamiento especial';
+    titulo.setAttribute('aria-label', 'Título del desplazamiento especial');
 
     const btnEliminar = document.createElement('button');
     btnEliminar.type = 'button';
@@ -644,7 +649,11 @@
     const irpfInput = document.getElementById('esp-irpf');
     const irpf = irpfInput ? irpfInput.value : '';
 
-    return { lineas, irpf };
+    // Título personalizado
+    const tituloInput = document.getElementById('esp-titulo-input');
+    const titulo = tituloInput ? tituloInput.value.trim() : '';
+
+    return { titulo, lineas, irpf };
   }
 
   /**
@@ -694,6 +703,12 @@
         }
       }
     });
+
+    // Restaurar título personalizado
+    const tituloInput = document.getElementById('esp-titulo-input');
+    if (tituloInput && datos.titulo) {
+      tituloInput.value = datos.titulo;
+    }
 
     // Restaurar IRPF (formateado)
     const irpfInput = document.getElementById('esp-irpf');
