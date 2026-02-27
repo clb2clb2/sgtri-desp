@@ -198,12 +198,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /**
    * Actualiza el texto informativo según el tipo de proyecto.
+   * Extrae la información de normativas desde datos.json.
    * @param {string} valor - Valor del tipo de proyecto
    */
   function actualizarTextoDecreto(valor) {
     if (!infoDecreto) return;
 
-    if (['G24', 'PEI', 'NAL'].includes(valor)) {
+    // Obtener lista de tipos de proyecto que usan RD desde datos.json
+    const datos = window.__sgtriDatos;
+    const rdList = datos?.normativasPorTipoProyecto?.rd || [];
+
+    if (rdList.includes(valor)) {
       infoDecreto.innerHTML = `
         Los cálculos se efectuarán en base al 
         RD 462/2002 (Gobierno de España).  
