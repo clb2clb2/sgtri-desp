@@ -155,11 +155,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btnBorrarTodo) {
         btnBorrarTodo.addEventListener('click', async () => {
           const confirmed = await window.showConfirm(
-            '¿Estás seguro de que quieres borrar todo el contenido del formulario?',
-            { confirmText: 'Borrar', icon: '⚠️' }
+            '¿Estás seguro de que quieres reiniciar el formulario?',
+            { confirmText: 'Reiniciar', icon: '⚠️' }
           );
           if (confirmed) {
             limpiarFormularioCompleto();
+            if (window.tipoLiquidacion?.volverAlMenuInicial) {
+              window.tipoLiquidacion.volverAlMenuInicial();
+            }
           }
         });
       }

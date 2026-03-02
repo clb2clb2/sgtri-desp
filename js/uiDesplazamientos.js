@@ -24,6 +24,8 @@
   let vehiculoContainer = null;
   let vehiculoVisible = false;
   let paisesData = [];
+  let maxDesplazamientosOverride = null;
+  let permitirDesplazamientoEspecial = true;
 
   // Callbacks externos (se configuran desde formLogic)
   let onDesplazamientoCreated = null;
@@ -45,14 +47,21 @@
     };
   }
 
+  function getMaxDesplazamientos() {
+    if (Number.isFinite(maxDesplazamientosOverride) && maxDesplazamientosOverride > 0) {
+      return maxDesplazamientosOverride;
+    }
+    return getLimites().maxDesplazamientos;
+  }
+
   /**
    * Actualiza la visibilidad del botón de añadir desplazamiento según el límite.
    */
   function actualizarBotonAddDesplazamiento() {
     if (!btnAddDesplazamiento || !desplazamientosContainer) return;
-    const limites = getLimites();
-    const count = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo').length;
-    btnAddDesplazamiento.style.display = count >= limites.maxDesplazamientos ? 'none' : '';
+    const maxDesplazamientos = getMaxDesplazamientos();
+    const count = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial)').length;
+    btnAddDesplazamiento.style.display = count >= maxDesplazamientos ? 'none' : '';
   }
 
   /**
@@ -412,6 +421,13 @@
       desplazamientosContainer = document.getElementById('desplazamientos-container');
     }
     if (!desplazamientosContainer) return null;
+
+    const maxDesplazamientos = getMaxDesplazamientos();
+    const countActual = desplazamientosContainer.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial)').length;
+    if (countActual >= maxDesplazamientos) {
+      actualizarBotonAddDesplazamiento();
+      return null;
+    }
 
     desplazamientoCounter++;
     const nuevoDesplazamiento = document.createElement('div');
@@ -841,6 +857,9 @@
       btnAddDesplazamiento.addEventListener('click', (e) => {
         // Shift+click: crear desplazamiento especial
         if (e.shiftKey) {
+          if (!permitirDesplazamientoEspecial) {
+            return;
+          }
           if (global.uiDesplazamientoEspecial?.crear) {
             const especial = global.uiDesplazamientoEspecial.crear();
             if (especial) {
@@ -944,6 +963,20 @@
     desplazamientoCounter = 0;
   }
 
+  function setMaxDesplazamientosOverride(value) {
+    if (value === null || value === undefined || value === '') {
+      maxDesplazamientosOverride = null;
+    } else {
+      const parsed = Number(value);
+      maxDesplazamientosOverride = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    }
+    actualizarBotonAddDesplazamiento();
+  }
+
+  function setPermitirDesplazamientoEspecial(value) {
+    permitirDesplazamientoEspecial = !!value;
+  }
+
   // =========================================================================
   // EXPORTACIÓN
   // =========================================================================
@@ -982,7 +1015,9 @@
     init,
     getCounter,
     setCounter,
-    resetCounter
+    resetCounter,
+    setMaxDesplazamientosOverride,
+    setPermitirDesplazamientoEspecial
   };
 
   global.uiDesplazamientos = uiDesplazamientos;

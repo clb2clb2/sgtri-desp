@@ -74,6 +74,19 @@
     }
   }
 
+  /**
+   * Normaliza el tipo de liquidación a uno de los valores válidos.
+   * @param {string} tipo
+   * @returns {'DESPL'|'CONGR'|'HONOR'|'GNRAL'}
+   */
+  function normalizarTipoLiquidacion(tipo) {
+    const raw = String(tipo || '').trim().toUpperCase();
+    if (raw === 'DESPL' || raw === 'CONGR' || raw === 'HONOR' || raw === 'GNRAL') {
+      return raw;
+    }
+    return 'GNRAL';
+  }
+
   // =========================================================================
   // RECOPILACIÓN DE DATOS (DOM → Objeto)
   // =========================================================================
@@ -370,9 +383,14 @@
    * @returns {Object} Objeto con todos los datos serializados
    */
   function recopilarTodo() {
+    const tipoLiquidacion = global.tipoLiquidacion?.getTipoActual
+      ? global.tipoLiquidacion.getTipoActual()
+      : normalizarTipoLiquidacion(global.__sgtriTipoLiquidacion);
+
     return {
       versionEsquema: VERSION_ESQUEMA,
       guardadoEl: new Date().toISOString(),
+      tipoLiquidacion,
       
       beneficiario: recopilarBeneficiario(),
       pago: recopilarPago(),
@@ -893,6 +911,28 @@
       if (!continuar) return false;
     }
 
+    const tipoLiquidacion = normalizarTipoLiquidacion(datos.tipoLiquidacion);
+    datos.tipoLiquidacion = tipoLiquidacion;
+
+    if ((tipoLiquidacion === 'CONGR' || tipoLiquidacion === 'HONOR') &&
+        Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 1) {
+      alert('El archivo no es compatible con este tipo de liquidación: contiene más de un desplazamiento.');
+      return false;
+    }
+
+    const tieneEspecial = !!(datos.desplazamientoEspecial &&
+      Array.isArray(datos.desplazamientoEspecial.lineas) &&
+      datos.desplazamientoEspecial.lineas.length > 0);
+
+    if ((tipoLiquidacion === 'DESPL' || tipoLiquidacion === 'CONGR' || tipoLiquidacion === 'HONOR') && tieneEspecial) {
+      alert('El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento especial.');
+      return false;
+    }
+
+    if (global.tipoLiquidacion?.aplicarModoDesdeArchivo) {
+      global.tipoLiquidacion.aplicarModoDesdeArchivo(tipoLiquidacion);
+    }
+
     // Limpiar formulario completo antes de restaurar
     if (global.formLogic?.limpiarFormularioCompleto) {
       global.formLogic.limpiarFormularioCompleto();
@@ -1078,8 +1118,10 @@
       const archivo = e.target.files[0];
       if (archivo) {
         try {
-          await importarArchivo(archivo);
-          alert('Datos cargados correctamente');
+          const exito = await importarArchivo(archivo);
+          if (exito) {
+            alert('Datos cargados correctamente');
+          }
         } catch (error) {
           alert(`Error: ${error.message}`);
         }
