@@ -41,6 +41,36 @@
     return document.querySelector(`.form-section[data-section-id="${sectionId}"]`);
   }
 
+  function abrirSeccion(sectionId) {
+    const section = getSectionById(sectionId);
+    if (!section) return;
+
+    const title = section.querySelector('.section-title');
+    const wrapper = section.querySelector('.section-content-wrapper');
+    const content = wrapper?.querySelector('.section-content');
+    const icon = title?.querySelector('.toggle-section');
+
+    if (!title || !wrapper || !content) return;
+
+    wrapper.classList.remove('collapsed');
+    wrapper.style.maxHeight = content.scrollHeight + 'px';
+    wrapper.setAttribute('aria-hidden', 'false');
+    title.setAttribute('aria-expanded', 'true');
+    if (icon) icon.classList.add('open');
+  }
+
+  function reordenarSeccionesPrincipales() {
+    const wrapper = document.getElementById('form-sections-wrapper');
+    const secDesplazamientos = getSectionById('desplazamientos');
+    const secEventos = getSectionById('eventos');
+    const secHonorarios = getSectionById('honorarios');
+
+    if (!wrapper || !secDesplazamientos || !secEventos || !secHonorarios) return;
+
+    wrapper.insertBefore(secEventos, secDesplazamientos);
+    wrapper.insertBefore(secHonorarios, secDesplazamientos);
+  }
+
   function mostrarFormulario() {
     const actionsBar = document.getElementById('actions-bar');
     const formWrapper = document.getElementById('form-sections-wrapper');
@@ -77,6 +107,13 @@
 
     if (secEventos) secEventos.style.display = cfg.mostrarEventos ? '' : 'none';
     if (secHonorarios) secHonorarios.style.display = cfg.mostrarHonorarios ? '' : 'none';
+
+    if (tipoNormalizado === TIPOS.CONGR) {
+      abrirSeccion('eventos');
+    }
+    if (tipoNormalizado === TIPOS.HONOR) {
+      abrirSeccion('honorarios');
+    }
 
     if (global.uiDesplazamientos?.setMaxDesplazamientosOverride) {
       global.uiDesplazamientos.setMaxDesplazamientosOverride(cfg.maxDesplazamientos);
@@ -120,6 +157,8 @@
   }
 
   function init() {
+    reordenarSeccionesPrincipales();
+
     const btnDespl = document.getElementById('btn-inicio-despl');
     const btnCongr = document.getElementById('btn-inicio-congr');
     const btnHonor = document.getElementById('btn-inicio-honor');
