@@ -805,7 +805,7 @@
     }
 
     // Línea 2: Beneficiario
-    const lineaBeneficiario = `El beneficiario, D./D.ª ${beneficiario.nombre || ''}, con N.I.F. n.º ${beneficiario.dni || ''} y domicilio en ${honorarios.domicilio || ''}, ${textouex}`;
+    const lineaBeneficiario = `El beneficiario, D./D.ª ${beneficiario.nombre || ''}, ${textouex}con N.I.F. n.º ${beneficiario.dni || ''} y domicilio en ${honorarios.domicilio || ''}`;
 
     // Línea 4: Texto según situación
     let textoSituacion = '';
