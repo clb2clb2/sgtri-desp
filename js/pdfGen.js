@@ -167,7 +167,9 @@
       console.error('[pdfGen] Módulo serializacionDatos no disponible');
       return null;
     }
-    return serializar.recopilarTodo();
+    const datos = serializar.recopilarTodo();
+    datos.tipoLiquidacion = datos.tipoLiquidacion || window.tipoLiquidacion?.getTipoActual?.() || 'GNRAL';
+    return datos;
   }
 
   // =========================================================================
@@ -193,7 +195,7 @@
       info: {
         title: 'Liquidación de Desplazamientos',
         author: 'SGTRI - Universidad de Extremadura',
-        subject: `Liquidación ${datos.proyecto?.referencia || ''}`,
+        subject: `Liquidación ${datos.tipoLiquidacion || 'GNRAL'} ${datos.proyecto?.referencia || ''}`,
         creator: 'SGTRI v2.0 (2026)'
       },
 
@@ -1778,6 +1780,7 @@
 
     try {
       console.log('[pdfGen] Datos del formulario:', d);
+      console.log('[pdfGen] Tipo de liquidación:', d.tipoLiquidacion || 'GNRAL');
       console.log('[pdfGen] Cargando logo...');
 
       // Intentar cargar como SVG primero

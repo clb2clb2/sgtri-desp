@@ -31,6 +31,7 @@
   <script src="js/uiAjustes.js" defer></script>
   <script src="js/uiImputacion.js" defer></script>
   <script src="js/serializacionDatos.js" defer></script>
+  <script src="js/tipoLiquidacion.js" defer></script>
 
   <!-- Scripts: Motor de cálculo y lógica -->
   <script src="js/cogeDatosDesp.js" defer></script>
@@ -67,8 +68,21 @@
     <h1>SGTRI - Liquidación de Dietas y Desplazamientos</h1>
   </header>
 
+  <!-- Menú inicial de tipo de liquidación -->
+  <section id="tipo-liquidacion-inicio" class="tipo-liquidacion-inicio" aria-label="Seleccionar tipo de liquidación">
+    <div class="tipo-liquidacion-panel">
+      <h2>Selecciona el tipo de liquidación:</h2>
+      <div class="tipo-liquidacion-opciones">
+        <button type="button" id="btn-inicio-despl" class="tipo-liquidacion-btn">Liquidación de desplazamientos</button>
+        <button type="button" id="btn-inicio-congr" class="tipo-liquidacion-btn">Asistencia a congresos</button>
+        <button type="button" id="btn-inicio-honor" class="tipo-liquidacion-btn">Liquidación de honorarios</button>
+        <button type="button" id="btn-inicio-cargar" class="tipo-liquidacion-btn">Cargar datos</button>
+      </div>
+    </div>
+  </section>
+
   <!-- Barra de acciones -->
-  <nav class="actions-bar">
+  <nav id="actions-bar" class="actions-bar app-hidden">
     <div class="menu-left">
       <button type="button" id="btn-cargar-datos" class="menu-item" title="Cargar borrador">
         📂 <span class="menu-text">Cargar datos</span>
@@ -79,8 +93,8 @@
       <button type="button" id="btn-comprobar-datos" class="menu-item" title="Comprobar datos obligatorios">
         ✅ <span class="menu-text">Comprobar</span>
       </button>
-      <button type="button" id="btn-borrar-todo" class="menu-item menu-danger" title="Borrar todo el formulario">
-        ❌ <span class="menu-text">Borrar todo</span>
+      <button type="button" id="btn-borrar-todo" class="menu-item menu-danger" title="Reiniciar formulario">
+        ❌ <span class="menu-text">Reiniciar</span>
       </button>
       
     </div>
@@ -92,7 +106,7 @@
   </nav>
 
   <!-- Contenedor único para todas las secciones -->
-  <div class="form-sections-wrapper">
+  <div id="form-sections-wrapper" class="form-sections-wrapper app-hidden">
 
     <!-- Sección 1: Datos del beneficiario -->
     <section class="form-section" data-section-id="beneficiario">
