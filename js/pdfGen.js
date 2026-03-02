@@ -119,6 +119,56 @@
   }
 
   /**
+   * Parsea fecha corta en formato DD/MM/AA o DD/MM/YYYY.
+   * @param {string} valor
+   * @returns {Date|null}
+   */
+  function parseFechaCorta(valor) {
+    if (!valor || typeof valor !== 'string') return null;
+    const s = valor.trim();
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (!m) return null;
+
+    const dia = parseInt(m[1], 10);
+    const mes = parseInt(m[2], 10);
+    let anio = parseInt(m[3], 10);
+
+    if (m[3].length === 2) anio += 2000;
+    if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+
+    const d = new Date(anio, mes - 1, dia);
+    if (d.getFullYear() !== anio || d.getMonth() !== (mes - 1) || d.getDate() !== dia) return null;
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  /**
+   * Valida que la fecha de firma fijada sea posterior a todas las fechas de regreso.
+   * @param {Object} datos
+   * @returns {boolean}
+   */
+  function validarFechaFirmaPosteriorADesplazamientos(datos) {
+    if (!datos) return true;
+
+    const fechaFirmaRaw = (datos.fechaFirma && datos.fechaFirma.fecha) || '';
+    if (!fechaFirmaRaw || !fechaFirmaRaw.trim()) return true;
+
+    const fechaFirma = parseFechaCorta(fechaFirmaRaw);
+    if (!fechaFirma) return true;
+
+    const desplazamientos = Array.isArray(datos.desplazamientos) ? datos.desplazamientos : [];
+    for (const desp of desplazamientos) {
+      const fechaRegreso = parseFechaCorta((desp && desp.fechaRegreso) || '');
+      if (!fechaRegreso) continue;
+      if (fechaFirma < fechaRegreso) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Carga una imagen y la convierte a Base64.
    * @param {string} url - URL de la imagen
    * @returns {Promise<string>} Data URL en base64
@@ -1917,6 +1967,23 @@
           if (revisarFormulario) {
             return;
           }
+        }
+
+        const datosActuales = obtenerDatosFormulario();
+        if (!validarFechaFirmaPosteriorADesplazamientos(datosActuales)) {
+          if (window.showConfirm) {
+            await window.showConfirm(
+              '¡Atención! La fecha de firma debe ser posterior a los desplazamientos incluidos en la liquidación',
+              {
+                confirmText: 'Aceptar',
+                cancelText: 'Cancelar',
+                icon: '⚠️'
+              }
+            );
+          } else {
+            alert('¡Atención! La fecha de firma debe ser posterior a los desplazamientos incluidos en la liquidación');
+          }
+          return;
         }
       
         preview();
