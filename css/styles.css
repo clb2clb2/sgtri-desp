@@ -128,11 +128,11 @@ body {
   font-family: var(--font-family-title);
   font-weight: 400;
   font-size: 2rem;
-  margin: 0;
+  margin: 0 100px;
   text-align: center;
   line-height: 1;
   pointer-events: none;
-  min-width: 730px;
+  min-width: 400px;
 }
 
 /* Botones de acción en el header */
