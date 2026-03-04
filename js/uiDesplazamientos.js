@@ -308,7 +308,10 @@
       const m = valor.match(/^(\d{1,2}):(\d{2})$/);
       if (m) {
         const hh = parseInt(m[1], 10);
-        if (hh >= 22) mostrar = true;
+        const mm = parseInt(m[2], 10);
+        if (!isNaN(hh) && !isNaN(mm) && hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) {
+          if ((hh * 60 + mm) > (22 * 60)) mostrar = true;
+        }
       }
 
       field.style.display = mostrar ? 'block' : 'none';
