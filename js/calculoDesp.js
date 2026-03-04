@@ -374,7 +374,7 @@ const HORA_PERNOCTA_MAX = 7 * 60; // 07:00
 /**
  * Calcula manutenciones para un viaje de un solo día.
  * @param {boolean} isLastIntlSegment - Si es el último tramo de un viaje internacional,
- *   no se requiere volver después de las 16:00 para media manutención (basta con 14:00).
+ *   no se requiere volver después de las 16:00 para media manutención (basta con >14:00).
  */
 function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticketCena, isLastIntlSegment = false) {
   if (tDep === null || tRet === null) return 0;
@@ -382,7 +382,7 @@ function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticket
   const durationHours = (dtVuelta.getTime() - dtIda.getTime()) / 3600000;
 
   // Media manutención por cena (depende de normativa y ticket)
-  const cenaCuenta = (normativa === 'rd') ? (tRet >= HORA_CENA && ticketCena) : (tRet >= HORA_CENA);
+  const cenaCuenta = (normativa === 'rd') ? (tRet > HORA_CENA && ticketCena) : (tRet > HORA_CENA);
   const retHalf = cenaCuenta ? 0.5 : 0;
 
   // Para RD: si duración < 5h, solo cuenta la cena
@@ -391,9 +391,9 @@ function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticket
   }
 
   // Media manutención por comida
-  // En el último tramo internacional, basta con volver después de las 14:00
+  // En el último tramo internacional, basta con volver estrictamente después de las 14:00
   const horaFinComidaEfectiva = isLastIntlSegment ? HORA_COMIDA : HORA_FIN_COMIDA;
-  const comidaCuenta = (tDep < HORA_COMIDA && tRet >= horaFinComidaEfectiva);
+  const comidaCuenta = (tDep < HORA_COMIDA && tRet > horaFinComidaEfectiva);
   const depHalf = comidaCuenta ? 0.5 : 0;
 
   return depHalf + retHalf;
@@ -402,7 +402,7 @@ function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticket
 /**
  * Calcula manutenciones para un viaje de varios días.
  * @param {boolean} isLastIntlSegment - Si es el último tramo de un viaje internacional,
- *   basta con volver después de las 14:00 para sumar media manutención.
+ *   basta con volver estrictamente después de las 14:00 para sumar media manutención.
  */
 function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena, isLastIntlSegment = false) {
   let total = 0;
@@ -420,14 +420,13 @@ function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ti
   total += diasIntermedios;
 
   // Día de regreso
-  // En el último tramo internacional, basta con 14:00 para media manutención
+  // En el último tramo internacional, basta con >14:00 para media manutención
   if (tRet !== null) {
-    const cenaCuenta = (normativa === 'rd') ? (tRet >= HORA_CENA && ticketCena) : (tRet >= HORA_CENA);
+    const cenaCuenta = (normativa === 'rd') ? (tRet > HORA_CENA && ticketCena) : (tRet > HORA_CENA);
     if (cenaCuenta) {
       total += 1;
-    } else if (tRet >= HORA_COMIDA) {
-      // En desplazamientos normales se requiere >= 16:00, pero en último tramo intl basta con 14:00
-      // Como ya estamos verificando >= HORA_COMIDA (14:00), esto ya cubre ambos casos
+    } else if (tRet > HORA_COMIDA) {
+      // En este cálculo de varios días se aplica umbral estricto > 14:00
       total += 0.5;
     }
   }
@@ -644,9 +643,9 @@ function getPerDayManutencionUnits(parsed, normativa, ticketCena, manutencionesS
   // Día de regreso
   let retUnits = 0;
   if (tRet !== null) {
-    const cenaCuenta = (normativa === 'rd') ? (tRet >= HORA_CENA && ticketCena) : (tRet >= HORA_CENA);
+    const cenaCuenta = (normativa === 'rd') ? (tRet > HORA_CENA && ticketCena) : (tRet > HORA_CENA);
     if (cenaCuenta) retUnits = 1;
-    else if (tRet >= HORA_COMIDA) retUnits = 0.5;
+    else if (tRet > HORA_COMIDA) retUnits = 0.5;
   }
   units.push(retUnits);
 

@@ -289,7 +289,9 @@
       const m = horaRegreso.match(/^(\d{1,2}):(\d{2})$/);
       if (!m) return false;
       const hh = parseInt(m[1], 10);
-      return hh >= 22 && hh < 24;
+      const mm = parseInt(m[2], 10);
+      if (isNaN(hh) || isNaN(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return false;
+      return (hh * 60 + mm) > (22 * 60);
     } catch (e) { 
       return false; 
     }
