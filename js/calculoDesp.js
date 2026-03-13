@@ -655,18 +655,35 @@ function getPerDayManutencionUnits(parsed, normativa, ticketCena, manutencionesS
 /**
  * Calcula el IRPF sujeto por día y el total.
  */
-function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCena, input) {
+function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCena, input, residMul = 1) {
   const { limites, source } = getLimitesIRPF(input.paisIndex, input.pais);
-  const residMul = input.residenciaEventual ? 0.8 : 1;
 
   const perDayUnits = getPerDayManutencionUnits(parsed, normativa, ticketCena, manutenciones);
+  const tRet = toMinutes(parsed?.horaRegreso);
+
+  // Si no ha pernoctado la última noche (vuelta antes de las 07:00 sin justificar),
+  // el penúltimo día natural también debe usar límite bajo (sin pernocta).
+  const justificaPernocta = !!(
+    input?.justificarPernocta ||
+    input?.flags?.justificarPernocta ||
+    input?._lastNightJustified ||
+    input?.flags?._lastNightJustified
+  );
+  const noPernoctaUltimaNoche = (
+    perDayUnits.length >= 2 &&
+    tRet !== null &&
+    tRet >= 0 &&
+    tRet < HORA_PERNOCTA_MAX &&
+    !justificaPernocta
+  );
 
   let sujetoTotal = 0;
   const breakdown = perDayUnits.map((units, i) => {
     const brutoOriginal = round2(units * precioManutencion);
     const bruto = round2(brutoOriginal * residMul);
     const isLast = (i === perDayUnits.length - 1);
-    const exento = Number(isLast ? limites[0] : limites[1]);
+    const isPenultimateWithoutPernocta = noPernoctaUltimaNoche && (i === perDayUnits.length - 2);
+    const exento = Number((isLast || isPenultimateWithoutPernocta) ? limites[0] : limites[1]);
     const sujeto = round2(Math.max(0, bruto - exento));
 
     sujetoTotal += sujeto;
@@ -794,10 +811,13 @@ function calculateDesplazamiento(input) {
   const nochesAmountIfCountedBase = round2(nochesCalc.nochesIfCounted * precios.noche);
   const nochesAmountIfNotCountedBase = round2(nochesCalc.nochesIfNotCounted * precios.noche);
 
-  // Detectar residencia eventual (solo para desplazamientos no segmentados)
-  // En desplazamientos segmentados, el flag se calcula en el wrapper
+  // Detectar residencia eventual
+  // - Si viene explícita en input, usarla (compatibilidad API)
+  // - Si no viene, autocalcular solo en desplazamientos no segmentados
   const esEspana = !isInternational;
-  const residenciaEventual = !flags.segmentMode && isResidenciaEventual(fechaIda, fechaRegreso, esEspana);
+  const residenciaEventual = (typeof input.residenciaEventual === 'boolean')
+    ? input.residenciaEventual
+    : (!flags.segmentMode && isResidenciaEventual(fechaIda, fechaRegreso, esEspana));
   const factorResidencia = residenciaEventual ? 0.8 : 1;
 
   // Aplicar factor de residencia eventual
@@ -845,7 +865,7 @@ function calculateDesplazamiento(input) {
   }
 
   // Calcular IRPF
-  result.irpf = calcIRPF(parsed, manutenciones, precios.manutencion, normativa, ticketCena, input);
+  result.irpf = calcIRPF(parsed, manutenciones, precios.manutencion, normativa, ticketCena, input, factorResidencia);
   result.irpfSource = result.irpf.source;
 
   // Aplicar flags post-cálculo
@@ -1157,6 +1177,32 @@ window.calculoDesp._daysBetween = daysBetween;
     });
   }
 
+  /**
+   * Aplica factor de residencia eventual al IRPF de segmentos internacionales.
+   * El sujeto se recalcula por día sobre brutoOriginal*factor y restando exento.
+   */
+  function applyResidenciaEventualToSegmentIRPF(segmentos, factor = 0.8) {
+    if (!Array.isArray(segmentos)) return;
+
+    segmentos.forEach(seg => {
+      if (!seg || !seg.irpf || !Array.isArray(seg.irpf.breakdown)) return;
+
+      let sujetoTotal = 0;
+      seg.irpf.breakdown.forEach(b => {
+        const brutoOriginal = Number(b?.brutoOriginal) || 0;
+        const exento = Number(b?.exento) || 0;
+        const bruto = round2(brutoOriginal * factor);
+        const sujeto = round2(Math.max(0, bruto - exento));
+
+        b.bruto = bruto;
+        b.sujeto = sujeto;
+        sujetoTotal += sujeto;
+      });
+
+      seg.irpf.sujeto = round2(sujetoTotal);
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // 2.3 Construcción de estructura unificada para salidaDesp
   // ---------------------------------------------------------------------------
@@ -1394,6 +1440,12 @@ window.calculoDesp._daysBetween = daysBetween;
     let residenciaEventualIntl = false;
     if (data.esInternacional && data.fechaIda && data.fechaRegreso && !fechasInvalidas) {
       residenciaEventualIntl = isResidenciaEventual(data.fechaIda, data.fechaRegreso, false);
+    }
+
+    // 6.1 Ajustar IRPF de segmentos internacionales cuando aplica residencia eventual
+    // Debe calcularse sujeto tras aplicar el factor 0.8 al bruto diario
+    if (residenciaEventualIntl && Array.isArray(segmentos) && segmentos.length > 0) {
+      applyResidenciaEventualToSegmentIRPF(segmentos, 0.8);
     }
 
     // 7. Construir estructura unificada
