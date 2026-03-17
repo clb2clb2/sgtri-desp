@@ -661,21 +661,45 @@ function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCen
   const perDayUnits = getPerDayManutencionUnits(parsed, normativa, ticketCena, manutenciones);
   const tRet = toMinutes(parsed?.horaRegreso);
 
-  // Si no ha pernoctado la última noche (vuelta antes de las 07:00 sin justificar),
-  // el penúltimo día natural también debe usar límite bajo (sin pernocta).
+  // Si no ha pernoctado la última noche, el penúltimo día natural usa límite bajo.
+  // En tramos internacionales segmentados hay que evaluar la hora REAL de regreso
+  // (_lastNightAmbiguousByHour), no la hora de fin del tramo (suele ser 00:00).
   const justificaPernocta = !!(
     input?.justificarPernocta ||
     input?.flags?.justificarPernocta ||
     input?._lastNightJustified ||
     input?.flags?._lastNightJustified
   );
-  const noPernoctaUltimaNoche = (
-    perDayUnits.length >= 2 &&
-    tRet !== null &&
-    tRet >= 0 &&
-    tRet < HORA_PERNOCTA_MAX &&
-    !justificaPernocta
+
+  const isSegmentMode = !!(input?._segmentMode || input?.flags?._segmentMode);
+  const isIntlSegment = isSegmentMode && (
+    (typeof input?.paisIndex === 'number' && input.paisIndex > 0) ||
+    (!!input?.pais && String(input.pais).toLowerCase() !== 'españa')
   );
+
+  const lastNightRef = input?._lastNightAmbiguousByHour || input?.flags?._lastNightAmbiguousByHour;
+  const lastNightRefTime = (() => {
+    if (!lastNightRef || typeof lastNightRef !== 'string') return null;
+    const parsedRef = parseTime(lastNightRef);
+    return parsedRef ? toMinutes(parsedRef) : null;
+  })();
+
+  let noPernoctaUltimaNoche = false;
+  if (perDayUnits.length >= 2) {
+    if (isIntlSegment) {
+      if (lastNightRefTime !== null) {
+        const { counts } = evalLastNightByHour(lastNightRefTime, justificaPernocta);
+        noPernoctaUltimaNoche = !counts;
+      }
+    } else {
+      noPernoctaUltimaNoche = (
+        tRet !== null &&
+        tRet >= 0 &&
+        tRet < HORA_PERNOCTA_MAX &&
+        !justificaPernocta
+      );
+    }
+  }
 
   let sujetoTotal = 0;
   const breakdown = perDayUnits.map((units, i) => {
