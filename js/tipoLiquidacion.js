@@ -7,6 +7,7 @@
  * - DESPL: solo desplazamientos
  * - CONGR: congresos + 1 desplazamiento
  * - HONOR: honorarios + 1 desplazamiento
+ * - AECC: igual que DESPL pero sin sección de desplazamientos
  * - GNRAL: modo completo
  */
 (function (global) {
@@ -16,14 +17,16 @@
     DESPL: 'DESPL',
     CONGR: 'CONGR',
     HONOR: 'HONOR',
+    AECC: 'AECC',
     GNRAL: 'GNRAL'
   };
 
   const CONFIG = {
-    DESPL: { mostrarEventos: false, mostrarHonorarios: false, maxDesplazamientos: null, permitirEspecial: false },
-    CONGR: { mostrarEventos: true, mostrarHonorarios: false, maxDesplazamientos: 1, permitirEspecial: false },
-    HONOR: { mostrarEventos: false, mostrarHonorarios: true, maxDesplazamientos: 1, permitirEspecial: false },
-    GNRAL: { mostrarEventos: true, mostrarHonorarios: true, maxDesplazamientos: null, permitirEspecial: true }
+    DESPL: { mostrarEventos: false, mostrarHonorarios: false, mostrarDesplazamientos: true, mostrarAeccDesplazamiento: false, maxDesplazamientos: null, permitirEspecial: false },
+    CONGR: { mostrarEventos: true, mostrarHonorarios: false, mostrarDesplazamientos: true, mostrarAeccDesplazamiento: false, maxDesplazamientos: 1, permitirEspecial: false },
+    HONOR: { mostrarEventos: false, mostrarHonorarios: true, mostrarDesplazamientos: true, mostrarAeccDesplazamiento: false, maxDesplazamientos: 1, permitirEspecial: false },
+    AECC: { mostrarEventos: false, mostrarHonorarios: false, mostrarDesplazamientos: false, mostrarAeccDesplazamiento: true, maxDesplazamientos: null, permitirEspecial: false },
+    GNRAL: { mostrarEventos: true, mostrarHonorarios: true, mostrarDesplazamientos: true, mostrarAeccDesplazamiento: false, maxDesplazamientos: null, permitirEspecial: true }
   };
 
   let tipoActual = null;
@@ -31,7 +34,7 @@
   function normalizarTipo(tipo) {
     if (!tipo) return TIPOS.GNRAL;
     const t = String(tipo).trim().toUpperCase();
-    if (t === TIPOS.DESPL || t === TIPOS.CONGR || t === TIPOS.HONOR || t === TIPOS.GNRAL) {
+    if (t === TIPOS.DESPL || t === TIPOS.CONGR || t === TIPOS.HONOR || t === TIPOS.AECC || t === TIPOS.GNRAL) {
       return t;
     }
     return TIPOS.GNRAL;
@@ -104,15 +107,26 @@
 
     const secEventos = getSectionById('eventos');
     const secHonorarios = getSectionById('honorarios');
+    const secDesplazamientos = getSectionById('desplazamientos');
+    const secAeccDesplazamiento = getSectionById('aecc-desplazamiento');
 
     if (secEventos) secEventos.style.display = cfg.mostrarEventos ? '' : 'none';
     if (secHonorarios) secHonorarios.style.display = cfg.mostrarHonorarios ? '' : 'none';
+    if (secDesplazamientos) secDesplazamientos.style.display = cfg.mostrarDesplazamientos ? '' : 'none';
+    if (secAeccDesplazamiento) secAeccDesplazamiento.style.display = cfg.mostrarAeccDesplazamiento ? '' : 'none';
+
+    if (!cfg.mostrarAeccDesplazamiento && global.uiDesplazamientoAecc?.reset) {
+      global.uiDesplazamientoAecc.reset();
+    }
 
     if (tipoNormalizado === TIPOS.CONGR) {
       abrirSeccion('eventos');
     }
     if (tipoNormalizado === TIPOS.HONOR) {
       abrirSeccion('honorarios');
+    }
+    if (tipoNormalizado === TIPOS.AECC) {
+      abrirSeccion('aecc-desplazamiento');
     }
 
     if (global.uiDesplazamientos?.setMaxDesplazamientosOverride) {
@@ -162,6 +176,7 @@
     const btnDespl = document.getElementById('btn-inicio-despl');
     const btnCongr = document.getElementById('btn-inicio-congr');
     const btnHonor = document.getElementById('btn-inicio-honor');
+    const btnAecc = document.getElementById('btn-inicio-aecc');
     const btnCargar = document.getElementById('btn-inicio-cargar');
 
     if (btnDespl) {
@@ -183,6 +198,15 @@
     if (btnHonor) {
       btnHonor.addEventListener('click', () => {
         seleccionarTipo(TIPOS.HONOR);
+      });
+    }
+
+    if (btnAecc) {
+      btnAecc.addEventListener('click', (e) => {
+        if (!e.shiftKey) {
+          return;
+        }
+        seleccionarTipo(TIPOS.AECC);
       });
     }
 

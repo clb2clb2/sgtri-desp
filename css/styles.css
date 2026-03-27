@@ -298,6 +298,31 @@ body {
   box-shadow: 0 1px 2px -2px #777;
 }
 
+.tipo-liquidacion-btn.tipo-liquidacion-btn-disabled-look {
+  background-color: #e4e4e4;
+  color: #8a8a8a;
+  border-color: #bdbdbd;
+  cursor: default;
+  transition: none;
+  box-shadow: none;
+}
+
+.tipo-liquidacion-btn.tipo-liquidacion-btn-disabled-look:hover {
+  background-color: #e4e4e4;
+  color: #8a8a8a;
+  border-color: #bdbdbd;
+  transform: none;
+  box-shadow: none;
+}
+
+.tipo-liquidacion-btn.tipo-liquidacion-btn-disabled-look:active {
+  background-color: #e4e4e4;
+  color: #8a8a8a;
+  border-color: #bdbdbd;
+  transform: none;
+  box-shadow: none;
+}
+
 /* ============================================
    4. SECCIONES ACORDEÓN
    ============================================ */
@@ -1233,6 +1258,10 @@ input.num-spinner::-webkit-inner-spin-button {
   white-space: nowrap;
 }
 
+.calc-result .label em {
+  font-style: italic;
+}
+
 .resultado-line .resultado-label em {
   font-style: italic;
   color: var(--color-text-muted);
@@ -1312,6 +1341,10 @@ input.num-spinner::-webkit-inner-spin-button {
 }
 
 .calc-result .calc-total .amount strong.slight {
+  font-weight: 600;
+}
+
+.calc-result .calc-total .calc-total-amount {
   font-weight: 600;
 }
 
