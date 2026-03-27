@@ -77,11 +77,11 @@
   /**
    * Normaliza el tipo de liquidación a uno de los valores válidos.
    * @param {string} tipo
-   * @returns {'DESPL'|'CONGR'|'HONOR'|'GNRAL'}
+   * @returns {'DESPL'|'CONGR'|'HONOR'|'AECC'|'GNRAL'}
    */
   function normalizarTipoLiquidacion(tipo) {
     const raw = String(tipo || '').trim().toUpperCase();
-    if (raw === 'DESPL' || raw === 'CONGR' || raw === 'HONOR' || raw === 'GNRAL') {
+    if (raw === 'DESPL' || raw === 'CONGR' || raw === 'HONOR' || raw === 'AECC' || raw === 'GNRAL') {
       return raw;
     }
     return 'GNRAL';
@@ -920,11 +920,16 @@
       return false;
     }
 
+    if (tipoLiquidacion === 'AECC' && Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 0) {
+      alert('El archivo no es compatible con este tipo de liquidación: incluye desplazamientos.');
+      return false;
+    }
+
     const tieneEspecial = !!(datos.desplazamientoEspecial &&
       Array.isArray(datos.desplazamientoEspecial.lineas) &&
       datos.desplazamientoEspecial.lineas.length > 0);
 
-    if ((tipoLiquidacion === 'DESPL' || tipoLiquidacion === 'CONGR' || tipoLiquidacion === 'HONOR') && tieneEspecial) {
+    if ((tipoLiquidacion === 'DESPL' || tipoLiquidacion === 'CONGR' || tipoLiquidacion === 'HONOR' || tipoLiquidacion === 'AECC') && tieneEspecial) {
       alert('El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento especial.');
       return false;
     }
