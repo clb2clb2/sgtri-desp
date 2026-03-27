@@ -103,6 +103,13 @@ document.addEventListener('DOMContentLoaded', () => {
       // 6️⃣ Países: configurar datos (el select inicial ya no existe, se pobla dinámicamente)
       const paisesData = (data.dietasPorPais && data.dietasPorPais.paises) ? data.dietasPorPais.paises : [];
       if (uiDesp.setPaisesData) uiDesp.setPaisesData(paisesData);
+      if (window.uiDesplazamientoAecc?.setPaisesData) window.uiDesplazamientoAecc.setPaisesData(paisesData);
+      if (window.uiDesplazamientoAecc?.setDatosAecc && data.datosAECC) {
+        window.uiDesplazamientoAecc.setDatosAecc(data.datosAECC);
+      }
+      if (window.uiDesplazamientoAecc?.setLimitesIrpf && data.limitesIRPF) {
+        window.uiDesplazamientoAecc.setLimitesIrpf(data.limitesIRPF);
+      }
 
       // =========================================================================
       // INICIALIZACIÓN DE MÓDULOS

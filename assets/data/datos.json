@@ -80,5 +80,17 @@
   "normativasPorTipoProyecto": {
     "rd": ["G24","I24","PEI","NAL"],
     "decreto": ["UEX","PCO","JEX"]
+  },
+  "datosAECC": {
+    "importekm": 0.26,
+    "importedesayunoEsp": 10,
+    "importecomidaEsp": 25,
+    "importecenaEsp": 25,
+    "importedesayunoExt": 20,
+    "importecomidaExt": 50,
+    "importecenaExt": 50,
+    "alojMaxEspNormal": 155,
+    "alojMaxEspAltaOcupacion": 200,
+    "alojMaxExt": 300
   }
 }
