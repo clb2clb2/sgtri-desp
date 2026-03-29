@@ -21,6 +21,11 @@
     GNRAL: 'GNRAL'
   };
 
+  const AECC_PROYECTO = {
+    value: 'Reto AECC 70% Supervivencia',
+    label: 'Reto AECC 70% Supervivencia'
+  };
+
   const CONFIG = {
     DESPL: { mostrarEventos: false, mostrarHonorarios: false, mostrarDesplazamientos: true, mostrarAeccDesplazamiento: false, maxDesplazamientos: null, permitirEspecial: false },
     CONGR: { mostrarEventos: true, mostrarHonorarios: false, mostrarDesplazamientos: true, mostrarAeccDesplazamiento: false, maxDesplazamientos: 1, permitirEspecial: false },
@@ -72,6 +77,53 @@
 
     wrapper.insertBefore(secEventos, secDesplazamientos);
     wrapper.insertBefore(secHonorarios, secDesplazamientos);
+  }
+
+  function aplicarRestriccionesProyectoPorTipo(tipo) {
+    const tipoNormalizado = normalizarTipo(tipo);
+    const tipoProyectoEl = document.getElementById('tipoProyecto');
+    const infoDecretoEl = document.getElementById('infoDecreto');
+    if (!tipoProyectoEl) return;
+
+    if (tipoNormalizado === TIPOS.AECC) {
+      const previo = tipoProyectoEl.dataset.prevTipoProyecto;
+      if (typeof previo === 'undefined') {
+        tipoProyectoEl.dataset.prevTipoProyecto = tipoProyectoEl.value || '';
+      }
+
+      let optAecc = tipoProyectoEl.querySelector('option[data-aecc-proyecto="true"]');
+      if (!optAecc) {
+        optAecc = document.createElement('option');
+        optAecc.value = AECC_PROYECTO.value;
+        optAecc.textContent = AECC_PROYECTO.label;
+        optAecc.dataset.aeccProyecto = 'true';
+        tipoProyectoEl.appendChild(optAecc);
+      }
+
+      tipoProyectoEl.value = AECC_PROYECTO.value;
+      tipoProyectoEl.disabled = true;
+      if (infoDecretoEl) {
+        infoDecretoEl.style.display = 'none';
+      }
+      tipoProyectoEl.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+
+    tipoProyectoEl.disabled = false;
+    if (infoDecretoEl) {
+      infoDecretoEl.style.display = '';
+    }
+
+    const previo = tipoProyectoEl.dataset.prevTipoProyecto;
+    if (previo) {
+      const existePrevio = Array.from(tipoProyectoEl.options).some((o) => o.value === previo);
+      if (existePrevio) {
+        tipoProyectoEl.value = previo;
+      }
+    }
+
+    delete tipoProyectoEl.dataset.prevTipoProyecto;
+    tipoProyectoEl.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   function mostrarFormulario() {
@@ -146,6 +198,8 @@
     if (global.uiDesplazamientos?.actualizarBotonAddDesplazamiento) {
       global.uiDesplazamientos.actualizarBotonAddDesplazamiento();
     }
+
+    aplicarRestriccionesProyectoPorTipo(tipoNormalizado);
 
     tipoActual = tipoNormalizado;
     global.__sgtriTipoLiquidacion = tipoActual;
