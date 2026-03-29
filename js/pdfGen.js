@@ -86,6 +86,15 @@
     return fmt(n) + ' €';
   }
 
+  function fmtEuroCompact(n) {
+    const num = Number(n) || 0;
+    const hasDecimals = Math.abs(num % 1) > Number.EPSILON;
+    return num.toLocaleString('de-DE', {
+      minimumFractionDigits: hasDecimals ? 2 : 0,
+      maximumFractionDigits: 2
+    }) + ' €';
+  }
+
   /**
    * Convierte una fecha en formato "DD/MM/YYYY" a texto largo en español.
    * Ej: "23/09/2026" → "23 de septiembre de 2026"
@@ -402,6 +411,9 @@
         // Tablas de desplazamientos
         ...buildTablasDesplazamientos(datos),
 
+        // Tabla de desplazamiento AECC (si existe)
+        ...buildTablaDesplazamientoAECC(datos),
+
         // Tabla de desplazamiento especial (si existe)
         ...buildTablaDesplazamientoEspecial(datos),
 
@@ -685,18 +697,22 @@
       ]);
     }
 
-    // Nota de normativa para el encabezado
-    let notaNormativa;
-    if (p.normativa === 'decreto') {
-      notaNormativa = {
-        text: 'Cálculos efectuados en base al Decreto 42/2025',
-        link: 'https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o'
-      };
-    } else {
-      notaNormativa = {
-        text: 'Cálculos efectuados en base al RD 462/2002',
-        link: 'https://www.boe.es/buscar/act.php?id=BOE-A-2002-10337'
-      };
+    // Nota de normativa para el encabezado (oculta en AECC)
+    const esAecc = String(datos.tipoLiquidacion || '').toUpperCase() === 'AECC' ||
+      (Array.isArray(datos.desplazamientoAECC) && datos.desplazamientoAECC.length > 0);
+    let notaNormativa = null;
+    if (!esAecc) {
+      if (p.normativa === 'decreto') {
+        notaNormativa = {
+          text: 'Cálculos efectuados en base al Decreto 42/2025',
+          link: 'https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o'
+        };
+      } else {
+        notaNormativa = {
+          text: 'Cálculos efectuados en base al RD 462/2002',
+          link: 'https://www.boe.es/buscar/act.php?id=BOE-A-2002-10337'
+        };
+      }
     }
 
     // Encabezado con línea verde + nota normativa a la derecha
@@ -930,6 +946,9 @@
       ];
       if (desp.ticketCena) {
         fechasText.push({ text: '     [ticket cena]', style: 'tablaNotaSmall' });
+      }
+      if (desp.justificaPernocta) {
+        fechasText.push({ text: '     [justif. última noche]', style: 'tablaNotaSmall' });
       }
 
       const origenDestinoText = esInternacional
@@ -1269,6 +1288,206 @@
     return [
       { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
       { unbreakable: true, stack: [...encabezado, tabla] }
+    ];
+  }
+
+  /**
+   * Construye la tabla del desplazamiento AECC.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array}
+   */
+  function buildTablaDesplazamientoAECC(datos) {
+    const aecc = Array.isArray(datos.desplazamientoAECC) ? datos.desplazamientoAECC[0] : null;
+    if (!aecc) return [];
+
+    const dc = aecc.datosCalculados || {};
+    const pernoctaciones = Number(dc.pernoctaciones) || 0;
+    const maxPorPernoctacion = Number(dc.maxAlojamientoPorPernoctacion) || 0;
+    const maxAlojamiento = Number(dc.maxAlojamiento) || 0;
+    const alojamiento = parseEuroNumber(aecc.alojamiento);
+    const excedeMax = !!dc.excedeMaxAlojamiento;
+    const kmValorCalculado = Number(dc.km);
+    const kmValorRaw = Number(
+      String(aecc.km || '')
+        .replace(/[^0-9,.-]/g, '')
+        .replace(/\./g, '')
+        .replace(',', '.')
+    ) || 0;
+    const kmValor = Number.isFinite(kmValorCalculado) && kmValorCalculado > 0
+      ? kmValorCalculado
+      : kmValorRaw;
+    const kmPrecio = Number(dc.precioKm) || 0;
+    const kmImporte = Number(dc.kilometraje) || 0;
+    const manutencion = Number(dc.manutencion) || 0;
+    const total = Number(dc.total) || 0;
+    const irpfSujeto = Number(dc.irpfSujeto) || 0;
+
+    const encabezado = buildEncabezadoSeccion('DESPLAZAMIENTO');
+
+    const layoutSinBordeSuperior = {
+      hLineWidth: (i) => i === 0 ? 0 : 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
+    const layoutUltimaTabla = {
+      hLineWidth: (i, node) => i === 0 ? 0 : 0.5,
+      vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 0.5 : 0,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingTop: () => 5
+    };
+
+    const fechasText = [
+      { text: `${aecc.fechaIda || ''}, ${aecc.horaIda || ''} h — ${aecc.fechaRegreso || ''}, ${aecc.horaRegreso || ''} h`, style: 'tablaDato' }
+    ];
+    if (aecc.justificaPernocta) {
+      fechasText.push({ text: '     [justif. última noche]', style: 'tablaNotaSmall' });
+    }
+
+    const tablaDatosGenerales = {
+      table: {
+        widths: ['50%', '*'],
+        body: [
+          [
+            { text: fechasText },
+            { text: `${aecc.origen || ''} — ${aecc.destino || ''}${aecc.paisDestino ? ` (${aecc.paisDestino})` : ''}`, style: 'tablaDato' }
+          ],
+          [
+            {
+              text: [
+                { text: 'Motivo: ', style: 'tablaEtiqueta' },
+                { text: aecc.motivo || '', style: 'tablaDato' }
+              ],
+              colSpan: 2
+            },
+            {}
+          ]
+        ]
+      },
+      layout: layoutSinBordeSuperior,
+      margin: [0, 0, 0, 0]
+    };
+
+    const textoManut = dc.textoManutencion || '';
+    const textoKm = `${Math.round(kmValor).toLocaleString('de-DE')} km × ${fmtEuroCompact(kmPrecio)}`;
+    const otrosArray = Array.isArray(aecc.otrosGastos) ? aecc.otrosGastos : [];
+    const TIPOS_OTROS_GASTOS = {
+      'ICG': 'Inscripción Congreso',
+      'AVN': 'Avión / Tren / Autobús',
+      'PJE': 'Peaje',
+      'TAX': 'Taxi',
+      'PRK': 'Aparcamiento',
+      'TRF': 'Transfer o Traslados',
+      'INS': 'Gastos de instalación',
+      'ALQ': 'Alquiler de coche',
+      'SAC': 'Seguro de accidentes',
+      'SME': 'Seguro médico',
+      'TTR': 'Tasa turística',
+      'TAG': 'Tasa agencia de viajes',
+      'OTR': 'Otros gastos'
+    };
+    const lineasEtiquetas = [];
+    const lineasImportes = [];
+
+    if (manutencion > 0) {
+      lineasEtiquetas.push({ text: `Manutención [ ${textoManut} ]`, style: 'tablaEtiqueta' });
+      lineasImportes.push({ text: fmtEuro(manutencion), style: 'tablaDato' });
+    }
+
+    if (alojamiento > 0) {
+      lineasEtiquetas.push({
+        text: `Alojamiento [ máximo: ${pernoctaciones} × ${fmtEuro(maxPorPernoctacion)} = ${fmtEuro(maxAlojamiento)} ]`,
+        style: 'tablaEtiqueta'
+      });
+      lineasImportes.push(
+        excedeMax
+          ? { text: `* ${fmtEuro(alojamiento)}`, style: 'tablaDato', color: '#c50909', italics: true }
+          : { text: fmtEuro(alojamiento), style: 'tablaDato' }
+      );
+    }
+
+    if (kmImporte > 0) {
+      lineasEtiquetas.push({ text: `Kilometraje [ ${textoKm} ]`, style: 'tablaEtiqueta' });
+      lineasImportes.push({ text: fmtEuro(kmImporte), style: 'tablaDato' });
+    }
+
+    for (const gasto of otrosArray) {
+      const nombreTipo = TIPOS_OTROS_GASTOS[gasto.tipo] || gasto.tipo || 'Otro';
+      const concepto = gasto.concepto || '';
+      const importeGasto = parseEuroNumber(gasto.importe);
+
+      if (importeGasto <= 0 && !concepto && !gasto.tipo) continue;
+
+      if (concepto) {
+        lineasEtiquetas.push({
+          text: [
+            { text: `${nombreTipo}: `, style: 'tablaEtiqueta' },
+            { text: concepto, style: 'tablaDato' }
+          ]
+        });
+      } else {
+        lineasEtiquetas.push({ text: nombreTipo, style: 'tablaEtiqueta' });
+      }
+
+      lineasImportes.push({ text: fmtEuro(importeGasto), style: 'tablaDato' });
+    }
+
+    const celdaIrpf = irpfSujeto > 0
+      ? {
+          text: [
+            { text: 'Sujeto a retención por IRPF: ', style: 'tablaEtiqueta' },
+            { text: fmtEuro(irpfSujeto), style: 'tablaDato' }
+          ],
+          alignment: 'left'
+        }
+      : { text: '' };
+
+    const celdaTotal = excedeMax
+      ? {
+          text: `* ${fmtEuro(total)}`,
+          style: 'tablaDato',
+          alignment: 'right',
+          bold: true,
+          color: '#c50909',
+          italics: true
+        }
+      : {
+          text: fmtEuro(total),
+          style: 'tablaDato',
+          alignment: 'right',
+          bold: true
+        };
+
+    const tablaImportes = {
+      table: {
+        widths: ['40%', '46%', '*'],
+        body: [
+          [
+            { stack: lineasEtiquetas, alignment: 'right', colSpan: 2, lineHeight: 1.35, margin: [0, 1, 0, -2] },
+            {},
+            { stack: lineasImportes, alignment: 'right', lineHeight: 1.35, margin: [0, 1, 0, -2] }
+          ],
+          [
+            celdaIrpf,
+            {
+              text: 'TOTAL:',
+              style: 'tablaEtiqueta',
+              alignment: 'right'
+            },
+            celdaTotal
+          ]
+        ]
+      },
+      layout: layoutUltimaTabla,
+      margin: [0, 0, 0, 0]
+    };
+
+    return [
+      { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
+      { unbreakable: true, stack: [...encabezado, tablaDatosGenerales, tablaImportes] }
     ];
   }
 

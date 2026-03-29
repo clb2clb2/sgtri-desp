@@ -24,9 +24,11 @@
     esp: [0, 0],
     ext: [0, 0]
   };
+  let maxOtrosGastosPorDesplazamiento = 10;
   let modoManutencion = 'none';
   let condicionNoPernoctaActiva = false;
   let initialized = false;
+  const AECC_RESULTADO_ID = 'aecc';
 
   function byId(id) {
     return document.getElementById(id);
@@ -129,6 +131,13 @@
     };
 
     renderResultado();
+  }
+
+  function setLimites(raw) {
+    const src = raw || {};
+    const maxOtros = Number(src.maxOtrosGastosPorDesplazamiento);
+    maxOtrosGastosPorDesplazamiento = Number.isFinite(maxOtros) && maxOtros > 0 ? maxOtros : 10;
+    actualizarVisibilidadBotonOtrosGastosAecc();
   }
 
   function getTarifasManutencionPorPais() {
@@ -438,10 +447,136 @@
     </span>`;
   }
 
-  function renderResultado() {
-    const resultEl = byId('aecc-calc-result');
-    if (!resultEl) return;
+  function getOtrosGastosDataCatalogo() {
+    const data = global.utils?.getSgtriDatos?.() || global.__sgtriDatos || {};
+    const base = Array.isArray(data.otrosGastos) ? data.otrosGastos : [];
 
+    // En AECC se añade una opción específica al principio de la lista.
+    const aeccFirst = ['Inscripción Congreso', 'ICG'];
+    const yaExiste = base.some((item) => {
+      const label = String(item?.[0] || '').trim().toLowerCase();
+      return label === 'inscripción congreso' || label === 'inscripcion congreso';
+    });
+
+    return yaExiste ? base : [aeccFirst, ...base];
+  }
+
+  function getOtrosGastosContainerAecc() {
+    return byId('aecc-otros-gastos');
+  }
+
+  function actualizarVisibilidadBotonOtrosGastosAecc() {
+    const cont = getOtrosGastosContainerAecc();
+    const btn = byId('aecc-btn-otros-gastos');
+    if (!cont || !btn) return;
+    const count = cont.querySelectorAll('.otros-gasto-line').length;
+    btn.style.display = count >= maxOtrosGastosPorDesplazamiento ? 'none' : '';
+  }
+
+  function crearLineaOtroGastoAecc() {
+    const cont = getOtrosGastosContainerAecc();
+    if (!cont) return null;
+
+    const line = document.createElement('div');
+    line.className = 'otros-gasto-line form-row three-cols-25-50-25';
+
+    const colTipo = document.createElement('div');
+    colTipo.className = 'form-group';
+    const labelTipo = document.createElement('label');
+    labelTipo.textContent = 'Tipo de gasto:';
+    const selectTipo = document.createElement('select');
+    selectTipo.className = 'otros-gasto-tipo';
+    selectTipo.setAttribute('aria-label', 'Tipo de gasto');
+    colTipo.appendChild(labelTipo);
+    colTipo.appendChild(selectTipo);
+
+    const colDesc = document.createElement('div');
+    colDesc.className = 'form-group';
+    const labelDesc = document.createElement('label');
+    labelDesc.textContent = 'Descripción:';
+    const inputDesc = document.createElement('input');
+    inputDesc.type = 'text';
+    inputDesc.className = 'otros-gasto-desc';
+    inputDesc.maxLength = 60;
+    inputDesc.setAttribute('aria-label', 'Descripción del gasto');
+    colDesc.appendChild(labelDesc);
+    colDesc.appendChild(inputDesc);
+
+    const colImp = document.createElement('div');
+    colImp.className = 'form-group';
+    const labelImp = document.createElement('label');
+    labelImp.textContent = 'Importe:';
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.gap = '0.5rem';
+    const inputImp = document.createElement('input');
+    inputImp.type = 'text';
+    inputImp.className = 'format-alojamiento otros-gasto-importe';
+    inputImp.placeholder = '0,00 €';
+    inputImp.maxLength = 12;
+    inputImp.setAttribute('aria-label', 'Importe del gasto');
+    const btnRemove = document.createElement('button');
+    btnRemove.type = 'button';
+    btnRemove.className = 'btn-remove-otros-gasto';
+    btnRemove.setAttribute('aria-label', 'Eliminar otro gasto');
+    const spanIcon = document.createElement('span');
+    spanIcon.className = 'btn-icon btn-icon-minus';
+    spanIcon.setAttribute('aria-hidden', 'true');
+    spanIcon.textContent = '+';
+    btnRemove.appendChild(spanIcon);
+
+    wrap.appendChild(inputImp);
+    wrap.appendChild(btnRemove);
+    colImp.appendChild(labelImp);
+    colImp.appendChild(wrap);
+
+    line.appendChild(colTipo);
+    line.appendChild(colDesc);
+    line.appendChild(colImp);
+
+    const catalogo = getOtrosGastosDataCatalogo();
+    catalogo.forEach((item) => {
+      const opt = document.createElement('option');
+      opt.value = item[1] || item[0] || '';
+      opt.textContent = item[0] || item[1] || '';
+      selectTipo.appendChild(opt);
+    });
+
+    cont.appendChild(line);
+    cont.style.display = 'block';
+    actualizarVisibilidadBotonOtrosGastosAecc();
+    renderResultado();
+    return line;
+  }
+
+  function extraerOtrosGastosAecc() {
+    const cont = getOtrosGastosContainerAecc();
+    if (!cont) return { items: [], total: 0 };
+    const lineas = cont.querySelectorAll('.otros-gasto-line');
+    const items = [];
+
+    lineas.forEach((linea) => {
+      const tipo = String(linea.querySelector('.otros-gasto-tipo')?.value || '').trim();
+      const concepto = String(linea.querySelector('.otros-gasto-desc')?.value || '').trim();
+      const importeRaw = String(linea.querySelector('.otros-gasto-importe')?.value || '').trim();
+      const importe = round2(parseNumber(importeRaw));
+
+      if (tipo || concepto || importe > 0) {
+        items.push({
+          tipo,
+          concepto,
+          importe,
+          importeRaw
+        });
+      }
+    });
+
+    const total = round2(items.reduce((sum, v) => sum + (Number(v.importe) || 0), 0));
+    return { items, total };
+  }
+
+  function calcularDatosResultadoAecc() {
     const dias = calcularNumeroDias();
     const modo = getModoManutencionSegunFechas();
     aplicarReglaNoPernoctaEnManutencionUltimoDia();
@@ -461,7 +596,9 @@
       baseDias = Math.max(dias - 2, 0);
     }
 
-    const manutencion = round2((baseDias * full) + impPrimer + impUltimo);
+    const manutencionBase = round2((baseDias * full) + impPrimer + impUltimo);
+    const excluirManutencion = !!byId('aecc-no-manutencion')?.checked;
+    const manutencion = excluirManutencion ? 0 : manutencionBase;
 
     const kmValor = parseNumber(byId('aecc-km')?.value || '');
     const kmTarifa = Number(datosAecc.importekm) || 0;
@@ -473,41 +610,155 @@
     const pernoctaciones = hayNoPernoctaMadrugada ? Math.max(pernoctacionesBase - 1, 0) : pernoctacionesBase;
     const maxPorPernoctacion = getMaxAlojamientoPorPernoctacion();
     const maxAlojamiento = round2(pernoctaciones * maxPorPernoctacion);
-    const total = round2(manutencion + kmImporte + alojamiento);
+    const otrosGastosData = extraerOtrosGastosAecc();
+    const otrosGastos = otrosGastosData.total;
+    const total = round2(manutencion + kmImporte + alojamiento + otrosGastos);
     const irpfLimites = getLimitesIrpfPorPais();
 
     let sujetoIrpf = 0;
-    if (modo === 'same') {
-      sujetoIrpf = round2(Math.max(0, impPrimer - irpfLimites.menor));
-    } else if (modo === 'range') {
-      const baseDiasSeguros = Math.max(baseDias, 0);
-      let exentoPrimer = irpfLimites.mayor;
-      let sujetoIntermedios = Math.max(0, full - irpfLimites.mayor) * baseDiasSeguros;
+    if (!excluirManutencion) {
+      if (modo === 'same') {
+        sujetoIrpf = round2(Math.max(0, impPrimer - irpfLimites.menor));
+      } else if (modo === 'range') {
+        const baseDiasSeguros = Math.max(baseDias, 0);
+        let exentoPrimer = irpfLimites.mayor;
+        let sujetoIntermedios = Math.max(0, full - irpfLimites.mayor) * baseDiasSeguros;
 
-      if (hayNoPernoctaMadrugada) {
-        if (baseDiasSeguros > 0) {
-          sujetoIntermedios = (Math.max(0, full - irpfLimites.mayor) * Math.max(baseDiasSeguros - 1, 0))
-            + Math.max(0, full - irpfLimites.menor);
-        } else {
-          // Si solo hay 2 días, el penúltimo coincide con el primer día.
-          exentoPrimer = irpfLimites.menor;
+        if (hayNoPernoctaMadrugada) {
+          if (baseDiasSeguros > 0) {
+            sujetoIntermedios = (Math.max(0, full - irpfLimites.mayor) * Math.max(baseDiasSeguros - 1, 0))
+              + Math.max(0, full - irpfLimites.menor);
+          } else {
+            exentoPrimer = irpfLimites.menor;
+          }
         }
-      }
 
-      const sujetoPrimer = Math.max(0, impPrimer - exentoPrimer);
-      const sujetoUltimo = Math.max(0, impUltimo - irpfLimites.menor);
-      sujetoIrpf = round2(sujetoPrimer + sujetoIntermedios + sujetoUltimo);
+        const sujetoPrimer = Math.max(0, impPrimer - exentoPrimer);
+        const sujetoUltimo = Math.max(0, impUltimo - irpfLimites.menor);
+        sujetoIrpf = round2(sujetoPrimer + sujetoIntermedios + sujetoUltimo);
+      }
     }
 
+    const textoManut = construirTextoManutencion(modo, baseDias, impPrimer, impUltimo, full);
+    const textoKm = `${(Math.round(kmValor)).toLocaleString('de-DE')} × ${fmtEuroCompact(kmTarifa)}`;
+
+    return {
+      modoManutencion: modo,
+      primerDiaCodigo: primerSel,
+      ultimoDiaCodigo: ultimoSel,
+      baseDias,
+      importePrimerDia: round2(impPrimer),
+      importeUltimoDia: round2(impUltimo),
+      manutencionDiaCompleto: full,
+      textoManutencion: textoManut,
+      manutencion,
+      excluirManutencion,
+      km: Math.round(kmValor),
+      precioKm: kmTarifa,
+      textoKm,
+      kilometraje: kmImporte,
+      alojamiento,
+      pernoctaciones,
+      pernoctacionesBase,
+      noPernoctaMadrugada: hayNoPernoctaMadrugada,
+      maxAlojamientoPorPernoctacion: maxPorPernoctacion,
+      maxAlojamiento,
+      excedeMaxAlojamiento: alojamiento > maxAlojamiento,
+      otrosGastos,
+      otrosGastosDetalle: otrosGastosData.items,
+      total,
+      irpfSujeto: sujetoIrpf,
+      irpfLimites: {
+        menor: irpfLimites.menor,
+        mayor: irpfLimites.mayor
+      }
+    };
+  }
+
+  function hasContenidoAecc(datos) {
+    if (!datos) return false;
+    const camposTexto = [
+      datos.fechaIda,
+      datos.horaIda,
+      datos.fechaRegreso,
+      datos.horaRegreso,
+      datos.origen,
+      datos.destino,
+      datos.paisDestino,
+      datos.motivo,
+      datos.km,
+      datos.alojamiento
+    ];
+    if (camposTexto.some((v) => String(v || '').trim() !== '')) return true;
+    if (datos.destinoAltaOcupacion || datos.justificaPernocta || datos.noManutencion) return true;
+    if (Array.isArray(datos.otrosGastos) && datos.otrosGastos.length > 0) return true;
+    const calc = datos.datosCalculados || {};
+    return (Number(calc.total) || 0) > 0;
+  }
+
+  function syncResultadoLiquidacionAecc(calculo, hayContenido) {
+    const rl = global.resultadoLiquidacion;
+    if (!rl) return;
+
+    if (!hayContenido) {
+      if (typeof rl.eliminarDesplazamiento === 'function') {
+        rl.eliminarDesplazamiento(AECC_RESULTADO_ID);
+      }
+      if (typeof rl.renderResultado === 'function') {
+        rl.renderResultado();
+      }
+      return;
+    }
+
+    if (typeof rl.registrarDesplazamiento === 'function') {
+      rl.registrarDesplazamiento(
+        AECC_RESULTADO_ID,
+        {
+          manutencion: calculo.manutencion,
+          alojamientoUser: calculo.alojamiento,
+          km: calculo.kilometraje,
+          otrosGastos: calculo.otrosGastos,
+          irpfSujeto: calculo.irpfSujeto
+        },
+        {
+          origen: byId('aecc-origen')?.value || '',
+          destino: byId('aecc-destino')?.value || '',
+          paisDestino: byId('aecc-pais-destino')?.value || '',
+          motivo: byId('aecc-motivo')?.value || '',
+          aecc: true,
+          ...calculo
+        }
+      );
+    }
+
+    if (typeof rl.renderResultado === 'function') {
+      rl.renderResultado();
+    }
+  }
+
+  function renderResultado() {
+    const resultEl = byId('aecc-calc-result');
+    if (!resultEl) return;
+    const calculo = calcularDatosResultadoAecc();
+    const manutencion = calculo.manutencion;
+    const textoManut = calculo.textoManutencion;
+    const kmImporte = calculo.kilometraje;
+    const textoKm = calculo.textoKm;
+    const alojamiento = calculo.alojamiento;
+    const pernoctaciones = calculo.pernoctaciones;
+    const maxPorPernoctacion = calculo.maxAlojamientoPorPernoctacion;
+    const maxAlojamiento = calculo.maxAlojamiento;
+    const otrosGastos = calculo.otrosGastos;
+    const total = calculo.total;
+    const sujetoIrpf = calculo.irpfSujeto;
+
     const hayContenido = total > 0;
+    syncResultadoLiquidacionAecc(calculo, hayContenido);
     if (!hayContenido) {
       resultEl.style.display = 'none';
       resultEl.innerHTML = '';
       return;
     }
-
-    const textoManut = construirTextoManutencion(modo, baseDias, impPrimer, impUltimo, full);
-    const textoKm = `${(Math.round(kmValor)).toLocaleString('de-DE')} × ${fmtEuroCompact(kmTarifa)}`;
 
     const lineas = [];
 
@@ -546,6 +797,16 @@
       `);
     }
 
+    if (otrosGastos > 0) {
+      lineas.push(`
+        <div class="calc-line">
+          <span class="label">Total otros gastos</span>
+          <span class="leader"></span>
+          <span class="amount">${fmtEuro(otrosGastos)}</span>
+        </div>
+      `);
+    }
+
     lineas.push(`
       <div class="calc-total">
         <span class="label">Total:</span>
@@ -553,12 +814,14 @@
       </div>
     `);
 
-    lineas.push(`
-      <div class="calc-irpf">
-        <span class="label">Sujeto a retención por IRPF:</span>
-        <span class="amount">${fmtEuro(sujetoIrpf)}</span>
-      </div>
-    `);
+    if (sujetoIrpf > 0) {
+      lineas.push(`
+        <div class="calc-irpf">
+          <span class="label">Sujeto a retención por IRPF:</span>
+          <span class="amount">${fmtEuro(sujetoIrpf)}</span>
+        </div>
+      `);
+    }
 
     resultEl.innerHTML = lineas.join('');
     resultEl.style.display = '';
@@ -661,11 +924,57 @@
       altaOcupacionEl.addEventListener('change', renderResultado);
     }
 
+    const noManutencionEl = byId('aecc-no-manutencion');
+    if (noManutencionEl) {
+      noManutencionEl.addEventListener('change', renderResultado);
+    }
+
     const justificarPernoctaEl = byId('aecc-justificar-pernocta');
     if (justificarPernoctaEl) {
       justificarPernoctaEl.addEventListener('change', () => {
         aplicarReglaNoPernoctaEnManutencionUltimoDia();
         renderResultado();
+      });
+    }
+
+    const otrosWrapper = byId('aecc-otros-gastos-wrapper');
+    if (otrosWrapper) {
+      otrosWrapper.addEventListener('click', (e) => {
+        const targetAdd = e.target.closest && e.target.closest('#aecc-btn-otros-gastos');
+        if (targetAdd) {
+          const nueva = crearLineaOtroGastoAecc();
+          if (nueva) {
+            const inp = nueva.querySelector('.otros-gasto-desc');
+            if (inp) setTimeout(() => inp.focus(), 80);
+          }
+          return;
+        }
+
+        const targetRemove = e.target.closest && e.target.closest('.btn-remove-otros-gasto');
+        if (targetRemove) {
+          const line = targetRemove.closest('.otros-gasto-line');
+          if (line && line.parentNode) {
+            line.parentNode.removeChild(line);
+          }
+          actualizarVisibilidadBotonOtrosGastosAecc();
+          renderResultado();
+        }
+      });
+
+      otrosWrapper.addEventListener('blur', (e) => {
+        const el = e.target;
+        if (!el || !el.classList) return;
+        if (el.classList.contains('otros-gasto-importe')) {
+          renderResultado();
+        }
+      }, true);
+
+      otrosWrapper.addEventListener('change', (e) => {
+        const el = e.target;
+        if (!el || !el.classList) return;
+        if (el.classList.contains('otros-gasto-tipo') || el.classList.contains('otros-gasto-desc') || el.classList.contains('otros-gasto-importe')) {
+          renderResultado();
+        }
       });
     }
   }
@@ -679,6 +988,9 @@
     }
     if (global.__sgtriDatos?.limitesIRPF) {
       setLimitesIrpf(global.__sgtriDatos.limitesIRPF);
+    }
+    if (global.__sgtriDatos?.limites) {
+      setLimites(global.__sgtriDatos.limites);
     }
 
     if (Array.isArray(global.__sgtriDatos?.dietasPorPais?.paises)) {
@@ -721,6 +1033,18 @@
       altaOcupacionEl.checked = false;
     }
 
+    const noManutencionEl = byId('aecc-no-manutencion');
+    if (noManutencionEl) {
+      noManutencionEl.checked = false;
+    }
+
+    const otrosGastosCont = getOtrosGastosContainerAecc();
+    if (otrosGastosCont) {
+      otrosGastosCont.innerHTML = '';
+      otrosGastosCont.style.display = 'none';
+    }
+    actualizarVisibilidadBotonOtrosGastosAecc();
+
     const justificarPernoctaEl = byId('aecc-justificar-pernocta');
     if (justificarPernoctaEl) {
       justificarPernoctaEl.checked = false;
@@ -756,9 +1080,19 @@
       resultEl.style.display = 'none';
       resultEl.innerHTML = '';
     }
+
+    syncResultadoLiquidacionAecc({
+      manutencion: 0,
+      alojamiento: 0,
+      kilometraje: 0,
+      otrosGastos: 0,
+      irpfSujeto: 0
+    }, false);
   }
 
   function obtenerDatos() {
+    const calculo = calcularDatosResultadoAecc();
+    const otrosDetalle = Array.isArray(calculo.otrosGastosDetalle) ? calculo.otrosGastosDetalle : [];
     return {
       fechaIda: byId('aecc-fecha-ida')?.value || '',
       horaIda: byId('aecc-hora-ida')?.value || '',
@@ -768,25 +1102,138 @@
       destino: byId('aecc-destino')?.value || '',
       paisDestino: byId('aecc-pais-destino')?.value || '',
       destinoAltaOcupacion: !!byId('aecc-destino-alta-ocupacion')?.checked,
-      justificarPernoctaMadrugada: !!byId('aecc-justificar-pernocta')?.checked,
+      justificaPernocta: !!byId('aecc-justificar-pernocta')?.checked,
+      noManutencion: !!byId('aecc-no-manutencion')?.checked,
       motivo: byId('aecc-motivo')?.value || '',
       manutPrimerDia: byId('aecc-manut-primer-dia')?.value || 'B+C+CN',
       manutUltimoDia: byId('aecc-manut-ultimo-dia')?.value || 'B+C+CN',
       km: byId('aecc-km')?.value || '',
       alojamiento: byId('aecc-alojamiento')?.value || '',
-      fechasValidas: validarOrdenFechaHora()
+      otrosGastos: otrosDetalle.map((g) => ({
+        tipo: g.tipo || '',
+        concepto: g.concepto || '',
+        importe: g.importeRaw || (g.importe > 0 ? fmtEuro(g.importe) : '')
+      })),
+      otrosGastosTotal: calculo.otrosGastos,
+      fechasValidas: validarOrdenFechaHora(),
+      datosCalculados: {
+        modoManutencion: calculo.modoManutencion,
+        textoManutencion: calculo.textoManutencion,
+        baseDiasManutencion: calculo.baseDias,
+        importePrimerDiaManutencion: calculo.importePrimerDia,
+        importeUltimoDiaManutencion: calculo.importeUltimoDia,
+        manutencionDiaCompleto: calculo.manutencionDiaCompleto,
+        manutencion: calculo.manutencion,
+        kilometraje: calculo.kilometraje,
+        precioKm: calculo.precioKm,
+        textoKm: calculo.textoKm,
+        alojamiento: calculo.alojamiento,
+        pernoctaciones: calculo.pernoctaciones,
+        maxAlojamientoPorPernoctacion: calculo.maxAlojamientoPorPernoctacion,
+        maxAlojamiento: calculo.maxAlojamiento,
+        excedeMaxAlojamiento: calculo.excedeMaxAlojamiento,
+        noPernoctaMadrugada: calculo.noPernoctaMadrugada,
+        otrosGastos: calculo.otrosGastos,
+        irpfSujeto: calculo.irpfSujeto,
+        total: calculo.total,
+        irpfLimites: calculo.irpfLimites
+      }
     };
+  }
+
+  function obtenerDatosSerializacion() {
+    const datos = obtenerDatos();
+    return {
+      ...datos,
+      tieneContenido: hasContenidoAecc(datos)
+    };
+  }
+
+  function restaurarDatos(datos) {
+    const src = datos || {};
+    reset();
+
+    establecerValorCampoInterno('aecc-fecha-ida', src.fechaIda);
+    establecerValorCampoInterno('aecc-hora-ida', src.horaIda);
+    establecerValorCampoInterno('aecc-fecha-regreso', src.fechaRegreso);
+    establecerValorCampoInterno('aecc-hora-regreso', src.horaRegreso);
+    establecerValorCampoInterno('aecc-origen', src.origen);
+    establecerValorCampoInterno('aecc-destino', src.destino);
+    establecerValorCampoInterno('aecc-motivo', src.motivo);
+    establecerValorCampoInterno('aecc-km', src.km);
+    establecerValorCampoInterno('aecc-alojamiento', src.alojamiento);
+
+    const paisEl = byId('aecc-pais-destino');
+    if (paisEl && src.paisDestino) {
+      paisEl.value = src.paisDestino;
+    }
+
+    const altaEl = byId('aecc-destino-alta-ocupacion');
+    if (altaEl) altaEl.checked = !!src.destinoAltaOcupacion;
+
+    const justificarEl = byId('aecc-justificar-pernocta');
+    if (justificarEl) {
+      // Compatibilidad con archivos anteriores
+      justificarEl.checked = !!(src.justificaPernocta || src.justificarPernoctaMadrugada);
+    }
+
+    const noManutEl = byId('aecc-no-manutencion');
+    if (noManutEl) noManutEl.checked = !!src.noManutencion;
+
+    actualizarVisibilidadAltaOcupacion();
+    actualizarVisibilidadJustificarPernoctaAecc();
+    actualizarVisibilidadManutencion();
+
+    const primerSel = byId('aecc-manut-primer-dia');
+    if (primerSel && src.manutPrimerDia) {
+      primerSel.value = src.manutPrimerDia;
+    }
+
+    const ultimoSel = byId('aecc-manut-ultimo-dia');
+    if (ultimoSel && src.manutUltimoDia) {
+      ultimoSel.value = src.manutUltimoDia;
+    }
+
+    const otrosCont = getOtrosGastosContainerAecc();
+    if (otrosCont) {
+      otrosCont.innerHTML = '';
+    }
+    const otros = Array.isArray(src.otrosGastos) ? src.otrosGastos : [];
+    otros.forEach((gasto) => {
+      const linea = crearLineaOtroGastoAecc();
+      if (!linea) return;
+      const tipoEl = linea.querySelector('.otros-gasto-tipo');
+      const conceptoEl = linea.querySelector('.otros-gasto-desc');
+      const importeEl = linea.querySelector('.otros-gasto-importe');
+
+      if (tipoEl) tipoEl.value = gasto.tipo || '';
+      if (conceptoEl) conceptoEl.value = gasto.concepto || gasto.descripcion || '';
+      if (importeEl) importeEl.value = gasto.importe || '';
+    });
+
+    actualizarVisibilidadBotonOtrosGastosAecc();
+    validarOrdenFechaHora();
+    renderResultado();
+  }
+
+  function establecerValorCampoInterno(id, valor) {
+    const el = byId(id);
+    if (!el) return;
+    el.value = valor ?? '';
   }
 
   global.uiDesplazamientoAecc = {
     init,
     setPaisesData,
     setDatosAecc,
+    setLimites,
     setLimitesIrpf,
     validarOrdenFechaHora,
     renderResultado,
     reset,
-    obtenerDatos
+    obtenerDatos,
+    obtenerDatosSerializacion,
+    restaurarDatos
   };
 
   if (document.readyState === 'loading') {
