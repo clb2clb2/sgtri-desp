@@ -110,6 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (window.uiDesplazamientoAecc?.setLimitesIrpf && data.limitesIRPF) {
         window.uiDesplazamientoAecc.setLimitesIrpf(data.limitesIRPF);
       }
+      if (window.uiDesplazamientoAecc?.setLimites && data.limites) {
+        window.uiDesplazamientoAecc.setLimites(data.limites);
+      }
 
       // =========================================================================
       // INICIALIZACIÓN DE MÓDULOS
@@ -1343,6 +1346,8 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function validarDatos() {
     let hayErrores = false;
+    const tipoActual = window.tipoLiquidacion?.getTipoActual?.() || window.__sgtriTipoLiquidacion || '';
+    const esModoAecc = String(tipoActual).toUpperCase() === 'AECC';
 
     // ---- SECCIÓN 1: Datos del beneficiario ----
     const camposBeneficiario = ['nombre-benef', 'dni', 'entidad', 'categoria', 'tipo-pago'];
@@ -1427,6 +1432,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // ---- SECCIÓN 3 (modo AECC): Desplazamiento AECC ----
+    if (esModoAecc) {
+      const camposAecc = [
+        'aecc-fecha-ida',
+        'aecc-hora-ida',
+        'aecc-fecha-regreso',
+        'aecc-hora-regreso',
+        'aecc-origen',
+        'aecc-destino',
+        'aecc-motivo'
+      ];
+
+      camposAecc.forEach(id => {
+        const campo = document.getElementById(id);
+        if (marcarCampoError(campo)) hayErrores = true;
+      });
+    }
+
     // ---- SECCIÓN 4: Asistencia a congresos ----
     const eventGastos = document.getElementById('evento-gastos');
     if (eventGastos) {
@@ -1506,6 +1529,9 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'proyecto':
         limpiarSeccionProyecto();
+        break;
+      case 'aecc-desplazamiento':
+        limpiarSeccionAeccDesplazamiento();
         break;
       case 'desplazamientos':
         limpiarSeccionDesplazamientos();
@@ -1601,6 +1627,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (organica) {
       organica.value = '18.';
       organica.classList.remove('field-error');
+    }
+  }
+
+  /**
+   * Limpia la sección de desplazamiento AECC.
+   */
+  function limpiarSeccionAeccDesplazamiento() {
+    if (window.uiDesplazamientoAecc?.reset) {
+      window.uiDesplazamientoAecc.reset();
+      return;
+    }
+
+    // Fallback defensivo si el módulo AECC no está disponible.
+    const form = document.getElementById('form-aecc-desplazamiento');
+    if (form) form.reset();
+    const result = document.getElementById('aecc-calc-result');
+    if (result) {
+      result.style.display = 'none';
+      result.innerHTML = '';
     }
   }
 
@@ -1802,6 +1847,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Limpiar cada sección (campos DOM + estado parcial)
     limpiarSeccionBeneficiario();
     limpiarSeccionProyecto();
+    limpiarSeccionAeccDesplazamiento();
     limpiarSeccionDesplazamientos();
     limpiarSeccionEventos();
     limpiarSeccionHonorarios();

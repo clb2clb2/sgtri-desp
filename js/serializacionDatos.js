@@ -215,6 +215,7 @@
         fechaRegreso: obtenerValorCampo(`fecha-regreso-${id}`),
         horaRegreso: obtenerValorCampo(`hora-regreso-${id}`),
         ticketCena: obtenerValorCampo(`ticket-cena-${id}`, 'checkbox'),
+        justificaPernocta: obtenerValorCampo(`justificar-pernocta-${id}`, 'checkbox'),
         origen: obtenerValorCampo(`origen-${id}`),
         destino: obtenerValorCampo(`destino-${id}`),
         paisDestino: obtenerValorCampo(`pais-destino-${id}`),
@@ -396,6 +397,7 @@
       pago: recopilarPago(),
       proyecto: recopilarProyecto(),
       desplazamientos: recopilarDesplazamientos(),
+      desplazamientoAECC: recopilarDesplazamientoAECC(),
       desplazamientoEspecial: recopilarDesplazamientoEspecial(),
       vehiculo: recopilarVehiculo(),
       evento: recopilarEvento(),
@@ -405,6 +407,27 @@
       resultadoLiquidacion: recopilarResultadoLiquidacion(),
       fechaFirma: recopilarFechaFirma()
     };
+  }
+
+  /**
+   * Recopila los datos del desplazamiento AECC.
+   * Se serializa como array para mantener homogeneidad con desplazamientos.
+   * @returns {Array}
+   */
+  function recopilarDesplazamientoAECC() {
+    if (!global.uiDesplazamientoAecc) return [];
+
+    const ui = global.uiDesplazamientoAecc;
+    const datos = typeof ui.obtenerDatosSerializacion === 'function'
+      ? ui.obtenerDatosSerializacion()
+      : (typeof ui.obtenerDatos === 'function' ? ui.obtenerDatos() : null);
+
+    if (!datos) return [];
+    if (datos.tieneContenido === false) return [];
+
+    const sinBandera = { ...datos };
+    delete sinBandera.tieneContenido;
+    return [sinBandera];
   }
 
   /**
@@ -579,6 +602,33 @@
 
     // Restaurar otros gastos
     restaurarOtrosGastos(id, desp.otrosGastos);
+
+    // Restaurar justificación de última pernocta (checkbox dinámico en la salida de cálculo)
+    restaurarJustificaPernoctaDesplazamiento(id, !!desp.justificaPernocta);
+  }
+
+  /**
+   * Restaura el checkbox dinámico de justificar última pernocta.
+   * Se reintenta porque el control puede renderizarse tras el recálculo.
+   * @param {number|string} id
+   * @param {boolean} valor
+   * @param {number} [intentos=10]
+   */
+  function restaurarJustificaPernoctaDesplazamiento(id, valor, intentos = 10) {
+    if (!valor) return;
+
+    const trySet = (restantes) => {
+      const chk = document.getElementById(`justificar-pernocta-${id}`);
+      if (chk) {
+        chk.checked = true;
+        chk.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      if (restantes <= 0) return;
+      setTimeout(() => trySet(restantes - 1), 120);
+    };
+
+    trySet(intentos);
   }
 
   /**
@@ -925,6 +975,12 @@
       return false;
     }
 
+    const tieneAECC = Array.isArray(datos.desplazamientoAECC) && datos.desplazamientoAECC.length > 0;
+    if ((tipoLiquidacion === 'DESPL' || tipoLiquidacion === 'CONGR' || tipoLiquidacion === 'HONOR') && tieneAECC) {
+      alert('El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento AECC.');
+      return false;
+    }
+
     const tieneEspecial = !!(datos.desplazamientoEspecial &&
       Array.isArray(datos.desplazamientoEspecial.lineas) &&
       datos.desplazamientoEspecial.lineas.length > 0);
@@ -950,6 +1006,11 @@
     
     // Restaurar desplazamientos (asíncrono)
     await restaurarDesplazamientos(datos.desplazamientos);
+
+    // Restaurar desplazamiento AECC
+    if (tieneAECC && global.uiDesplazamientoAecc?.restaurarDatos) {
+      global.uiDesplazamientoAecc.restaurarDatos(datos.desplazamientoAECC[0]);
+    }
     
     // Esperar un poco más para que el DOM se actualice completamente
     await new Promise(resolve => setTimeout(resolve, 100));
