@@ -256,10 +256,7 @@
     }
 
     if (btnAecc) {
-      btnAecc.addEventListener('click', (e) => {
-        if (!e.shiftKey) {
-          return;
-        }
+      btnAecc.addEventListener('click', () => {
         seleccionarTipo(TIPOS.AECC);
       });
     }

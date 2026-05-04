@@ -888,6 +888,57 @@
     const evento = datos.evento || {};
     const desplazamientoAsociado = evento.desplazamientoAsociado;
     const result = [];
+    let tablaCongresoInsertada = false;
+
+    // Considera "con datos" un desplazamiento que tenga contenido manual,
+    // gastos asociados o resultados de cálculo distintos de cero.
+    function tieneDatosDesplazamiento(desp) {
+      if (!desp || typeof desp !== 'object') return false;
+
+      const tieneTexto = [
+        desp.fechaIda,
+        desp.horaIda,
+        desp.fechaRegreso,
+        desp.horaRegreso,
+        desp.origen,
+        desp.destino,
+        desp.motivo,
+        desp.cruceIda,
+        desp.cruceVuelta
+      ].some((v) => String(v || '').trim() !== '');
+
+      if (tieneTexto) return true;
+
+      if (desp.ticketCena || desp.justificaPernocta || desp.noManutencion) return true;
+
+      const km = parseEuroNumber(desp.km);
+      const alojamiento = parseEuroNumber(desp.alojamiento);
+      if (km > 0 || alojamiento > 0) return true;
+
+      const otrosGastos = Array.isArray(desp.otrosGastos) ? desp.otrosGastos : [];
+      const tieneOtrosGastos = otrosGastos.some((g) => {
+        if (!g || typeof g !== 'object') return false;
+        return String(g.tipo || '').trim() !== '' ||
+          String(g.concepto || '').trim() !== '' ||
+          parseEuroNumber(g.importe) > 0;
+      });
+      if (tieneOtrosGastos) return true;
+
+      const dc = desp.datosCalculados || {};
+      const tieneCalculos =
+        Number(dc.importeManutencion) > 0 ||
+        Number(dc.importeMaxAlojamiento) > 0 ||
+        Number(dc.importeKm) > 0 ||
+        Number(dc.irpfSujeto) > 0 ||
+        Number(dc.importeTotal) > 0 ||
+        (Array.isArray(dc.segmentos) && dc.segmentos.length > 0);
+
+      return tieneCalculos;
+    }
+
+    const desplazamientosConIndice = desplazamientos
+      .map((desp, idx) => ({ desp, idx }))
+      .filter(({ desp }) => tieneDatosDesplazamiento(desp));
 
     // Mapa de tipos de otros gastos
     const TIPOS_OTROS_GASTOS = {
@@ -932,8 +983,9 @@
       paddingTop: () => 5
     };
 
-    for (let despIdx = 0; despIdx < desplazamientos.length; despIdx++) {
-      const desp = desplazamientos[despIdx];
+    for (const item of desplazamientosConIndice) {
+      const desp = item.desp;
+      const despIdx = item.idx;
       const dc = desp.datosCalculados || {};
       const esInternacional = desp.paisDestino !== 'España';
 
@@ -1160,7 +1212,14 @@
       }
       if (indiceAsociado !== null && indiceAsociado === despIdx) {
         result.push(...buildTablaCongresos(datos));
+        tablaCongresoInsertada = true;
       }
+    }
+
+    // Si el congreso estaba asociado a un desplazamiento sin datos (filtrado),
+    // se añade igualmente al final para no perder esa información en el PDF.
+    if (desplazamientoAsociado && !tablaCongresoInsertada) {
+      result.push(...buildTablaCongresos(datos));
     }
 
     return result;
@@ -1297,6 +1356,9 @@
    * @returns {Array}
    */
   function buildTablaDesplazamientoAECC(datos) {
+    const tipoLiquidacion = String(datos?.tipoLiquidacion || '').trim().toUpperCase();
+    if (tipoLiquidacion !== 'AECC') return [];
+
     const aecc = Array.isArray(datos.desplazamientoAECC) ? datos.desplazamientoAECC[0] : null;
     if (!aecc) return [];
 

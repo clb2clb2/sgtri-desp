@@ -684,12 +684,16 @@
       datos.horaRegreso,
       datos.origen,
       datos.destino,
-      datos.paisDestino,
       datos.motivo,
       datos.km,
       datos.alojamiento
     ];
     if (camposTexto.some((v) => String(v || '').trim() !== '')) return true;
+
+    // "España" es el valor por defecto del selector; no debe contar como contenido.
+    const paisDestino = String(datos.paisDestino || '').trim();
+    if (paisDestino && paisDestino !== 'España') return true;
+
     if (datos.destinoAltaOcupacion || datos.justificaPernocta || datos.noManutencion) return true;
     if (Array.isArray(datos.otrosGastos) && datos.otrosGastos.length > 0) return true;
     const calc = datos.datosCalculados || {};
