@@ -87,6 +87,22 @@
     return 'GNRAL';
   }
 
+  /**
+   * Devuelve el nombre legible del tipo de liquidacion.
+   * @param {'DESPL'|'CONGR'|'HONOR'|'AECC'|'GNRAL'} tipo
+   * @returns {string}
+   */
+  function obtenerNombreTipoLiquidacion(tipo) {
+    const mapa = {
+      DESPL: 'Liquidacion de desplazamientos',
+      CONGR: 'Asistencia a Congresos',
+      HONOR: 'Honorarios',
+      AECC: 'AECC',
+      GNRAL: 'Especial'
+    };
+    return mapa[tipo] || 'Especial';
+  }
+
   // =========================================================================
   // RECOPILACIÓN DE DATOS (DOM → Objeto)
   // =========================================================================
@@ -946,7 +962,7 @@
   async function restaurarTodo(datos) {
     if (!datos) {
       console.error('[serializacionDatos] No hay datos para restaurar');
-      return false;
+      return { ok: false, cargaParcial: false };
     }
 
     // Verificar versión del esquema
@@ -958,40 +974,65 @@
         `Aplicación: ${VERSION_ESQUEMA}\n\n` +
         `¿Desea intentar cargarlo de todos modos?`
       );
-      if (!continuar) return false;
+      if (!continuar) return { ok: false, cargaParcial: false };
     }
 
-    const tipoLiquidacion = normalizarTipoLiquidacion(datos.tipoLiquidacion);
-    datos.tipoLiquidacion = tipoLiquidacion;
+    const tipoArchivo = normalizarTipoLiquidacion(datos.tipoLiquidacion);
+    datos.tipoLiquidacion = tipoArchivo;
 
-    if ((tipoLiquidacion === 'CONGR' || tipoLiquidacion === 'HONOR') &&
+    const tipoActual = global.tipoLiquidacion?.getTipoActual
+      ? normalizarTipoLiquidacion(global.tipoLiquidacion.getTipoActual())
+      : normalizarTipoLiquidacion(global.__sgtriTipoLiquidacion);
+
+    const hayFormularioAbierto = !!global.__sgtriTipoLiquidacion;
+    const tipoDistinto = hayFormularioAbierto && (tipoArchivo !== tipoActual);
+
+    // Si el usuario ya esta en un tipo de formulario y carga otro tipo distinto,
+    // se mantiene el modo actual y se restauran solo secciones compatibles.
+    if (tipoDistinto) {
+      restaurarBeneficiario(datos.beneficiario);
+      if (tipoArchivo !== 'AECC') {
+        restaurarProyecto(datos.proyecto);
+      }
+
+      const nombreTipoArchivo = obtenerNombreTipoLiquidacion(tipoArchivo);
+      if (tipoArchivo === 'AECC') {
+        alert(`La liquidacion cargada es de tipo "${nombreTipoArchivo}". Solamente se cargaron los datos de beneficiario.`);
+      } else {
+        alert(`La liquidacion cargada es de tipo "${nombreTipoArchivo}". Solamente se cargaron los datos de beneficiario y proyecto.`);
+      }
+
+      return { ok: true, cargaParcial: true };
+    }
+
+    if ((tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR') &&
         Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 1) {
       alert('El archivo no es compatible con este tipo de liquidación: contiene más de un desplazamiento.');
-      return false;
+      return { ok: false, cargaParcial: false };
     }
 
-    if (tipoLiquidacion === 'AECC' && Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 0) {
+    if (tipoArchivo === 'AECC' && Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 0) {
       alert('El archivo no es compatible con este tipo de liquidación: incluye desplazamientos.');
-      return false;
+      return { ok: false, cargaParcial: false };
     }
 
     const tieneAECC = Array.isArray(datos.desplazamientoAECC) && datos.desplazamientoAECC.length > 0;
-    if ((tipoLiquidacion === 'DESPL' || tipoLiquidacion === 'CONGR' || tipoLiquidacion === 'HONOR') && tieneAECC) {
+    if ((tipoArchivo === 'DESPL' || tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR') && tieneAECC) {
       alert('El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento AECC.');
-      return false;
+      return { ok: false, cargaParcial: false };
     }
 
     const tieneEspecial = !!(datos.desplazamientoEspecial &&
       Array.isArray(datos.desplazamientoEspecial.lineas) &&
       datos.desplazamientoEspecial.lineas.length > 0);
 
-    if ((tipoLiquidacion === 'DESPL' || tipoLiquidacion === 'CONGR' || tipoLiquidacion === 'HONOR' || tipoLiquidacion === 'AECC') && tieneEspecial) {
+    if ((tipoArchivo === 'DESPL' || tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR' || tipoArchivo === 'AECC') && tieneEspecial) {
       alert('El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento especial.');
-      return false;
+      return { ok: false, cargaParcial: false };
     }
 
     if (global.tipoLiquidacion?.aplicarModoDesdeArchivo) {
-      global.tipoLiquidacion.aplicarModoDesdeArchivo(tipoLiquidacion);
+      global.tipoLiquidacion.aplicarModoDesdeArchivo(tipoArchivo);
     }
 
     // Limpiar formulario completo antes de restaurar
@@ -1076,7 +1117,7 @@
       
     }, 300);
 
-    return true;
+    return { ok: true, cargaParcial: false };
   }
 
   // =========================================================================
@@ -1157,8 +1198,8 @@
       lector.onload = async (e) => {
         try {
           const datos = JSON.parse(e.target.result);
-          const exito = await restaurarTodo(datos);
-          resolve(exito);
+          const resultado = await restaurarTodo(datos);
+          resolve(resultado);
         } catch (error) {
           reject(new Error(`Error al leer el archivo: ${error.message}`));
         }
@@ -1184,8 +1225,12 @@
       const archivo = e.target.files[0];
       if (archivo) {
         try {
-          const exito = await importarArchivo(archivo);
-          if (exito) {
+          const resultado = await importarArchivo(archivo);
+          if (resultado && resultado.ok) {
+            if (!resultado.cargaParcial) {
+              alert('Datos cargados correctamente');
+            }
+          } else if (resultado === true) {
             alert('Datos cargados correctamente');
           }
         } catch (error) {
