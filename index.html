@@ -110,10 +110,10 @@
   <!-- Contenedor único para todas las secciones -->
   <div id="form-sections-wrapper" class="form-sections-wrapper app-hidden">
 
-    <!-- Sección 1: Datos del beneficiario -->
+    <!-- Sección 1: Datos de la persona beneficiaria -->
     <section class="form-section" data-section-id="beneficiario">
       <div class="section-title">
-        Datos del beneficiario
+        Datos de la persona beneficiaria
         <span class="section-actions">
           <button type="button" class="btn-clear-section" aria-label="Borrar contenido de la sección">
             <svg class="icon-eraser" viewBox="0 0 122.88 103.38" aria-hidden="true" focusable="false">
@@ -134,7 +134,7 @@
           <form id="form-beneficiario">
             <div class="form-row two-cols-75-25">
               <div class="form-group">
-                <label for="nombre-benef">Nombre del beneficiario:</label>
+                <label for="nombre-benef">Nombre y apellidos:</label>
                 <input type="text" id="nombre-benef" name="nombre-benef" maxlength="70" required />
               </div>
               <div class="form-group">
@@ -211,7 +211,13 @@
 
             <!-- Campos del proyecto -->
             <div class="form-group">
-              <label for="responsable">Responsable:</label>
+              <div class="proyecto-responsable-head">
+                <label for="responsable">Responsable:</label>
+                <label for="beneficiario-coincide-responsable" class="proyecto-responsable-check-inline">
+                  <input type="checkbox" id="beneficiario-coincide-responsable" name="beneficiario-coincide-responsable" />
+                  Marca si coincide con la persona beneficiaria de la liquidación
+                </label>
+              </div>
               <input type="text" id="responsable" name="responsable" class="general-text" maxlength="70" required />
             </div>
             <div class="form-row two-cols-50-50">
