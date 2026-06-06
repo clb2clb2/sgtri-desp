@@ -35,6 +35,7 @@
    *   gastosInscripcion: number,
    *   descuentoCongreso: number,
    *   financiacionMaxima: number,
+   *   importeAnticipado: number,
    *   descuentosAjustes: [{ tipo, motivo, importe }, ...]
    * }
    */
@@ -46,6 +47,7 @@
         gastosInscripcion: 0,
         descuentoCongreso: 0,
         financiacionMaxima: 0,
+        importeAnticipado: 0,
         descuentosAjustes: []
       };
     }
@@ -110,6 +112,14 @@
    */
   function registrarFinanciacionMaxima(importe) {
     getRegistro().financiacionMaxima = round2(importe || 0);
+  }
+
+  /**
+   * Registra el importe anticipado.
+   * @param {number} importe
+   */
+  function registrarImporteAnticipado(importe) {
+    getRegistro().importeAnticipado = round2(importe || 0);
   }
 
   /**
@@ -251,6 +261,20 @@
   }
 
   /**
+   * Obtiene el importe anticipado desde el registro.
+   * Solo aplica en modo especial (GNRAL).
+   * @returns {number}
+   */
+  function getImporteAnticipado() {
+    const tipoActual = global.tipoLiquidacion?.getTipoActual
+      ? String(global.tipoLiquidacion.getTipoActual()).toUpperCase()
+      : String(global.__sgtriTipoLiquidacion || '').toUpperCase();
+
+    if (tipoActual !== 'GNRAL') return 0;
+    return getRegistro().importeAnticipado || 0;
+  }
+
+  /**
    * Obtiene el importe de honorarios desde el registro.
    * @returns {number}
    */
@@ -300,6 +324,14 @@
   function actualizarFinanciacionMaxima() {
     const input = document.getElementById('financiacion-maxima');
     registrarFinanciacionMaxima(input ? parseNumber(input.value) : 0);
+  }
+
+  /**
+   * Lee y actualiza importe anticipado desde el DOM.
+   */
+  function actualizarImporteAnticipado() {
+    const input = document.getElementById('importe-anticipado');
+    registrarImporteAnticipado(input ? parseNumber(input.value) : 0);
   }
 
   /**
@@ -361,6 +393,7 @@
     const descuentosAjustes = getDescuentosAjustes();
     const descuentosAgrupados = agruparDescuentosPorTipo(descuentosAjustes);
     const financiacionMaxima = getFinanciacionMaxima();
+    const importeAnticipado = getImporteAnticipado();
     const honorarios = getHonorarios();
     const gastosInscripcion = getGastosInscripcion();
 
@@ -419,12 +452,16 @@
     // IRPF final (restando descuentos TOT y financiación máxima)
     const irpfTotal = round2(Math.max(0, irpfAntesDescTot - descuentosTotales));
 
+    // Importe final a imputar tras descontar, si procede, un anticipo.
+    const importeImputar = round2(Math.max(0, totalLiquidacion - importeAnticipado));
+
     return {
       totales,
       descuentoCongreso,
       descuentosAjustes,
       descuentosAgrupados,
       financiacionMaxima,
+      importeAnticipado,
       descuentoFinanciacionMaxima,
       honorarios,
       gastosInscripcion,
@@ -435,7 +472,9 @@
         kilometraje: netoKilometraje,
         otrosGastos: netoOtrosGastos
       },
+      totalAntesFinanciacion: round2(totalAntesFinanciacion),
       totalLiquidacion: round2(totalLiquidacion),
+      importeImputar,
       irpfTotal
     };
   }
@@ -485,12 +524,33 @@
   }
 
   /**
+   * Genera línea de importe a imputar.
+   */
+  function lineaTotalImputar(amount) {
+    return `<div class="resultado-total resultado-total-secundario">
+      <span class="resultado-label">IMPORTE A IMPUTAR:</span>
+      <span class="resultado-amount">${fmt(amount)} €</span>
+    </div>`;
+  }
+
+  /**
    * Genera línea de IRPF.
    */
   function lineaIrpf(amount) {
     if (amount <= 0) return '';
     return `<div class="resultado-irpf">
       <span class="resultado-label">Sujeto a retención por IRPF:</span>
+      <span class="resultado-amount">${fmt(amount)} €</span>
+    </div>`;
+  }
+
+  /**
+   * Genera línea de importe anticipado con estilo de IRPF (alineada a la derecha).
+   */
+  function lineaImporteAnticipado(amount) {
+    if (amount <= 0) return '';
+    return `<div class="resultado-irpf">
+      <span class="resultado-label">Importe anticipado:</span>
       <span class="resultado-amount">${fmt(amount)} €</span>
     </div>`;
   }
@@ -587,8 +647,16 @@
       return;
     }
 
-    // --- Total y IRPF ---
+    // --- Total ---
     lines.push(lineaTotal(datos.totalLiquidacion));
+
+    // --- Anticipo e importe a imputar (solo si hay anticipo > 0) ---
+    if (datos.importeAnticipado > 0) {
+      lines.push(lineaImporteAnticipado(datos.importeAnticipado));
+      lines.push(lineaTotalImputar(datos.importeImputar));
+    }
+
+    // --- IRPF (siempre al final) ---
     lines.push(lineaIrpf(datos.irpfTotal));
 
     container.innerHTML = lines.join('\n');
@@ -635,6 +703,11 @@
     renderResultado();
   }
 
+  function onImporteAnticipadoChange() {
+    actualizarImporteAnticipado();
+    renderResultado();
+  }
+
   function onDescuentosAjustesChange() {
     actualizarDescuentosAjustes();
     renderResultado();
@@ -654,6 +727,13 @@
     if (finMax) {
       finMax.addEventListener('change', onFinanciacionMaximaChange);
       finMax.addEventListener('blur', onFinanciacionMaximaChange);
+    }
+
+    // Listener para importe anticipado
+    const impAnt = document.getElementById('importe-anticipado');
+    if (impAnt) {
+      impAnt.addEventListener('change', onImporteAnticipadoChange);
+      impAnt.addEventListener('blur', onImporteAnticipadoChange);
     }
 
     // Listener para honorarios
@@ -691,6 +771,7 @@
     actualizarHonorarios();
     actualizarGastosInscripcion();
     actualizarFinanciacionMaxima();
+    actualizarImporteAnticipado();
     actualizarDescuentoCongreso();
     actualizarDescuentosAjustes();
 
@@ -709,6 +790,7 @@
       gastosInscripcion: 0,
       descuentoCongreso: 0,
       financiacionMaxima: 0,
+      importeAnticipado: 0,
       descuentosAjustes: []
     };
   }
@@ -728,6 +810,7 @@
     registrarGastosInscripcion,
     registrarDescuentoCongreso,
     registrarFinanciacionMaxima,
+    registrarImporteAnticipado,
     registrarDescuentosAjustes,
     
     // Actualización desde DOM (para usar tras restaurar datos)
@@ -736,6 +819,7 @@
     actualizarDescuentoCongreso,
     actualizarDescuentosAjustes,
     actualizarFinanciacionMaxima,
+    actualizarImporteAnticipado,
     
     // Renderizado
     renderResultado,
