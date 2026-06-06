@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const tipoPagoSelect = document.getElementById('tipo-pago');
   const tipoProyecto = document.getElementById('tipoProyecto');
   const infoDecreto = document.getElementById('infoDecreto');
+  const nombreBenefInput = document.getElementById('nombre-benef');
+  const responsableInput = document.getElementById('responsable');
+  const chkBeneficiarioCoincide = document.getElementById('beneficiario-coincide-responsable');
 
   // =========================================================================
   // MÓDULOS - Referencias locales
@@ -32,6 +35,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const uiPagos = window.uiPagos || {};
   const uiDesp = window.uiDesplazamientos || {};
   const serializar = window.serializacionDatos || {};
+
+  // =========================================================================
+  // SINCRONIZACIÓN BENEFICIARIO / RESPONSABLE
+  // =========================================================================
+
+  function aplicarCoincidenciaBeneficiarioResponsable() {
+    if (!responsableInput || !chkBeneficiarioCoincide) return;
+
+    const coincide = !!chkBeneficiarioCoincide.checked;
+    if (coincide) {
+      responsableInput.value = (nombreBenefInput?.value || '').trim();
+      responsableInput.readOnly = true;
+      responsableInput.setAttribute('aria-readonly', 'true');
+    } else {
+      responsableInput.readOnly = false;
+      responsableInput.removeAttribute('aria-readonly');
+    }
+  }
+
+  if (chkBeneficiarioCoincide) {
+    chkBeneficiarioCoincide.addEventListener('change', aplicarCoincidenciaBeneficiarioResponsable);
+  }
+  if (nombreBenefInput) {
+    nombreBenefInput.addEventListener('input', aplicarCoincidenciaBeneficiarioResponsable);
+    nombreBenefInput.addEventListener('change', aplicarCoincidenciaBeneficiarioResponsable);
+  }
+  aplicarCoincidenciaBeneficiarioResponsable();
 
   // =========================================================================
   // CARGA DE DATOS JSON
@@ -1599,6 +1629,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Ocultar warning de DNI
     const dniWarn = document.querySelector('.dni-warn');
     if (dniWarn) dniWarn.style.display = 'none';
+
+    aplicarCoincidenciaBeneficiarioResponsable();
   }
 
   /**
@@ -1621,6 +1653,11 @@ document.addEventListener('DOMContentLoaded', () => {
         campo.classList.remove('field-error');
       }
     });
+
+    if (chkBeneficiarioCoincide) {
+      chkBeneficiarioCoincide.checked = false;
+      chkBeneficiarioCoincide.dispatchEvent(new Event('change', { bubbles: true }));
+    }
 
     // Orgánica: restaurar valor por defecto "18."
     const organica = document.getElementById('organica');

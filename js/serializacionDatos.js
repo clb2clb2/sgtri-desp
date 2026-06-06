@@ -173,6 +173,7 @@
       tipo: tipoValor,
       tipoNombre: tipoNombre,
       normativa: normativa,
+      beneficiarioCoincideResponsable: obtenerValorCampo('beneficiario-coincide-responsable', 'checkbox'),
       responsable: obtenerValorCampo('responsable'),
       organica: obtenerValorCampo('organica'),
       referencia: obtenerValorCampo('referencia')
@@ -551,8 +552,14 @@
     if (!datos) return;
     establecerValorCampo('tipoProyecto', datos.tipo);
     establecerValorCampo('responsable', datos.responsable);
+    establecerValorCampo('beneficiario-coincide-responsable', datos.beneficiarioCoincideResponsable, 'checkbox');
     establecerValorCampo('organica', datos.organica);
     establecerValorCampo('referencia', datos.referencia);
+
+    const chkCoincide = document.getElementById('beneficiario-coincide-responsable');
+    if (chkCoincide) {
+      chkCoincide.dispatchEvent(new Event('change', { bubbles: true }));
+    }
 
     // Disparar evento change para actualizar info decreto
     const tipoProyectoEl = document.getElementById('tipoProyecto');
