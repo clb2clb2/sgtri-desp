@@ -2024,6 +2024,7 @@
     const beneficiario = datos.beneficiario || {};
     const proyecto = datos.proyecto || {};
     const fechaFirma = datos.fechaFirma || {};
+    const beneficiarioCoincideResponsable = !!proyecto.beneficiarioCoincideResponsable;
 
     // Responsables únicos (sin repetir)
     const responsablesUnicos = [...new Set(
@@ -2093,29 +2094,44 @@
               {},
               {}
             ],
-            // Fila 3: Fdo + nombres responsables (colspan=2) | Fdo + nombre beneficiario (colspan=2)
-            [
-              {
-                stack: [
-                  { text: textoFdoResponsable, style: 'tablaDato', alignment: 'center' },
-                  { text: responsablesUnicos.join('\n'), style: 'tablaDato', alignment: 'center' }
+            // Fila 3: firma única o doble según coincidencia beneficiario/responsable
+            beneficiarioCoincideResponsable
+              ? [
+                  {
+                    stack: [
+                      { text: 'Fdo: el/la responsable y beneficiario/a,', style: 'tablaDato', alignment: 'center' },
+                      { text: proyecto.responsable || beneficiario.nombre || '', style: 'tablaDato', alignment: 'center' }
+                    ],
+                    lineHeight: 1.20,
+                    colSpan: 4,
+                    margin: [0, 1, 0, -2]
+                  },
+                  {},
+                  {},
+                  {}
+                ]
+              : [
+                  {
+                    stack: [
+                      { text: textoFdoResponsable, style: 'tablaDato', alignment: 'center' },
+                      { text: responsablesUnicos.join('\n'), style: 'tablaDato', alignment: 'center' }
+                    ],
+                    lineHeight: 1.20,
+                    colSpan: 2,
+                    margin: [0, 1, 0, -2]
+                  },
+                  {},
+                  {
+                    stack: [
+                      { text: 'Fdo.: el/la beneficiario/a,', style: 'tablaDato', alignment: 'center' },
+                      { text: beneficiario.nombre || '', style: 'tablaDato', alignment: 'center' }
+                    ],
+                    lineHeight: 1.20,
+                    colSpan: 2,
+                    margin: [0, 1, 0, -2]
+                  },
+                  {}
                 ],
-                lineHeight: 1.20,
-                colSpan: 2,
-                margin: [0, 1, 0, -2]
-              },
-              {},
-              {
-                stack: [
-                  { text: 'Fdo.: el/la beneficiario/a,', style: 'tablaDato', alignment: 'center' },
-                  { text: beneficiario.nombre || '', style: 'tablaDato', alignment: 'center' }
-                ],
-                lineHeight: 1.20,
-                colSpan: 2,
-                margin: [0, 1, 0, -2]
-              },
-              {}
-            ],
             // Fila 4: vacía | logos (colspan=2) | Paginación
             [
               { text: '' },

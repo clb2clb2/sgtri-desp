@@ -1005,6 +1005,48 @@ input.num-spinner::-webkit-inner-spin-button {
   text-align: left;
 }
 
+.proyecto-responsable-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.proyecto-responsable-head > label {
+  margin-bottom: 0.25rem;
+}
+
+.proyecto-responsable-check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-style: italic;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.proyecto-responsable-check-inline input[type="checkbox"] {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .proyecto-responsable-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .proyecto-responsable-head > label {
+    margin-bottom: 0;
+  }
+}
+
 .ticket-cena-field .form-group {
   margin-bottom: 0;
 }
@@ -1886,6 +1928,12 @@ input.num-spinner::-webkit-inner-spin-button {
 }
 
 .imputacion-linea input[readonly] {
+  background-color: var(--color-bg-light);
+  border-color: #bbb;
+  cursor: default;
+}
+
+#responsable[readonly] {
   background-color: var(--color-bg-light);
   border-color: #bbb;
   cursor: default;
