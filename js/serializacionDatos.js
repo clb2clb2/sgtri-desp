@@ -335,6 +335,7 @@
   function recopilarAjustes() {
     const ajustes = {
       financiacionMaxima: obtenerValorCampo('financiacion-maxima'),
+      importeAnticipado: obtenerValorCampo('importe-anticipado'),
       descuentos: []
     };
 
@@ -368,12 +369,18 @@
     if (!global.resultadoLiquidacion || typeof global.resultadoLiquidacion.calcularResultado !== 'function') {
       return {
         totalLiquidacion: 0,
+        totalAntesFinanciacion: 0,
+        importeAnticipado: 0,
+        importeImputar: 0,
         irpfTotal: 0
       };
     }
     const resultado = global.resultadoLiquidacion.calcularResultado();
     return {
       totalLiquidacion: resultado.totalLiquidacion || 0,
+      totalAntesFinanciacion: resultado.totalAntesFinanciacion || 0,
+      importeAnticipado: resultado.importeAnticipado || 0,
+      importeImputar: resultado.importeImputar || 0,
       irpfTotal: resultado.irpfTotal || 0
     };
   }
@@ -797,6 +804,7 @@
 
     // Restaurar financiación máxima
     establecerValorCampo('financiacion-maxima', datos.financiacionMaxima);
+    establecerValorCampo('importe-anticipado', datos.importeAnticipado);
 
     // Restaurar líneas de descuentos
     if (datos.descuentos && Array.isArray(datos.descuentos) && datos.descuentos.length > 0) {
@@ -830,6 +838,9 @@
     if (global.resultadoLiquidacion) {
       if (global.resultadoLiquidacion.actualizarFinanciacionMaxima) {
         global.resultadoLiquidacion.actualizarFinanciacionMaxima();
+      }
+      if (global.resultadoLiquidacion.actualizarImporteAnticipado) {
+        global.resultadoLiquidacion.actualizarImporteAnticipado();
       }
       if (global.resultadoLiquidacion.actualizarDescuentosAjustes) {
         global.resultadoLiquidacion.actualizarDescuentosAjustes();
@@ -893,7 +904,7 @@
     }
     if (sectionId === 'ajustes') {
       const a = datos.ajustes;
-      return a && (a.financiacionMaxima || (a.descuentos && a.descuentos.length > 0));
+      return a && (a.financiacionMaxima || a.importeAnticipado || (a.descuentos && a.descuentos.length > 0));
     }
     return false;
   }

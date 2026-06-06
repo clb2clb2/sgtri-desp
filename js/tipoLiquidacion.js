@@ -199,6 +199,10 @@
       global.uiDesplazamientos.actualizarBotonAddDesplazamiento();
     }
 
+    if (global.uiAjustes?.actualizarVisibilidadImporteAnticipado) {
+      global.uiAjustes.actualizarVisibilidadImporteAnticipado(tipoNormalizado);
+    }
+
     aplicarRestriccionesProyectoPorTipo(tipoNormalizado);
 
     tipoActual = tipoNormalizado;

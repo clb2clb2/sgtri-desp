@@ -1,5 +1,5 @@
 {
-  "versionEsquema": "25.1.0",
+  "versionEsquema": "26.6.0",
   "guardadoEl": "2025-12-15T19:48:52.639Z",
   "generadoParaPDF": "2025-12-28T10:30:00.000Z",
   

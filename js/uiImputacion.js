@@ -119,7 +119,10 @@
   function getTotalLiquidacion() {
     if (global.resultadoLiquidacion && typeof global.resultadoLiquidacion.calcularResultado === 'function') {
       const resultado = global.resultadoLiquidacion.calcularResultado();
-      return round2(resultado.totalLiquidacion || 0);
+      const totalBase = typeof resultado.importeImputar === 'number'
+        ? resultado.importeImputar
+        : resultado.totalLiquidacion;
+      return round2(totalBase || 0);
     }
     return 0;
   }

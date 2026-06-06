@@ -1324,6 +1324,12 @@ input.num-spinner::-webkit-inner-spin-button {
   font-size: 1rem;
 }
 
+.resultado-total-secundario {
+  margin-top: 0.35rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
 /* IRPF */
 .calc-result .calc-irpf,
 .resultado-irpf {
