@@ -164,6 +164,24 @@
   }
 
   /**
+   * Muestra u oculta el campo "Importe anticipado" según tipo de liquidación.
+   * Solo se muestra en modo especial (GNRAL).
+   * @param {string} tipo
+   */
+  function actualizarVisibilidadImporteAnticipado(tipo) {
+    const row = document.getElementById('ajustes-importe-anticipado-row');
+    if (!row) return;
+
+    const t = String(tipo || '').trim().toUpperCase();
+    const esEspecial = t === 'GNRAL';
+    row.classList.toggle('app-hidden', !esEspecial);
+
+    if (global.resultadoLiquidacion?.renderResultado) {
+      global.resultadoLiquidacion.renderResultado();
+    }
+  }
+
+  /**
    * Inicializa el módulo
    */
   function init() {
@@ -171,6 +189,11 @@
     if (btnAdd) {
       btnAdd.addEventListener('click', agregarDescuento);
     }
+
+    const tipoActual = global.tipoLiquidacion?.getTipoActual
+      ? global.tipoLiquidacion.getTipoActual()
+      : global.__sgtriTipoLiquidacion;
+    actualizarVisibilidadImporteAnticipado(tipoActual);
   }
 
   // =========================================================================
@@ -190,6 +213,7 @@
     agregarDescuento,
     crearLineaDescuento,
     actualizarBotonAddDescuento,
+    actualizarVisibilidadImporteAnticipado,
     getDescuentoCounter: () => descuentoCounter,
     setDescuentoCounter: (val) => { descuentoCounter = val; },
     reset

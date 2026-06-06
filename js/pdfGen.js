@@ -255,7 +255,7 @@
         title: 'Liquidación de Desplazamientos',
         author: 'SGTRI - Universidad de Extremadura',
         subject: `Liquidación ${datos.tipoLiquidacion || 'GNRAL'} ${datos.proyecto?.referencia || ''}`,
-        creator: 'SGTRI v2.0 (2026)'
+        creator: 'SGTRI v2.1 (2026)'
       },
 
       // ─────────────────────────────────────────────────────────────────────
@@ -370,7 +370,7 @@
                   alignment: 'center',
                   stack: [
                     { text: 'S.G.T.R.I.', style: 'version' },
-                    { text: 'v2.0 (2026)', style: 'versionSmall' }
+                    { text: 'v2.1 (2026)', style: 'versionSmall' }
                   ]
                 }
               ]
@@ -1669,6 +1669,16 @@
     const descuentoComidas = parseEuroNumber(evento.descuentoComidas);
     const tieneDescuentos = descuentoComidas > 0 || descuentos.length > 0;
     const tieneFinanciacion = ajustes.financiacionMaxima && parseEuroNumber(ajustes.financiacionMaxima) > 0;
+    const importeAnticipado = parseEuroNumber(
+      resultadoLiquidacion.importeAnticipado || ajustes.importeAnticipado
+    );
+    const tieneImporteAnticipado = importeAnticipado > 0;
+    const mostrarResumenPrevio = tieneFinanciacion || tieneImporteAnticipado;
+    const resultadoPrevioAjustes = parseEuroNumber(
+      resultadoLiquidacion.totalAntesFinanciacion != null
+        ? resultadoLiquidacion.totalAntesFinanciacion
+        : totalLiquidacion
+    );
 
     // Encabezado con línea verde
     const encabezado = buildEncabezadoSeccion('RESULTADO DE LA LIQUIDACIÓN');
@@ -1692,6 +1702,25 @@
     };
 
     const bodyRows = [];
+
+    // Fila 0: Resultado previo a financiación máxima y/o anticipo (si aplica)
+    if (mostrarResumenPrevio) {
+      bodyRows.push([
+        {
+          text: 'Resultado de la liquidación',
+          style: 'tablaEtiqueta',
+          color: '#407C2E',
+          alignment: 'left',
+          colSpan: 2
+        },
+        {},
+        {
+          text: fmtEuro(resultadoPrevioAjustes),
+          style: 'tablaDato',
+          alignment: 'right'
+        }
+      ]);
+    }
 
     // Fila 1: Descuentos (si los hay)
     if (tieneDescuentos) {
@@ -1755,7 +1784,7 @@
       const financiacion = parseEuroNumber(ajustes.financiacionMaxima);
       bodyRows.push([
         {
-          text: 'Financiación Máxima concedida',
+          text: 'Financiación máxima concedida',
           style: 'tablaEtiqueta',
           color: '#407C2E',
           alignment: 'left',
@@ -1764,6 +1793,25 @@
         {},
         {
           text: fmtEuro(financiacion),
+          style: 'tablaDato',
+          alignment: 'right'
+        }
+      ]);
+    }
+
+    // Fila 3: Importe anticipado (si existe)
+    if (tieneImporteAnticipado) {
+      bodyRows.push([
+        {
+          text: 'Importe anticipado',
+          style: 'tablaEtiqueta',
+          color: '#407C2E',
+          alignment: 'left',
+          colSpan: 2
+        },
+        {},
+        {
+          text: fmtEuro(importeAnticipado),
           style: 'tablaDato',
           alignment: 'right'
         }
@@ -1796,6 +1844,12 @@
     }
 
     // Tabla 2: Resultado de la liquidación (siempre presente con bordes verdes)
+    const importeTotalImputar = parseEuroNumber(
+      resultadoLiquidacion.importeImputar != null
+        ? resultadoLiquidacion.importeImputar
+        : Math.max(0, totalLiquidacion - importeAnticipado)
+    );
+
     const tablaResultado = {
       table: {
         widths: ['30%', '56%', '14%'],
@@ -1812,7 +1866,7 @@
             },
             {},
             {
-              text: fmtEuro(totalLiquidacion),
+              text: fmtEuro(importeTotalImputar),
               style: 'tablaDato',
               bold: true,
               alignment: 'right'

@@ -1792,6 +1792,13 @@ document.addEventListener('DOMContentLoaded', () => {
       financiacion.classList.remove('field-error');
     }
 
+    // Importe anticipado
+    const importeAnticipado = document.getElementById('importe-anticipado');
+    if (importeAnticipado) {
+      importeAnticipado.value = '';
+      importeAnticipado.classList.remove('field-error');
+    }
+
     // Eliminar líneas de otros descuentos
     const descuentosContainer = document.getElementById('otros-descuentos-container');
     if (descuentosContainer) {
