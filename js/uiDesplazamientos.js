@@ -172,8 +172,12 @@
    * También considera si existe el desplazamiento especial.
    */
   function evaluarKmParaMostrarFicha() {
-    // Si existe desplazamiento especial, siempre mostrar
-    if (global.uiDesplazamientoEspecial?.existe && global.uiDesplazamientoEspecial.existe()) {
+    const tipoActual = global.tipoLiquidacion?.getTipoActual
+      ? String(global.tipoLiquidacion.getTipoActual()).toUpperCase()
+      : String(global.__sgtriTipoLiquidacion || '').toUpperCase();
+
+    // En modo Especial (GNRAL), si existe desplazamiento especial, siempre mostrar.
+    if (tipoActual === 'GNRAL' && global.uiDesplazamientoEspecial?.existe && global.uiDesplazamientoEspecial.existe()) {
       mostrarFichaVehiculo();
       return;
     }
@@ -866,6 +870,8 @@
           if (global.uiDesplazamientoEspecial?.crear) {
             const especial = global.uiDesplazamientoEspecial.crear();
             if (especial) {
+              // Garantiza visibilidad inmediata de la ficha de vehículo en el flujo Shift+Añadir.
+              mostrarFichaVehiculo();
               especial.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
           }
