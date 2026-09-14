@@ -772,7 +772,8 @@ input.num-spinner::-webkit-inner-spin-button {
 .btn-add-imputacion:active,
 .btn-remove-imputacion:active,
 .btn-remove-otros-gasto:active,
-.btn-remove-esp-linea:active {
+.btn-remove-esp-linea:active,
+.btn-order-esp-linea:active {
   transform: translateY(1px);
   box-shadow: 0 1px 2px -2px #777;
 }
@@ -2071,6 +2072,50 @@ input.num-spinner::-webkit-inner-spin-button {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.esp-linea-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.esp-linea-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.btn-order-esp-linea {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-text);
+  padding: 0;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.60rem;
+  width: 1rem;
+  height: 2rem;
+  flex-shrink: 0;
+  transition: background-color var(--transition-normal), opacity var(--transition-fast);
+  box-shadow: var(--shadow-card);
+}
+
+.btn-order-esp-linea:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-order-esp-linea:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+.btn-order-esp-linea:disabled:hover {
+  background-color: var(--color-primary-light);
 }
 
 /* Línea de sección (solo descripción) */

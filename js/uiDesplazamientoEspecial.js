@@ -99,9 +99,11 @@
     inputDesc.maxLength = 100;
     inputDesc.addEventListener('blur', actualizarResultado);
 
-    // Botón eliminar
+    // Controles de orden (izquierda) + eliminar (derecha)
+    const controlesOrden = crearControlesLinea(linea);
     const btnRemove = crearBotonEliminar(linea);
 
+    linea.appendChild(controlesOrden);
     linea.appendChild(inputDesc);
     linea.appendChild(btnRemove);
 
@@ -195,7 +197,8 @@
       // Solo recalcular si el usuario está editando manualmente
     });
 
-    // Botón eliminar
+    // Controles de orden (izquierda) + eliminar (derecha)
+    const controlesOrden = crearControlesLinea(linea);
     const btnRemove = crearBotonEliminar(linea);
 
     // Ensamblar
@@ -207,11 +210,47 @@
     numWrapper.appendChild(equals);
     numWrapper.appendChild(inputTotal);
 
+    linea.appendChild(controlesOrden);
     linea.appendChild(inputDesc);
     linea.appendChild(numWrapper);
     linea.appendChild(btnRemove);
 
     return linea;
+  }
+
+  /**
+   * Crea el bloque de controles de orden de una línea: subir y bajar.
+   * @param {HTMLElement} linea
+   * @returns {HTMLDivElement}
+   */
+  function crearControlesLinea(linea) {
+    const orden = document.createElement('div');
+    orden.className = 'esp-linea-order';
+
+    const btnUp = document.createElement('button');
+    btnUp.type = 'button';
+    btnUp.className = 'btn-order-esp-linea btn-order-esp-up';
+    btnUp.setAttribute('aria-label', 'Subir linea');
+    btnUp.title = 'Subir linea';
+    btnUp.textContent = '▲';
+    btnUp.addEventListener('click', () => {
+      moverLinea(linea, 'up');
+    });
+
+    const btnDown = document.createElement('button');
+    btnDown.type = 'button';
+    btnDown.className = 'btn-order-esp-linea btn-order-esp-down';
+    btnDown.setAttribute('aria-label', 'Bajar linea');
+    btnDown.title = 'Bajar linea';
+    btnDown.textContent = '▼';
+    btnDown.addEventListener('click', () => {
+      moverLinea(linea, 'down');
+    });
+
+    orden.appendChild(btnUp);
+    orden.appendChild(btnDown);
+
+    return orden;
   }
 
   /**
@@ -233,10 +272,50 @@
 
     btn.addEventListener('click', () => {
       linea.remove();
+      actualizarControlesOrden();
       actualizarResultado();
     });
 
     return btn;
+  }
+
+  /**
+   * Mueve una línea una posición arriba o abajo dentro del contenedor.
+   * @param {HTMLElement} linea
+   * @param {'up'|'down'} direccion
+   */
+  function moverLinea(linea, direccion) {
+    if (!contenedorLineas || !linea) return;
+
+    if (direccion === 'up') {
+      const prev = linea.previousElementSibling;
+      if (prev) {
+        contenedorLineas.insertBefore(linea, prev);
+      }
+    } else {
+      const next = linea.nextElementSibling;
+      if (next) {
+        contenedorLineas.insertBefore(next, linea);
+      }
+    }
+
+    actualizarControlesOrden();
+    actualizarResultado();
+  }
+
+  /**
+   * Activa/desactiva botones de subir/bajar según posición de cada línea.
+   */
+  function actualizarControlesOrden() {
+    if (!contenedorLineas) return;
+
+    const lineas = Array.from(contenedorLineas.querySelectorAll('.esp-linea'));
+    lineas.forEach((linea, index) => {
+      const btnUp = linea.querySelector('.btn-order-esp-up');
+      const btnDown = linea.querySelector('.btn-order-esp-down');
+      if (btnUp) btnUp.disabled = index === 0;
+      if (btnDown) btnDown.disabled = index === lineas.length - 1;
+    });
   }
 
   // =========================================================================
@@ -487,6 +566,7 @@
       const linea = crearLineaNormal();
       contenedorLineas.appendChild(linea);
       linea.querySelector('.esp-desc')?.focus();
+      actualizarControlesOrden();
       actualizarResultado();
     });
 
@@ -498,6 +578,7 @@
       const linea = crearLineaSeccion();
       contenedorLineas.appendChild(linea);
       linea.querySelector('.esp-desc')?.focus();
+      actualizarControlesOrden();
       actualizarResultado();
     });
 
@@ -717,6 +798,7 @@
       irpfInput.value = valorIrpf !== 0 ? fmt(valorIrpf) + ' €' : '';
     }
 
+    actualizarControlesOrden();
     actualizarResultado();
   }
 
