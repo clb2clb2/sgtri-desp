@@ -190,12 +190,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
-      // Configurar botón de borrar todo
+      // Configurar botón de borrar todo (mantener tipo de liquidación actual)
       const btnBorrarTodo = document.getElementById('btn-borrar-todo');
       if (btnBorrarTodo) {
         btnBorrarTodo.addEventListener('click', async () => {
           const confirmed = await window.showConfirm(
-            '¿Estás seguro de que quieres reiniciar el formulario?',
+            '¿Está seguro de que desea borrar todos los datos del formulario actual?',
+            { confirmText: 'Borrar todo', icon: '⚠️' }
+          );
+          if (confirmed) {
+            limpiarFormularioCompleto();
+          }
+        });
+      }
+
+      // Configurar botón reiniciar (volver al menú inicial)
+      const btnReiniciar = document.getElementById('btn-home');
+      if (btnReiniciar) {
+        btnReiniciar.addEventListener('click', async () => {
+          const confirmed = await window.showConfirm(
+            '¿Está seguro de que desea borrar todos los datos y volver al menú inicial?',
             { confirmText: 'Reiniciar', icon: '⚠️' }
           );
           if (confirmed) {
