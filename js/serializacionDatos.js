@@ -75,6 +75,16 @@
   }
 
   /**
+   * Normaliza el texto de comentarios y limita su contenido a 10 líneas.
+   * @param {*} texto
+   * @returns {string}
+   */
+  function normalizarComentarios(texto) {
+    const normalizado = String(texto ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    return normalizado.split('\n').slice(0, 10).join('\n');
+  }
+
+  /**
    * Normaliza el tipo de liquidación a uno de los valores válidos.
    * @param {string} tipo
    * @returns {'DESPL'|'CONGR'|'HONOR'|'AECC'|'GNRAL'}
@@ -337,6 +347,7 @@
     const ajustes = {
       financiacionMaxima: obtenerValorCampo('financiacion-maxima'),
       importeAnticipado: obtenerValorCampo('importe-anticipado'),
+      comentarios: normalizarComentarios(obtenerValorCampo('comentarios-liquidacion')),
       descuentos: []
     };
 
@@ -812,6 +823,7 @@
     // Restaurar financiación máxima
     establecerValorCampo('financiacion-maxima', datos.financiacionMaxima);
     establecerValorCampo('importe-anticipado', datos.importeAnticipado);
+    establecerValorCampo('comentarios-liquidacion', normalizarComentarios(datos.comentarios || ''));
 
     // Restaurar líneas de descuentos
     if (datos.descuentos && Array.isArray(datos.descuentos) && datos.descuentos.length > 0) {
@@ -913,6 +925,10 @@
       const a = datos.ajustes;
       return a && (a.financiacionMaxima || a.importeAnticipado || (a.descuentos && a.descuentos.length > 0));
     }
+    if (sectionId === 'comentarios') {
+      const a = datos.ajustes;
+      return !!(a && a.comentarios && a.comentarios.trim() !== '');
+    }
     return false;
   }
 
@@ -953,6 +969,8 @@
         tieneContenido = seccionTieneContenido('honorarios', datos);
       } else if (texto.includes('ajuste')) {
         tieneContenido = seccionTieneContenido('ajustes', datos);
+      } else if (texto.includes('comentario')) {
+        tieneContenido = seccionTieneContenido('comentarios', datos);
       }
       
       if (tieneContenido) {
