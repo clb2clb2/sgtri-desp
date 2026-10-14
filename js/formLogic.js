@@ -52,6 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
       responsableInput.readOnly = false;
       responsableInput.removeAttribute('aria-readonly');
     }
+
+    // Notificar cambios programáticos para mantener sincronizada la imputación principal.
+    responsableInput.dispatchEvent(new Event('change', { bubbles: true }));
+    if (window.uiImputacion?.actualizar) {
+      window.uiImputacion.actualizar();
+    }
   }
 
   if (chkBeneficiarioCoincide) {
@@ -206,18 +212,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Configurar botón reiniciar (volver al menú inicial)
       const btnReiniciar = document.getElementById('btn-home');
-      if (btnReiniciar) {
-        btnReiniciar.addEventListener('click', async () => {
-          const confirmed = await window.showConfirm(
-            '¿Está seguro de que desea borrar todos los datos y volver al menú inicial?',
-            { confirmText: 'Reiniciar', icon: '⚠️' }
-          );
-          if (confirmed) {
-            limpiarFormularioCompleto();
-            if (window.tipoLiquidacion?.volverAlMenuInicial) {
-              window.tipoLiquidacion.volverAlMenuInicial();
-            }
+      const appTitleReset = document.getElementById('app-title-reset');
+      const ejecutarReinicio = async () => {
+        const confirmed = await window.showConfirm(
+          '¿Está seguro de que desea borrar todos los datos y volver al menú inicial?',
+          { confirmText: 'Reiniciar', icon: '⚠️' }
+        );
+        if (confirmed) {
+          limpiarFormularioCompleto();
+          if (window.tipoLiquidacion?.volverAlMenuInicial) {
+            window.tipoLiquidacion.volverAlMenuInicial();
           }
+        }
+      };
+
+      if (btnReiniciar) {
+        btnReiniciar.addEventListener('click', ejecutarReinicio);
+      }
+      if (appTitleReset) {
+        appTitleReset.addEventListener('click', () => {
+          if (!window.__sgtriTipoLiquidacion) return;
+          ejecutarReinicio();
         });
       }
 
@@ -540,16 +555,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Comentarios (máximo 10 líneas)
+    if (el.id === 'comentarios-liquidacion') {
+      const original = String(el.value || '');
+      const normalizado = original.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const lineas = normalizado.split('\n');
+      if (lineas.length > 10) {
+        el.value = lineas.slice(0, 10).join('\n');
+      }
+      return;
+    }
+
     // Orgánica
     if (el.classList.contains('organica') || el.id === 'organica' || /^organica-/.test(el.id || '')) {
-      applyWithCaret(el, (valOrg, selStart) => {
-        const v = valOrg || '';
-        if (selStart > 0 && v[selStart - 1] === '.') {
-          return v.replace(/[^A-Za-z0-9.]/g, '').toUpperCase().slice(0, 20);
-        }
-        const only = v.replace(/[^A-Za-z0-9]/g, '').slice(0, 14).toUpperCase();
-        const parts = only.match(/.{1,2}/g) || [];
-        return parts.join('.');
+      applyWithCaret(el, (valOrg) => {
+        return String(valOrg || '')
+          .replace(/[^A-Za-z0-9. ]/g, '')
+          .toUpperCase()
+          .slice(0, 20);
       });
       return;
     }
@@ -825,7 +848,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Orgánica blur: validar formato (2-7 pares de 2 caracteres separados por puntos, empezando por "18.")
+    // Orgánica blur: validar que comience por "18."
     if (el.id === 'organica') {
       const warnWrapper = document.querySelector('.organica-warn');
       let val = (el.value || '').trim();
@@ -834,15 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
         el.value = '18.';
         val = '18.';
       }
-      // Si es solo "18.", no marcar error (el usuario lo completará)
-      if (val === '18.') {
-        if (warnWrapper) warnWrapper.style.display = 'none';
-        el.classList.remove('field-error');
-        return;
-      }
-      // Regex: 2 a 7 pares de exactamente 2 caracteres alfanuméricos separados por puntos
-      const regexOrganica = /^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){1,6}$/;
-      const esValida = val.startsWith('18.') && regexOrganica.test(val);
+      const esValida = val.startsWith('18.');
       if (warnWrapper) {
         warnWrapper.style.display = esValida ? 'none' : 'inline-flex';
       }
@@ -1372,6 +1387,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function marcarCampoError(campo) {
     if (!campo) return false;
     const valor = (campo.value || '').trim();
+
+    // Orgánica: obligatoria y debe empezar por 18.
+    const esCampoOrganica = campo.id === 'organica' || campo.classList.contains('imputacion-organica');
+    if (esCampoOrganica) {
+      if (valor === '' || !valor.startsWith('18.')) {
+        campo.classList.add('field-error');
+        const seccion = campo.closest('.form-section');
+        if (seccion) expandirSeccion(seccion);
+        return true;
+      }
+      return false;
+    }
+
     if (valor === '' || valor === '18.') {
       campo.classList.add('field-error');
       const seccion = campo.closest('.form-section');
@@ -1588,6 +1616,9 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       case 'ajustes':
         limpiarSeccionAjustes();
+        break;
+      case 'comentarios':
+        limpiarSeccionComentarios();
         break;
     }
 
@@ -1863,6 +1894,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
+   * Limpia la sección de comentarios.
+   */
+  function limpiarSeccionComentarios() {
+    const comentarios = document.getElementById('comentarios-liquidacion');
+    if (comentarios) {
+      comentarios.value = '';
+      comentarios.classList.remove('field-error');
+    }
+  }
+
+  /**
    * Limpia la sección de fecha de firma.
    */
   function limpiarFechaFirma() {
@@ -1910,6 +1952,7 @@ document.addEventListener('DOMContentLoaded', () => {
     limpiarSeccionEventos();
     limpiarSeccionHonorarios();
     limpiarSeccionAjustes();
+    limpiarSeccionComentarios();
     limpiarFechaFirma();
 
     // 2. Resetear estado interno del desplazamiento especial

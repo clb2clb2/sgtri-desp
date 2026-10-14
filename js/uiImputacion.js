@@ -86,31 +86,25 @@
   }
 
   /**
-   * Formatea orgánica (delega a limpiaDatos si disponible).
+   * Sanea orgánica como texto libre permitido.
+   * Solo admite letras, números, puntos y espacios; transforma a mayúsculas.
    */
-  function formatOrganica(valor) {
-    if (global.limpiaDatos && typeof global.limpiaDatos.formatOrganica === 'function') {
-      return global.limpiaDatos.formatOrganica(valor);
-    }
-    // Fallback básico
-    return (valor || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
+  function sanitizeOrganica(valor) {
+    return String(valor || '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9. ]/g, '')
+      .slice(0, 20);
   }
 
   /**
-   * Valida si una orgánica tiene formato correcto.
-   * Debe empezar por "18." y tener 2-5 pares de 2 caracteres alfanuméricos.
+   * Valida si una orgánica es correcta.
+   * Debe empezar por "18.".
    * @param {string} valor - Valor de la orgánica
-   * @returns {boolean} true si es válida o está vacía/incompleta
+   * @returns {boolean}
    */
   function validarOrganica(valor) {
     const val = (valor || '').trim();
-    // Si está vacío o es solo "18.", no marcar error (el usuario lo completará)
-    if (val === '' || val === '18.') {
-      return true;
-    }
-    // Regex: 2 a 7 pares de exactamente 2 caracteres alfanuméricos separados por puntos
-    const regexOrganica = /^[A-Za-z0-9]{2}(\.[A-Za-z0-9]{2}){1,6}$/;
-    return val.startsWith('18.') && regexOrganica.test(val);
+    return val !== '' && val.startsWith('18.');
   }
 
   /**
@@ -238,7 +232,7 @@
         <input type="text" 
                class="imputacion-organica organica${fieldErrorClass}" 
                value="${escapeHtml(linea.organica)}"
-               pattern="^18(\\.[A-Za-z0-9]{2}){1,6}$"
+               pattern="^18\\.[A-Za-z0-9. ]*$"
                maxlength="20"
                ${readonlyAttr}${tabindexAttr}
                aria-label="Orgánica" />
@@ -357,7 +351,7 @@
     const linea = lineasImputacion.find(l => l.id === lineaId);
     if (!linea || linea.readonly) return;
 
-    let formatted = formatOrganica(valor);
+    let formatted = sanitizeOrganica(valor);
     
     // Si está vacío o incompleto, restaurar a "18."
     if (formatted === '' || formatted === '18') {

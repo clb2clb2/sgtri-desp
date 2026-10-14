@@ -132,7 +132,13 @@ body {
   text-align: center;
   line-height: 1;
   pointer-events: none;
+  cursor: default;
   min-width: 400px;
+}
+
+.Encabezado h1.is-reset-enabled {
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 /* Botones de acción en el header */

@@ -45,6 +45,18 @@
     return TIPOS.GNRAL;
   }
 
+  function actualizarEstadoTituloReinicio(activo) {
+    const title = document.getElementById('app-title-reset');
+    if (!title) return;
+    if (activo) {
+      title.classList.add('is-reset-enabled');
+      title.setAttribute('title', 'Volver al menú inicial');
+    } else {
+      title.classList.remove('is-reset-enabled');
+      title.removeAttribute('title');
+    }
+  }
+
   function getSectionById(sectionId) {
     return document.querySelector(`.form-section[data-section-id="${sectionId}"]`);
   }
@@ -134,6 +146,7 @@
     if (actionsBar) actionsBar.classList.remove('app-hidden');
     if (formWrapper) formWrapper.classList.remove('app-hidden');
     if (menuInicio) menuInicio.style.display = 'none';
+    actualizarEstadoTituloReinicio(true);
   }
 
   function mostrarMenuInicial() {
@@ -151,6 +164,7 @@
         menuInicio.classList.remove('fade-enter');
       });
     }
+    actualizarEstadoTituloReinicio(false);
   }
 
   function aplicarModoUI(tipo) {

@@ -427,6 +427,9 @@
           return [];
         })(),
 
+        // Tabla de comentarios (si existe)
+        ...buildTablaComentarios(datos),
+
         // Tabla de resultado de liquidación (si hay descuentos o financiación)
         ...buildTablaResultadoLiquidacion(datos),
 
@@ -1885,6 +1888,48 @@
     return [
       { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
       { unbreakable: true, stack: contenido }
+    ];
+  }
+
+  /**
+   * Construye la tabla de comentarios de la liquidación.
+   * @param {Object} datos - Datos del formulario
+   * @returns {Array} Array con tabla (vacío si no hay comentarios)
+   */
+  function buildTablaComentarios(datos) {
+    const ajustes = datos.ajustes || {};
+    const comentariosRaw = typeof ajustes.comentarios === 'string' ? ajustes.comentarios : '';
+    const comentarios = comentariosRaw.trim();
+    if (!comentarios) return [];
+
+    const encabezado = buildEncabezadoSeccion('COMENTARIOS');
+
+    const tabla = {
+      table: {
+        widths: ['*'],
+        body: [
+          [
+            {
+              text: comentarios.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
+              style: 'tablaDato',
+              alignment: 'left'
+            }
+          ]
+        ]
+      },
+      layout: {
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => '#cccccc',
+        vLineColor: () => '#cccccc',
+        paddingTop: () => 5
+      },
+      margin: [0, 0, 0, 0]
+    };
+
+    return [
+      { text: '', margin: [0, PDF_CONFIG.espacioTablas, 0, 0] },
+      { unbreakable: true, stack: [...encabezado, tabla] }
     ];
   }
 
