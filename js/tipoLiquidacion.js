@@ -140,10 +140,12 @@
 
   function mostrarFormulario() {
     const actionsBar = document.getElementById('actions-bar');
+    const headerActions = document.getElementById('header-actions');
     const formWrapper = document.getElementById('form-sections-wrapper');
     const menuInicio = document.getElementById('tipo-liquidacion-inicio');
 
     if (actionsBar) actionsBar.classList.remove('app-hidden');
+    if (headerActions) headerActions.classList.remove('app-hidden');
     if (formWrapper) formWrapper.classList.remove('app-hidden');
     if (menuInicio) menuInicio.style.display = 'none';
     actualizarEstadoTituloReinicio(true);
@@ -151,10 +153,12 @@
 
   function mostrarMenuInicial() {
     const actionsBar = document.getElementById('actions-bar');
+    const headerActions = document.getElementById('header-actions');
     const formWrapper = document.getElementById('form-sections-wrapper');
     const menuInicio = document.getElementById('tipo-liquidacion-inicio');
 
     if (actionsBar) actionsBar.classList.add('app-hidden');
+    if (headerActions) headerActions.classList.add('app-hidden');
     if (formWrapper) formWrapper.classList.add('app-hidden');
     if (menuInicio) {
       menuInicio.classList.add('fade-enter');

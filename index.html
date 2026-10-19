@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="favicon.ico" type="image/x-icon">
-  <title>UEx - SGTRI - Liquidación de Dietas y Desplazamientos</title>
+  <title>UEx - SGTRI - Liquidación de Desplazamientos, Honorarios y Congresos</title>
 
   <!-- Preconnect para optimizar carga de fuentes -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,6 +13,8 @@
 
   <!-- Fuentes -->
   <link href="https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,100..900;1,100..900&display=swap"
+    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&display=swap"
     rel="stylesheet">
 
   <!-- Estilos -->
@@ -65,8 +67,17 @@
 
   <!-- Encabezado principal -->
   <header class="Encabezado">
-    <img src="assets/img/logo-uex-blanco.png" alt="Logo UEx" class="logo" />
-    <h1 id="app-title-reset">SGTRI - Liquidación de Dietas y Desplazamientos</h1>
+    <div class="encabezado-top-row">
+      <img src="assets/img/logo-sgtri-horizontal-color.svg" alt="Logo SGTRI" class="logo" />
+      <div id="header-actions" class="header-actions app-hidden">
+        <button type="button" id="btn-generar-pdf" class="menu-item menu-primary" title="Generar el PDF con la liquidación final">
+          ▶📋 <span class="menu-text">Generar PDF</span>
+        </button>
+      </div>
+    </div>
+    <h1 id="app-title-reset">
+      <span class="app-title-sub">Liquidación de Desplazamientos, Honorarios y Congresos</span>
+    </h1>
   </header>
 
   <!-- Menú inicial de tipo de liquidación -->
@@ -103,11 +114,7 @@
       </button>
       
     </div>
-    <div class="menu-right">
-      <button type="button" id="btn-generar-pdf" class="menu-item menu-primary" title="Generar el PDF con la liquidación final">
-        ▶📋 <span class="menu-text">Generar PDF</span>
-      </button>
-    </div>
+    <div class="menu-right"></div>
   </nav>
 
   <!-- Contenedor único para todas las secciones -->
