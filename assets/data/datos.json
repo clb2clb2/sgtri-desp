@@ -1,5 +1,5 @@
 {
-  "versionEsquema": "26.6.0",
+  "versionEsquema": "26.10.2",
   "limites": {
     "maxDesplazamientos": 8,
     "maxOtrosGastosPorDesplazamiento": 10,

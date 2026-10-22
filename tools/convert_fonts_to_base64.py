@@ -24,6 +24,8 @@ FONTS_TO_CONVERT = {
     "HelveticaNeueLTStd-Bd.otf": "HelveticaNeue-Bold",
     "HelveticaNeueLTStd-It.otf": "HelveticaNeue-Italic",
     "HelveticaNeueLTStd-BdCn.otf": "HelveticaNeue-BoldCondensed",
+    "Montserrat-Regular.ttf": "Montserrat-Regular",
+    "Montserrat-Medium.ttf": "Montserrat-Medium",
 }
 
 
@@ -94,16 +96,15 @@ def generate_vfs_js(fonts: dict[str, str]) -> str:
         "      italics: 'HelveticaNeue-Italic',",
         "      bolditalics: 'HelveticaNeue-Bold'",
         "    },",
-        "    // Roboto viene incluida en vfs_fonts.js del CDN",
-        "    'Roboto': {",
-        "      normal: 'Roboto-Regular.ttf',",
-        "      bold: 'Roboto-Medium.ttf',",
-        "      italics: 'Roboto-Italic.ttf',",
-        "      bolditalics: 'Roboto-MediumItalic.ttf'",
+        "    'Montserrat': {",
+        "      normal: 'Montserrat-Regular',",
+        "      bold: 'Montserrat-Medium',",
+        "      italics: 'Montserrat-Regular',",
+        "      bolditalics: 'Montserrat-Medium'",
         "    }",
         "  });",
         "",
-        "  console.log('[pdfFonts] Fuentes Helvetica Neue y Roboto cargadas correctamente');",
+        "  console.log('[pdfFonts] Fuentes Helvetica Neue y Montserrat cargadas correctamente');",
         "",
         "})(typeof window !== 'undefined' ? window : this);",
         ""
