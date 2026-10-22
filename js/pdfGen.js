@@ -28,7 +28,17 @@
     // Espacio base reservado en el margen inferior para el pie de página principal
     footer: {
       baseHeight: 132
+    },
+    header: {
+      titleUnderlineWidth: 2,
+      titleUnderlineColor: '#f4b223'
     }
+  };
+
+  const PDF_LOGO = {
+    svg: 'assets/img/uex-sello-institucional-color.svg',
+    png: 'assets/img/uex-sello-institucional-color.png',
+    fallbackPng: 'assets/img/logo-uex.png'
   };
 
   /**
@@ -66,6 +76,49 @@
     // Quitar símbolo €, espacios, puntos de miles, y reemplazar coma decimal por punto
     const cleaned = val.replace(/€/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
     return Number(cleaned) || 0;
+  }
+
+  function obtenerTituloLiquidacion(datos) {
+    const tipoLiquidacion = String(datos?.tipoLiquidacion || 'GNRAL').trim().toUpperCase();
+    const tituloPorTipo = {
+      DESPL: 'Liquidación de Desplazamientos',
+      CONGR: 'Liquidación por Asistencia a Congresos',
+      HONOR: 'Liquidación de Honorarios',
+      AECC: 'Liquidación de Desplazamientos AECC',
+      GNRAL: 'Liquidación de Desplazamientos, Honorarios y Congresos'
+    };
+
+    if (tipoLiquidacion !== 'GNRAL') {
+      return tituloPorTipo[tipoLiquidacion] || tituloPorTipo.GNRAL;
+    }
+
+    const tieneDesplazamientos = (Array.isArray(datos?.desplazamientos) ? datos.desplazamientos : [])
+      .some((desp) => Number(desp?.datosCalculados?.importeTotal) > 0);
+    const tieneCongresos = parseEuroNumber(datos?.evento?.gastosInscripcion) > 0;
+    const tieneHonorarios = parseEuroNumber(datos?.honorarios?.importe) > 0;
+
+    if (tieneDesplazamientos && tieneHonorarios && tieneCongresos) {
+      return 'Liquidación de Desplazamientos, Honorarios y Congresos';
+    }
+    if (tieneDesplazamientos && tieneCongresos) {
+      return 'Liquidación de Desplazamientos y Congresos';
+    }
+    if (tieneDesplazamientos && tieneHonorarios) {
+      return 'Liquidación de Desplazamientos y Honorarios';
+    }
+    if (tieneHonorarios && tieneCongresos) {
+      return 'Liquidación de Honorarios y Congresos';
+    }
+    if (tieneDesplazamientos) {
+      return 'Liquidación de Desplazamientos';
+    }
+    if (tieneHonorarios) {
+      return 'Liquidación de Honorarios';
+    }
+    if (tieneCongresos) {
+      return 'Liquidación por Asistencia a Congresos';
+    }
+    return tituloPorTipo.GNRAL;
   }
 
   /**
@@ -240,22 +293,35 @@
    * @param {Object} datos - Datos de la liquidación
    * @param {string} logoBase64 - Logo en Base64 (PNG) o contenido SVG
    * @param {boolean} logoIsSVG - true si el logo es SVG
-   * @param {string} separadorSVG - Contenido SVG del separador
    * @param {string|null} logosGr24Base64 - Imagen logos_gr24 en Base64 (para pie de página)
    */
-  function buildDocDefinition(datos, logoBase64, logoIsSVG = false, separadorSVG = null, logosGr24Base64 = null) {
+  function buildDocDefinition(datos, logoBase64, logoIsSVG = false, logosGr24Base64 = null) {
     const margin = PDF_CONFIG.page.margin;
     const footerHeight = calcularAlturaFooter(datos);
+    const tituloLiquidacion = obtenerTituloLiquidacion(datos);
+    const versionEsquema = String(datos?.versionEsquema || '').trim();
+    const versionVisiblePdf = versionEsquema ? `v. ${versionEsquema}` : '';
+    const cmToPt = 28.35;
+    const headerSize = 2.30 * cmToPt;
+    const sideColWidth = 1.30 * cmToPt;
+    const rightBlockWidth = PDF_CONFIG.anchoUtil - headerSize;
+    const titleColWidth = rightBlockWidth - sideColWidth;
+    const rightTableHeight = 1.20 * cmToPt;
+    const titleFontSize = 18;
+    const titleYOffset = Math.max(0, rightTableHeight - titleFontSize - 2);
+    const tituloLiquidacionPdf = tituloLiquidacion;
+    const headerTitleUnderlineWidth = PDF_CONFIG.header.titleUnderlineWidth;
+    const headerTitleUnderlineColor = PDF_CONFIG.header.titleUnderlineColor;
 
     return {
       // ─────────────────────────────────────────────────────────────────────
       // INFORMACIÓN DEL DOCUMENTO
       // ─────────────────────────────────────────────────────────────────────
       info: {
-        title: 'Liquidación de Desplazamientos',
+        title: tituloLiquidacion,
         author: 'SGTRI - Universidad de Extremadura',
         subject: `Liquidación ${datos.tipoLiquidacion || 'GNRAL'} ${datos.proyecto?.referencia || ''}`,
-        creator: 'SGTRI v2.1 (2026)'
+        creator: versionVisiblePdf ? `SGTRI ${versionVisiblePdf}` : 'SGTRI'
       },
 
       // ─────────────────────────────────────────────────────────────────────
@@ -284,9 +350,9 @@
 
       styles: {
         titulo: {
-          font: 'HelveticaNeue-BoldCondensed',
-          fontSize: 18,
-          color: '#407C2E'  // RGB(64,124,46)
+          font: 'Montserrat',
+          fontSize: 16,
+          color: '#000000'
         },
         version: {
           font: 'HelveticaNeue-MediumCondensed',
@@ -300,7 +366,7 @@
         },
         // Estilos para tablas de datos
         tablaEncabezado: {
-          font: 'HelveticaNeue',
+          font: 'Montserrat',
           bold: true,
           fontSize: 10,
           color: '#407C2E'  // RGB(64,124,46) - Verde
@@ -333,44 +399,67 @@
         // ═══════════════════════════════════════════════════════════════════
         {
           table: {
-            widths: [80, '*', 80],
-            heights: [42],
+            widths: [rightBlockWidth+10, headerSize-10],
+            heights: [headerSize],
             body: [
               [
-                // Celda 1: Logo
                 {
-                  margin: [0, -8, 0, 0],
-                  alignment: 'left',
+                  margin: [0, 0, 0, 0],
+                  table: {
+                    widths: [titleColWidth, sideColWidth],
+                    heights: [rightTableHeight],
+                    body: [
+                      [
+                        {
+                          margin: [5, 0, 0, 0],
+                          alignment: 'left',
+                          relativePosition: { x: 0, y: titleYOffset },
+                          text: tituloLiquidacionPdf,
+                          style: 'titulo',
+                          border: [false, false, false, true],
+                          borderColor: [null, null, null, headerTitleUnderlineColor],
+                          borderWidth: [0, 0, 0, headerTitleUnderlineWidth]
+                        },
+                        {
+                          margin: [0, 0, 0, 0],
+                          alignment: 'center',
+                          valign: 'top',
+                          text: `S.G.T.R.I.\n${versionVisiblePdf}`,
+                          style: 'versionSmall',
+                          border: [false, false, false, true],
+                          borderColor: [null, null, null, headerTitleUnderlineColor],
+                          borderWidth: [0, 0, 0, headerTitleUnderlineWidth]
+                        }
+                      ]
+                    ]
+                  },
+                  layout: {
+                    defaultBorder: false,
+                    paddingLeft: () => 0,
+                    paddingRight: () => 0,
+                    paddingTop: () => 0,
+                    paddingBottom: () => 0,
+                    hLineWidth: (i, node) => (i === node.table.body.length ? headerTitleUnderlineWidth : 0),
+                    hLineColor: (i, node) => (i === node.table.body.length ? headerTitleUnderlineColor : '#000000'),
+                    vLineWidth: () => 0
+                  }
+                },
+                {
+                  margin: [0, 0, 0, 0],
+                  alignment: 'right',
+                  valign: 'top',
                   stack: [
                     logoIsSVG
                       ? {
                         svg: logoBase64,
-                        fit: [80, 50],
+                        fit: [headerSize, headerSize],
                         alignment: 'left'
                       }
                       : {
                         image: logoBase64,
-                        fit: [80, 50],
+                        fit: [headerSize, headerSize],
                         alignment: 'left'
                       }
-                  ]
-                },
-                // Celda 2: Título
-                {
-                  margin: [0, 3, 0, 0],
-                  alignment: 'center',
-                  stack: [
-                    { text: 'Liquidación de Desplazamientos,', style: 'titulo' },
-                    { text: 'Congresos y Honorarios', style: 'titulo' }
-                  ]
-                },
-                // Celda 3: SGTRI
-                {
-                  margin: [0, 0, 0, 0],
-                  alignment: 'center',
-                  stack: [
-                    { text: 'S.G.T.R.I.', style: 'version' },
-                    { text: 'v2.1 (2026)', style: 'versionSmall' }
                   ]
                 }
               ]
@@ -378,19 +467,13 @@
           },
           layout: {
             defaultBorder: false,
+            paddingLeft: () => 0,
+            paddingRight: () => 0,
+            paddingTop: () => 0,
+            paddingBottom: () => 0
           },
-          margin: [0, -4, 0, 4]
-        },
-
-        // ═══════════════════════════════════════════════════════════════════
-        // LÍNEA SEPARADORA
-        // ═══════════════════════════════════════════════════════════════════
-        separadorSVG ? {
-          svg: separadorSVG,
-          width: PDF_CONFIG.anchoUtil,
-          alignment: 'center',
           margin: [0, 0, 0, 10]
-        } : {},
+        },
 
         // ═══════════════════════════════════════════════════════════════════
         // TABLAS DE DATOS
@@ -472,7 +555,7 @@
             x1: 0, y1: 0,
             x2: PDF_CONFIG.anchoUtil, y2: 0,
             lineWidth: 1,
-            lineColor: '#407C2E'
+            lineColor: '#f4b223'
           }
         ],
         margin: [0, 0, 0, 0]
@@ -2234,28 +2317,25 @@
       let isSVG = false;
 
       try {
-        logoData = await loadSVG('assets/img/logouex.svg');
+        logoData = await loadSVG(PDF_LOGO.svg);
         isSVG = true;
         console.log('[pdfGen] Logo SVG cargado');
       } catch (svgError) {
         console.warn('[pdfGen] No se pudo cargar SVG, intentando PNG...');
         try {
-          logoData = await loadImageAsBase64('assets/img/logo-uex.png');
+          logoData = await loadImageAsBase64(PDF_LOGO.png);
           console.log('[pdfGen] Logo PNG cargado');
         } catch (pngError) {
-          console.error('[pdfGen] No se pudo cargar ningún logo');
-          // Continuar sin logo
-          logoData = null;
+          console.warn('[pdfGen] No se pudo cargar PNG principal, intentando PNG de respaldo...');
+          try {
+            logoData = await loadImageAsBase64(PDF_LOGO.fallbackPng);
+            console.log('[pdfGen] Logo PNG de respaldo cargado');
+          } catch (fallbackPngError) {
+            console.error('[pdfGen] No se pudo cargar ningún logo');
+            // Continuar sin logo
+            logoData = null;
+          }
         }
-      }
-
-      // Cargar separador SVG
-      let separadorSVG = null;
-      try {
-        separadorSVG = await loadSVG('assets/img/separador.svg');
-        console.log('[pdfGen] Separador SVG cargado');
-      } catch (e) {
-        console.warn('[pdfGen] No se pudo cargar el separador SVG');
       }
 
       // Cargar logos GR24 (para pie de página)
@@ -2268,9 +2348,9 @@
       }
 
       console.log('[pdfGen] Generando PDF...');
-      const docDefinition = buildDocDefinition(d, logoData, isSVG, separadorSVG, logosGr24Base64);
-
-      pdfMake.createPdf(docDefinition).download(`Liquidacion_${d.proyecto?.referencia || 'borrador'}.pdf`);
+      const docDefinition = buildDocDefinition(d, logoData, isSVG, logosGr24Base64);
+      const tituloLiquidacion = obtenerTituloLiquidacion(d);
+      pdfMake.createPdf(docDefinition).download(`${tituloLiquidacion}.pdf`);
       console.log('[pdfGen] PDF generado correctamente');
 
     } catch (error) {
@@ -2303,22 +2383,18 @@
       let isSVG = false;
 
       try {
-        logoData = await loadSVG('assets/img/logouex.svg');
+        logoData = await loadSVG(PDF_LOGO.svg);
         isSVG = true;
       } catch {
         try {
-          logoData = await loadImageAsBase64('assets/img/logo-uex.png');
+          logoData = await loadImageAsBase64(PDF_LOGO.png);
         } catch {
-          logoData = null;
+          try {
+            logoData = await loadImageAsBase64(PDF_LOGO.fallbackPng);
+          } catch {
+            logoData = null;
+          }
         }
-      }
-
-      // Cargar separador SVG
-      let separadorSVG = null;
-      try {
-        separadorSVG = await loadSVG('assets/img/separador.svg');
-      } catch {
-        // Continuar sin separador
       }
 
       // Cargar logos GR24 (para pie de página)
@@ -2329,7 +2405,7 @@
         // Continuar sin logos
       }
 
-      const docDefinition = buildDocDefinition(d, logoData, isSVG, separadorSVG, logosGr24Base64);
+      const docDefinition = buildDocDefinition(d, logoData, isSVG, logosGr24Base64);
       pdfMake.createPdf(docDefinition).open();
 
     } catch (error) {
