@@ -18,13 +18,7 @@
    * Delega a utils.fmt si está disponible.
    */
   function fmt(n) {
-    if (window.utils && typeof window.utils.fmt === 'function') {
-      return window.utils.fmt(n);
-    }
-    return (Number(n) || 0).toLocaleString('de-DE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    return window.utils.fmt(n);
   }
 
   /**
@@ -32,63 +26,7 @@
    * Delega a utils.fmtPrecio si está disponible.
    */
   function fmtPrecio(n) {
-    if (window.utils && typeof window.utils.fmtPrecio === 'function') {
-      return window.utils.fmtPrecio(n);
-    }
-    const num = Number(n) || 0;
-    const str = num.toString();
-    const decimals = str.includes('.') ? str.split('.')[1].length : 0;
-    const maxDecimals = Math.max(2, Math.min(decimals, 3));
-    return num.toLocaleString('de-DE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: maxDecimals
-    });
-  }
-
-  /**
-   * Obtiene el descuento por comidas de congreso para un desplazamiento específico.
-   * Solo devuelve el descuento si el desplazamiento es el asociado al congreso.
-   * @param {string|number} despId - ID del desplazamiento
-   * @returns {number} Descuento en euros (0 si no aplica a este desplazamiento)
-   */
-  function getDescuentoCongreso(despId) {
-    const hidden = document.getElementById('descuento-manut-congreso');
-    if (!hidden) return 0;
-    
-    const descuento = Number(hidden.value) || 0;
-    if (descuento <= 0) return 0;
-    
-    // Determinar a qué desplazamiento aplica el descuento
-    const desplazamientos = document.querySelectorAll('.desplazamiento-grupo');
-    
-    if (desplazamientos.length === 1) {
-      // Si solo hay un desplazamiento, el descuento aplica a ese
-      return descuento;
-    }
-    
-    // Si hay varios, verificar cuál está seleccionado en evento-asociado
-    const eventoAsociado = document.getElementById('evento-asociado');
-    if (!eventoAsociado) return 0;
-    
-    const valSel = eventoAsociado.value || '';
-    const match = valSel.match(/^desp(\d+)$/);
-    if (!match) return 0;
-    
-    const despAsociado = match[1];
-    // Solo aplicar el descuento si coincide con el desplazamiento actual
-    return String(despId) === String(despAsociado) ? descuento : 0;
-  }
-
-  /**
-   * Calcula el IRPF ajustado restando el descuento por congreso.
-   * El resultado nunca será negativo.
-   * @param {number} irpfBase - IRPF calculado sin ajustes
-   * @param {string|number} despId - ID del desplazamiento
-   * @returns {number} IRPF ajustado (>= 0)
-   */
-  function calcIrpfAjustado(irpfBase, despId) {
-    const descuento = getDescuentoCongreso(despId);
-    return Math.max(0, (irpfBase || 0) - descuento);
+    return window.utils.fmtPrecio(n);
   }
 
   // =========================================================================
@@ -317,7 +255,7 @@
    * Solo muestra líneas de totales con importe > 0.
    */
   function renderSegmentado(data) {
-    const { totales, segmentos, ui, exclusiones } = data;
+    const { totales, segmentos, ui } = data;
     const residenciaEventual = ui?.residenciaEventual || false;
 
     // Verificar si hay datos válidos de segmentos (fechas validadas)
@@ -508,122 +446,13 @@
   }
 
   // =========================================================================
-  // CONVERSIÓN LEGACY
-  // =========================================================================
-
-  /**
-   * Suma totales desde segmentos o canonical.
-   */
-  function sumLegacyTotals(canonical) {
-    const segResults = canonical.segmentsResults;
-    const esInternacional = Array.isArray(segResults) && segResults.length > 0;
-
-    if (!esInternacional) {
-      return {
-        manutencion: Number(canonical.manutencionesAmount) || 0,
-        alojamientoMax: Number(canonical.nochesAmount) || 0,
-        noches: Number(canonical.noches) || 0,
-        hayNochesAmbiguas: !!canonical.nochesAmbiguous,
-        nochesAmbiguasRango: canonical.nochesAmbiguousFrom && canonical.nochesAmbiguousTo
-          ? { desde: canonical.nochesAmbiguousFrom, hasta: canonical.nochesAmbiguousTo }
-          : null
-      };
-    }
-
-    let manutencion = 0, alojamientoMax = 0, noches = 0;
-    let hayNochesAmbiguas = false, nochesAmbiguasRango = null;
-
-    for (const seg of segResults) {
-      manutencion += Number(seg.manutencionesAmount) || 0;
-      alojamientoMax += Number(seg.nochesAmount) || 0;
-      noches += Number(seg.noches) || 0;
-
-      if (seg.nochesAmbiguous) {
-        hayNochesAmbiguas = true;
-        if (seg.nochesAmbiguousFrom && seg.nochesAmbiguousTo) {
-          nochesAmbiguasRango = { desde: seg.nochesAmbiguousFrom, hasta: seg.nochesAmbiguousTo };
-        }
-      }
-    }
-
-    return { manutencion, alojamientoMax, noches, hayNochesAmbiguas, nochesAmbiguasRango };
-  }
-
-  /**
-   * Convierte formato legacy a estructura unificada.
-   */
-  function convertLegacyToUnified(canonical, ctx, despEl) {
-    const id = ctx?.id || despEl?.dataset?.desplazamientoId || '';
-    const segResults = canonical.segmentsResults;
-    const esInternacional = Array.isArray(segResults) && segResults.length > 0;
-
-    const totals = sumLegacyTotals(canonical);
-    const alojamientoUser = (typeof ctx?.alojNum !== 'undefined')
-      ? Number(ctx.alojNum)
-      : Number(canonical.alojamiento || 0);
-    const kmAmount = Number(canonical.kmAmount) || 0;
-    const otrosGastos = Number(ctx?.otrosSum) || 0;
-
-    return {
-      id,
-      totales: {
-        manutencion: totals.manutencion,
-        alojamientoMax: totals.alojamientoMax,
-        alojamientoUser,
-        km: kmAmount,
-        otrosGastos,
-        total: totals.manutencion + alojamientoUser + kmAmount + otrosGastos,
-        noches: totals.noches
-      },
-      detalles: esInternacional ? null : {
-        manutenciones: canonical.manutenciones || 0,
-        precioManutencion: canonical.precioManutencion || 0,
-        noches: canonical.noches || 0,
-        precioNoche: canonical.precioNoche || 0,
-        km: Number(canonical.km) || 0,
-        precioKm: canonical.precioKm || 0.26
-      },
-      segmentos: esInternacional ? segResults.map(seg => ({
-        titulo: seg.segTitle || 'Tramo',
-        pais: seg.segPais || '',
-        manutenciones: seg.manutenciones || 0,
-        manutencionAmount: Number(seg.manutencionesAmount) || 0,
-        precioManutencion: seg.precioManutencion || 0,
-        noches: seg.noches || 0,
-        nochesAmount: Number(seg.nochesAmount) || 0,
-        precioNoche: seg.precioNoche || 0,
-        nochesAmbiguous: !!seg.nochesAmbiguous
-      })) : null,
-      ui: {
-        esInternacional,
-        alojamientoExcedeMax: alojamientoUser > totals.alojamientoMax,
-        nochesAmbiguas: totals.hayNochesAmbiguas,
-        nochesAmbiguasRango: totals.nochesAmbiguasRango,
-        precioNocheMedio: totals.noches > 0
-          ? totals.alojamientoMax / totals.noches
-          : (canonical.precioNoche || 0)
-      },
-      exclusiones: {
-        manutencion: !!(ctx?.excludeManutencion),
-        alojamiento: !!(ctx?.excludeAlojamiento)
-      }
-    };
-  }
-
-  // =========================================================================
   // API PÚBLICA
   // =========================================================================
 
   /**
-   * Renderiza el resultado de un cálculo de desplazamiento.
-   * Acepta nueva estructura unificada o formato legacy.
+   * Renderiza el resultado de un cálculo de desplazamiento (salidaData de calculoDesp.buildSalidaData).
    */
-  function renderSalida(despEl, salidaData, legacyCtx) {
-    // Detectar formato legacy
-    if (salidaData && !salidaData.totales && legacyCtx) {
-      salidaData = convertLegacyToUnified(salidaData, legacyCtx, despEl);
-    }
-
+  function renderSalida(despEl, salidaData) {
     // Normalizar id
     if (!salidaData.id && despEl?.dataset?.desplazamientoId) {
       salidaData.id = despEl.dataset.desplazamientoId;
@@ -642,8 +471,7 @@
     renderSalidaHtml,
     mountSalida,
     templates,
-    fmt,
-    convertLegacyToUnified
+    fmt
   };
 
 })(typeof window !== 'undefined' ? window : this);

@@ -16,3 +16,7 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/tasks.json
 !.vscode/launch.json
+
+# Archivos con datos personales (no versionar)
+datos_ejemplo.js
+Prueba salida PDF *.docx

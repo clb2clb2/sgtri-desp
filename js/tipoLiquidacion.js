@@ -34,7 +34,16 @@
     GNRAL: { mostrarEventos: true, mostrarHonorarios: true, mostrarDesplazamientos: true, mostrarAeccDesplazamiento: false, maxDesplazamientos: null, permitirEspecial: true }
   };
 
+  const TITULO_POR_TIPO = {
+    DESPL: 'Liquidación de Desplazamientos',
+    CONGR: 'Liquidación por Asistencia a Congresos',
+    HONOR: 'Liquidación de Honorarios',
+    AECC: 'Liquidación de Desplazamientos AECC',
+    GNRAL: 'Liquidación de Desplazamientos, Honorarios y Congresos'
+  };
+
   let tipoActual = null;
+  let tituloInicial = null;
 
   function normalizarTipo(tipo) {
     if (!tipo) return TIPOS.GNRAL;
@@ -47,14 +56,54 @@
 
   function actualizarEstadoTituloReinicio(activo) {
     const title = document.getElementById('app-title-reset');
-    if (!title) return;
+    const logo = document.querySelector('.Encabezado .logo');
     if (activo) {
-      title.classList.add('is-reset-enabled');
-      title.setAttribute('title', 'Volver al menú inicial');
+      if (title) {
+        title.classList.add('is-reset-enabled');
+        title.setAttribute('title', 'Volver al menú inicial');
+      }
+      if (logo) {
+        logo.classList.add('is-reset-enabled');
+        logo.setAttribute('title', 'Volver al menú inicial');
+      }
     } else {
-      title.classList.remove('is-reset-enabled');
-      title.removeAttribute('title');
+      if (title) {
+        title.classList.remove('is-reset-enabled');
+        title.removeAttribute('title');
+      }
+      if (logo) {
+        logo.classList.remove('is-reset-enabled');
+        logo.removeAttribute('title');
+      }
     }
+  }
+
+  function obtenerElementoTextoTitulo() {
+    const title = document.getElementById('app-title-reset');
+    if (!title) return null;
+    return title.querySelector('.app-title-sub') || title;
+  }
+
+  function leerTituloActual() {
+    const el = obtenerElementoTextoTitulo();
+    return el ? el.textContent.trim() : '';
+  }
+
+  function establecerTitulo(texto) {
+    const el = obtenerElementoTextoTitulo();
+    if (!el) return;
+    el.textContent = texto;
+  }
+
+  function asegurarTituloInicial() {
+    if (tituloInicial !== null) return;
+    tituloInicial = leerTituloActual() || TITULO_POR_TIPO.GNRAL;
+  }
+
+  function actualizarTituloPorTipo(tipo) {
+    const tipoNormalizado = normalizarTipo(tipo);
+    const nuevoTitulo = TITULO_POR_TIPO[tipoNormalizado] || TITULO_POR_TIPO.GNRAL;
+    establecerTitulo(nuevoTitulo);
   }
 
   function getSectionById(sectionId) {
@@ -126,6 +175,10 @@
       infoDecretoEl.style.display = '';
     }
 
+    // La opción "Reto AECC" solo existe mientras se está en modo AECC
+    const optAecc = tipoProyectoEl.querySelector('option[data-aecc-proyecto="true"]');
+    if (optAecc) optAecc.remove();
+
     const previo = tipoProyectoEl.dataset.prevTipoProyecto;
     if (previo) {
       const existePrevio = Array.from(tipoProyectoEl.options).some((o) => o.value === previo);
@@ -143,11 +196,16 @@
     const headerActions = document.getElementById('header-actions');
     const formWrapper = document.getElementById('form-sections-wrapper');
     const menuInicio = document.getElementById('tipo-liquidacion-inicio');
+    const encabezado = document.querySelector('.Encabezado');
 
     if (actionsBar) actionsBar.classList.remove('app-hidden');
     if (headerActions) headerActions.classList.remove('app-hidden');
     if (formWrapper) formWrapper.classList.remove('app-hidden');
     if (menuInicio) menuInicio.style.display = 'none';
+    if (encabezado) {
+      encabezado.classList.remove('portada-mode');
+      encabezado.classList.add('formulario-mode');
+    }
     actualizarEstadoTituloReinicio(true);
   }
 
@@ -156,10 +214,15 @@
     const headerActions = document.getElementById('header-actions');
     const formWrapper = document.getElementById('form-sections-wrapper');
     const menuInicio = document.getElementById('tipo-liquidacion-inicio');
+    const encabezado = document.querySelector('.Encabezado');
 
     if (actionsBar) actionsBar.classList.add('app-hidden');
     if (headerActions) headerActions.classList.add('app-hidden');
     if (formWrapper) formWrapper.classList.add('app-hidden');
+    if (encabezado) {
+      encabezado.classList.remove('formulario-mode');
+      encabezado.classList.add('portada-mode');
+    }
     if (menuInicio) {
       menuInicio.classList.add('fade-enter');
       menuInicio.style.display = '';
@@ -168,6 +231,8 @@
         menuInicio.classList.remove('fade-enter');
       });
     }
+    asegurarTituloInicial();
+    establecerTitulo(tituloInicial);
     actualizarEstadoTituloReinicio(false);
   }
 
@@ -230,6 +295,7 @@
   function seleccionarTipo(tipo) {
     aplicarModoUI(tipo);
     mostrarFormulario();
+    actualizarTituloPorTipo(tipo);
   }
 
   function aplicarModoDesdeArchivo(tipo) {
@@ -247,6 +313,7 @@
   }
 
   function init() {
+    asegurarTituloInicial();
     reordenarSeccionesPrincipales();
 
     const btnDespl = document.getElementById('btn-inicio-despl');
@@ -294,6 +361,7 @@
 
   global.tipoLiquidacion = {
     TIPOS,
+    TITULO_POR_TIPO,
     init,
     normalizarTipo,
     seleccionarTipo,

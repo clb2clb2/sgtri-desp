@@ -49,7 +49,6 @@
 
   <!-- PDF: pdfmake (local) + fuentes personalizadas + generador -->
   <script src="js/pdfmake.min.js"></script>
-  <script src="js/vfs_fonts.js"></script>
   <script src="js/pdfFonts.js"></script>
   <script src="js/pdfGen.js" defer></script>
 </head>
@@ -66,7 +65,7 @@
   </svg>
 
   <!-- Encabezado principal -->
-  <header class="Encabezado">
+  <header class="Encabezado portada-mode">
     <div class="encabezado-top-row">
       <img src="assets/img/logo-sgtri-horizontal-color.svg" alt="Logo SGTRI" class="logo" />
       <div id="header-actions" class="header-actions app-hidden">
@@ -83,13 +82,13 @@
   <!-- Menú inicial de tipo de liquidación -->
   <section id="tipo-liquidacion-inicio" class="tipo-liquidacion-inicio" aria-label="Seleccionar tipo de liquidación">
     <div class="tipo-liquidacion-panel">
-      <h2>Selecciona el tipo de liquidación:</h2>
+      <h2>Elige el tipo de liquidación:</h2>
       <div class="tipo-liquidacion-opciones">
         <button type="button" id="btn-inicio-despl" class="tipo-liquidacion-btn">Liquidación de desplazamientos</button>
         <button type="button" id="btn-inicio-congr" class="tipo-liquidacion-btn">Asistencia a congresos</button>
         <button type="button" id="btn-inicio-honor" class="tipo-liquidacion-btn">Liquidación de honorarios</button>
         <button type="button" id="btn-inicio-aecc" class="tipo-liquidacion-btn">Desplazamiento Asociación Española Contra el Cáncer</button>
-        <button type="button" id="btn-inicio-cargar" class="tipo-liquidacion-btn">Cargar datos</button>
+        <button type="button" id="btn-inicio-cargar" class="tipo-liquidacion-btn">Cargar datos guardados</button>
       </div>
     </div>
   </section>
@@ -212,7 +211,7 @@
 
             <!-- Texto informativo -->
             <p id="infoDecreto" class="info-normativa">
-              Los cálculos se efectuarán en base al Decreto 42/2005 (Junta de Extremadura).
+              Los cálculos se efectuarán en base al Decreto 42/2025 (Junta de Extremadura).
               <a href="https://doe.juntaex.es/otrosFormatos/html.php?xml=2025040078&anio=2025&doe=1010o" target="_blank"
                 rel="noopener noreferrer">
                 Ver Decreto

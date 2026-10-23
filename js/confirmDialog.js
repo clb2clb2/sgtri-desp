@@ -25,6 +25,29 @@
    *   // Proceder con la eliminación
    * }
    */
+  /**
+   * Escapa texto para insertarlo en HTML (contenido o atributo).
+   * @param {*} valor
+   * @returns {string}
+   */
+  function escapeHtml(valor) {
+    return String(valor ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Escapa un mensaje y convierte los saltos de línea en <br>.
+   * @param {*} mensaje
+   * @returns {string}
+   */
+  function mensajeHtml(mensaje) {
+    return escapeHtml(mensaje).replace(/\r?\n/g, '<br>');
+  }
+
   function showConfirm(message, options = {}) {
     return new Promise(resolve => {
       const {
@@ -39,21 +62,21 @@
       const overlay = document.createElement('div');
       overlay.className = 'confirm-overlay';
       overlay.tabIndex = -1;
-      const iconHtml = icon ? `<div class="confirm-icon">${icon}</div>` : '';
+      const iconHtml = icon ? `<div class="confirm-icon">${escapeHtml(icon)}</div>` : '';
       overlay.innerHTML = `
         <div class="confirm-dialog" role="dialog" aria-modal="true">
           ${iconHtml}
-          <div class="confirm-body">${message}</div>
+          <div class="confirm-body">${mensajeHtml(message)}</div>
           <div class="confirm-actions">
-            <button class="${confirmClass}">${confirmText}</button>
-            <button class="${cancelClass}">${cancelText}</button>
+            <button class="${escapeHtml(confirmClass)}" data-accion="confirmar">${escapeHtml(confirmText)}</button>
+            <button class="${escapeHtml(cancelClass)}" data-accion="cancelar">${escapeHtml(cancelText)}</button>
           </div>
         </div>
       `;
       document.body.appendChild(overlay);
 
-      const yesBtn = overlay.querySelector(`.${confirmClass}`);
-      const noBtn = overlay.querySelector(`.${cancelClass}`);
+      const yesBtn = overlay.querySelector('[data-accion="confirmar"]');
+      const noBtn = overlay.querySelector('[data-accion="cancelar"]');
 
       // Prevenir scroll del body
       const originalOverflow = document.body.style.overflow;
@@ -118,25 +141,6 @@
   }
 
   /**
-   * Versión simplificada para confirmaciones de eliminación.
-   * @param {string} itemName - Nombre del elemento a eliminar
-   * @returns {Promise<boolean>}
-   */
-  function confirmDelete(itemName) {
-    return showConfirm(`¿Eliminar ${itemName}?`);
-  }
-
-  /**
-   * Versión con botones personalizados para acciones genéricas.
-   * @param {string} message - Mensaje a mostrar
-   * @param {string} confirmText - Texto del botón de acción
-   * @returns {Promise<boolean>}
-   */
-  function confirmAction(message, confirmText) {
-    return showConfirm(message, { confirmText });
-  }
-
-  /**
    * Muestra un diálogo modal con un campo de entrada de texto.
    * @param {string} message - Mensaje/etiqueta a mostrar
    * @param {Object} [options] - Opciones de configuración
@@ -145,6 +149,8 @@
    * @param {string} [options.suffix=''] - Sufijo fijo (ej: extensión de archivo)
    * @param {string} [options.confirmText='Aceptar'] - Texto del botón de confirmar
    * @param {string} [options.cancelText='Cancelar'] - Texto del botón de cancelar
+   * @param {string} [options.confirmClass='btn-confirm-yes'] - Clase CSS del botón confirmar
+   * @param {string} [options.cancelClass='btn-confirm-no'] - Clase CSS del botón cancelar
    * @param {number} [options.maxLength=100] - Longitud máxima del campo
    * @returns {Promise<string|null>} Valor introducido o null si se cancela
    *
@@ -165,6 +171,8 @@
         suffix = '',
         confirmText = 'Aceptar',
         cancelText = 'Cancelar',
+        confirmClass = 'btn-confirm-yes',
+        cancelClass = 'btn-confirm-no',
         maxLength = 100
       } = options;
 
@@ -175,26 +183,26 @@
       overlay.innerHTML = `
         <div class="confirm-dialog prompt-dialog" role="dialog" aria-modal="true">
           <div class="confirm-body">
-            <label for="prompt-input">${message}</label>
+            <label for="prompt-input">${mensajeHtml(message)}</label>
             <div class="prompt-input-wrapper">
               <input type="text" id="prompt-input" class="prompt-input" 
-                     value="${defaultValue}" 
-                     placeholder="${placeholder}"
-                     maxlength="${maxLength}" />
-              ${suffix ? `<span class="prompt-suffix">${suffix}</span>` : ''}
+                     value="${escapeHtml(defaultValue)}" 
+                     placeholder="${escapeHtml(placeholder)}"
+                     maxlength="${escapeHtml(maxLength)}" />
+              ${suffix ? `<span class="prompt-suffix">${escapeHtml(suffix)}</span>` : ''}
             </div>
           </div>
           <div class="confirm-actions">
-            <button class="btn-confirm-yes">${confirmText}</button>
-            <button class="btn-confirm-no">${cancelText}</button>
+            <button class="${escapeHtml(confirmClass)}" data-accion="confirmar">${escapeHtml(confirmText)}</button>
+            <button class="${escapeHtml(cancelClass)}" data-accion="cancelar">${escapeHtml(cancelText)}</button>
           </div>
         </div>
       `;
       document.body.appendChild(overlay);
 
       const input = overlay.querySelector('#prompt-input');
-      const yesBtn = overlay.querySelector('.btn-confirm-yes');
-      const noBtn = overlay.querySelector('.btn-confirm-no');
+      const yesBtn = overlay.querySelector('[data-accion="confirmar"]');
+      const noBtn = overlay.querySelector('[data-accion="cancelar"]');
 
       // Prevenir scroll del body
       const originalOverflow = document.body.style.overflow;
@@ -274,8 +282,6 @@
 
   const confirmDialog = {
     showConfirm,
-    confirmDelete,
-    confirmAction,
     showPrompt
   };
 

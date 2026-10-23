@@ -33,45 +33,21 @@
    * Formatea número a string con 2 decimales y formato europeo.
    */
   function fmt(n) {
-    if (global.utils && typeof global.utils.fmt === 'function') {
-      return global.utils.fmt(n);
-    }
-    return (Number(n) || 0).toLocaleString('de-DE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    return global.utils.fmt(n);
   }
 
   /**
    * Parsea número con tolerancia a formatos europeos.
    */
   function parseNumber(value) {
-    if (global.utils && typeof global.utils.parseNumber === 'function') {
-      return global.utils.parseNumber(value);
-    }
-    if (typeof value === 'number') return value;
-    if (!value) return 0;
-    let s = String(value).replace(/[^0-9,.\-]/g, '');
-    const lastComma = s.lastIndexOf(',');
-    const lastDot = s.lastIndexOf('.');
-    if (lastComma > lastDot) {
-      s = s.replace(/\./g, '').replace(',', '.');
-    } else if (lastDot > lastComma) {
-      s = s.replace(/,/g, '');
-    } else if (lastComma !== -1) {
-      s = s.replace(',', '.');
-    }
-    return parseFloat(s) || 0;
+    return global.utils.parseNumber(value);
   }
 
   /**
    * Redondea a 2 decimales.
    */
   function round2(n) {
-    if (global.utils && typeof global.utils.round2 === 'function') {
-      return global.utils.round2(n);
-    }
-    return Math.round((n + Number.EPSILON) * 100) / 100;
+    return global.utils.round2(n);
   }
 
   // =========================================================================
@@ -417,7 +393,7 @@
   function actualizarResultado() {
     if (!contenedorResultado || !contenedorLineas) return;
 
-    const lineas = contenedorLineas.querySelectorAll('.esp-linea');
+    const { lineas, total, irpf } = leerLineasResultado();
     
     if (lineas.length === 0) {
       contenedorResultado.style.display = 'none';
@@ -425,56 +401,25 @@
     }
 
     contenedorResultado.style.display = 'block';
-    let html = '';
-    let totalGeneral = 0;
-
-    lineas.forEach(linea => {
-      const tipo = linea.dataset.tipo;
-      
-      if (tipo === 'seccion') {
-        const desc = linea.querySelector('.esp-desc')?.value || '';
-        if (desc.trim()) {
-          html += `<div class="calc-seg-title">${escapeHtml(desc)}</div>`;
-        }
-      } else if (tipo === 'normal') {
-        const desc = linea.querySelector('.esp-desc')?.value || '';
-        const importe = parseNumber(linea.querySelector('.esp-importe')?.value);
-        const cantidad = parseNumber(linea.querySelector('.esp-cantidad')?.value);
-        const total = parseNumber(linea.querySelector('.esp-total')?.value);
-
-        totalGeneral += total;
-
-        // Construir label
-        let labelText = escapeHtml(desc);
-        if (importe !== 0 || cantidad !== 0) {
-          const importeStr = fmt(importe);
-          const cantidadStr = cantidad !== 0 ? formatCantidadDisplay(cantidad) : '';
-          if (cantidadStr) {
-            labelText += ` <span class="esp-calc-formula">[${importeStr} × ${cantidadStr}]</span>`;
-          }
-        }
-
-        html += `<div class="calc-line">
-          <span class="label">${labelText}</span>
+    let html = lineas.map(l => l.tipo === 'seccion'
+      ? `<div class="calc-seg-title">${l.labelHtml}</div>`
+      : `<div class="calc-line">
+          <span class="label">${l.labelHtml}</span>
           <span class="leader"></span>
-          <span class="amount">${fmt(total)} €</span>
-        </div>`;
-      }
-    });
+          <span class="amount">${fmt(l.total)} €</span>
+        </div>`).join('');
 
     // Total general
     html += `<div class="calc-total">
       <span class="label">Total:</span>
-      <span class="amount"><strong>${fmt(totalGeneral)} €</strong></span>
+      <span class="amount"><strong>${fmt(total)} €</strong></span>
     </div>`;
 
     // Retención IRPF (si tiene valor)
-    const irpfInput = document.getElementById('esp-irpf');
-    const irpfValue = irpfInput ? parseNumber(irpfInput.value) : 0;
-    if (irpfValue !== 0) {
+    if (irpf !== 0) {
       html += `<div class="calc-irpf">
         <span class="label">Sujeto a retención por IRPF:</span>
-        <span class="amount">${fmt(irpfValue)} €</span>
+        <span class="amount">${fmt(irpf)} €</span>
       </div>`;
     }
 
@@ -484,6 +429,40 @@
     if (global.resultadoLiquidacion?.renderResultado) {
       global.resultadoLiquidacion.renderResultado();
     }
+  }
+
+  /**
+   * Lee las líneas de la ficha especial para mostrarlas en un resultado.
+   * Las secciones sin descripción se omiten.
+   * @returns {{lineas: Array<{tipo: string, labelHtml: string, total: number}>, total: number, irpf: number}}
+   */
+  function leerLineasResultado() {
+    const lineas = [];
+    let total = 0;
+
+    contenedorLineas.querySelectorAll('.esp-linea').forEach(linea => {
+      const tipo = linea.dataset.tipo;
+      const desc = linea.querySelector('.esp-desc')?.value || '';
+
+      if (tipo === 'seccion') {
+        if (desc.trim()) lineas.push({ tipo, labelHtml: escapeHtml(desc), total: 0 });
+      } else if (tipo === 'normal') {
+        const importe = parseNumber(linea.querySelector('.esp-importe')?.value);
+        const cantidad = parseNumber(linea.querySelector('.esp-cantidad')?.value);
+        const totalLinea = parseNumber(linea.querySelector('.esp-total')?.value);
+        total += totalLinea;
+
+        let labelHtml = escapeHtml(desc);
+        if (cantidad !== 0) {
+          labelHtml += ` <span class="esp-calc-formula">[${fmt(importe)} × ${formatCantidadDisplay(cantidad)}]</span>`;
+        }
+        lineas.push({ tipo, labelHtml, total: totalLinea });
+      }
+    });
+
+    const irpfInput = document.getElementById('esp-irpf');
+    const irpf = irpfInput ? parseNumber(irpfInput.value) : 0;
+    return { lineas, total, irpf };
   }
 
   /**
@@ -812,55 +791,21 @@
    */
   function getDatosParaLiquidacion() {
     if (!especialCreado || !contenedorLineas) return null;
+    if (contenedorLineas.querySelectorAll('.esp-linea').length === 0) return null;
 
-    const lineas = contenedorLineas.querySelectorAll('.esp-linea');
-    if (lineas.length === 0) return null;
-
-    const lineasHtml = [];
-    let totalGeneral = 0;
-
-    lineas.forEach(linea => {
-      const tipo = linea.dataset.tipo;
-      
-      if (tipo === 'seccion') {
-        const desc = linea.querySelector('.esp-desc')?.value || '';
-        if (desc.trim()) {
-          lineasHtml.push(`<div class="calc-seg-title">${escapeHtml(desc)}</div>`);
-        }
-      } else if (tipo === 'normal') {
-        const desc = linea.querySelector('.esp-desc')?.value || '';
-        const importe = parseNumber(linea.querySelector('.esp-importe')?.value);
-        const cantidad = parseNumber(linea.querySelector('.esp-cantidad')?.value);
-        const total = parseNumber(linea.querySelector('.esp-total')?.value);
-
-        totalGeneral += total;
-
-        // Construir label
-        let labelText = escapeHtml(desc);
-        if (importe !== 0 || cantidad !== 0) {
-          const importeStr = fmt(importe);
-          const cantidadStr = cantidad !== 0 ? formatCantidadDisplay(cantidad) : '';
-          if (cantidadStr) {
-            labelText += ` <span class="esp-calc-formula">[${importeStr} × ${cantidadStr}]</span>`;
-          }
-        }
-
-        lineasHtml.push(`<div class="resultado-line">
-          <span class="resultado-label">${labelText}</span>
+    const { lineas, total, irpf } = leerLineasResultado();
+    const lineasHtml = lineas.map(l => l.tipo === 'seccion'
+      ? `<div class="calc-seg-title">${l.labelHtml}</div>`
+      : `<div class="resultado-line">
+          <span class="resultado-label">${l.labelHtml}</span>
           <span class="resultado-leader" aria-hidden="true"></span>
-          <span class="resultado-amount">${fmt(total)} €</span>
+          <span class="resultado-amount">${fmt(l.total)} €</span>
         </div>`);
-      }
-    });
-
-    // Obtener IRPF
-    const irpfInput = document.getElementById('esp-irpf');
-    const irpfValue = irpfInput ? parseNumber(irpfInput.value) : 0;
 
     return {
       lineasHtml,
-      total: round2(totalGeneral),
-      irpf: round2(irpfValue)
+      total: round2(total),
+      irpf: round2(irpf)
     };
   }
 

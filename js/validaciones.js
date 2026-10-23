@@ -165,9 +165,7 @@
 
       // Determinar si es internacional
       const paisEl = desp.querySelector(`#pais-destino-${id}`);
-      const isInternational = paisEl && paisEl.value && 
-                              String(paisEl.value).trim() !== '' && 
-                              String(paisEl.value).trim() !== 'España';
+      const isInternational = !!paisEl && global.utils.esPaisInternacional(paisEl.value);
 
       // Si no hay campos de cruce y no es internacional, OK
       if (!cruceIdEl || !cruceVueltaEl) {
@@ -228,10 +226,7 @@
       }
 
       // Validar orden: fechaId <= cruceId <= cruceVuelta <= fechaRegreso
-      let orderingOk = true;
-      if (fId && cId && cId < fId) orderingOk = false;
-      if (fReg && cV && cV > fReg) orderingOk = false;
-      if (cId && cV && cV < cId) orderingOk = false;
+      const orderingOk = global.utils.ordenCrucesValido(fId, cId, cV, fReg);
 
       if (!orderingOk) {
         [cruceIdEl, cruceVueltaEl].forEach(n => n && n.classList && n.classList.add('field-error'));
@@ -424,19 +419,6 @@
   }
 
   // =========================================================================
-  // INICIALIZACIÓN DE LISTENERS
-  // =========================================================================
-
-  /**
-   * Inicializa los listeners globales de validación.
-   * Se llama automáticamente al cargar el módulo.
-   */
-  function init() {
-    // Los handlers se adjuntan via delegación en formLogic.js para evitar duplicados
-    // Este método puede usarse para re-inicializar si es necesario
-  }
-
-  // =========================================================================
   // EXPORTACIÓN
   // =========================================================================
 
@@ -451,10 +433,7 @@
     handleHoraKeydown,
 
     // Helpers
-    sumNonManutencionAmounts,
-
-    // Inicialización
-    init
+    sumNonManutencionAmounts
   };
 
   global.validaciones = validaciones;

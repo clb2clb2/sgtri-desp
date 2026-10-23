@@ -246,10 +246,8 @@
       }
 
       // Orden: fechaIda <= cruceIda <= cruceVuelta <= fechaRegreso
-      if (cId && cV) {
-        if (fId && cId < fId) hasError = true;
-        if (fReg && cV > fReg) hasError = true;
-        if (cV < cId) hasError = true;
+      if (cId && cV && !global.utils.ordenCrucesValido(fId, cId, cV, fReg)) {
+        hasError = true;
       }
 
       // Actualizar clases visuales
@@ -272,19 +270,12 @@
   // =========================================================================
 
   function parseDateStrict(v) {
-    if (!v) return null;
-    const parts = String(v).split('/');
-    if (parts.length !== 3) return null;
-    const d = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10) - 1;
-    const y = 2000 + parseInt(parts[2], 10);
-    const dt = new Date(y, m, d);
-    return isNaN(dt.getTime()) ? null : dt;
+    return global.limpiaDatos.parseDateStrict(v);
   }
 
   function shouldShowTicketCena(tipoProyecto, horaRegreso) {
     try {
-      const esRD462 = ['G24', 'PEI', 'NAL'].includes(tipoProyecto);
+      const esRD462 = global.utils.getNormativa(tipoProyecto) === 'rd';
       if (!esRD462 || !horaRegreso) return false;
       const m = horaRegreso.match(/^(\d{1,2}):(\d{2})$/);
       if (!m) return false;
@@ -297,37 +288,17 @@
     }
   }
 
-  function shouldShowJustificarPernocta(horaRegreso) {
-    try {
-      if (!horaRegreso) return false;
-      const m = horaRegreso.match(/^(\d{1,2}):(\d{2})$/);
-      if (!m) return false;
-      const hh = parseInt(m[1], 10);
-      return hh >= 1 && hh < 7;
-    } catch (e) { 
-      return false; 
-    }
-  }
-
   function isInternationalCountry(pais) {
-    return pais && String(pais).trim() !== '' && String(pais).trim() !== 'España';
+    return global.utils.esPaisInternacional(pais);
   }
 
   function validateFechaOrden(fechaIda, horaIda, fechaReg, horaReg) {
     try {
       function parse(d, h) {
-        if (!d) return null;
-        const parts = String(d).split('/');
-        if (parts.length !== 3) return null;
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const year = 2000 + parseInt(parts[2], 10);
-        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-        const date = new Date(year, month, day);
-        if (h && /^(\d{1,2}):(\d{2})$/.test(h)) {
-          const [hh, mm] = h.split(':').map(n => parseInt(n, 10));
-          date.setHours(hh, mm, 0, 0);
-        }
+        const date = parseDateStrict(d);
+        if (!date) return null;
+        const t = global.limpiaDatos.parseTimeStrict(h);
+        if (t) date.setHours(t.hh, t.mm, 0, 0);
         return date;
       }
       
@@ -353,7 +324,6 @@
     recalcularFicha,
     recalcularTodas,
     shouldShowTicketCena,
-    shouldShowJustificarPernocta,
     isInternationalCountry,
     validateFechaOrden,
     // Mantener compatibilidad con código existente

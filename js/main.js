@@ -81,8 +81,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Handler de toggle
         function toggle() {
-            const isCollapsed = wrapper.classList.contains('collapsed') || 
-                               wrapper.style.maxHeight === '0px';
+            // La clase es la fuente de verdad: maxHeight puede ser 0px en una sección abierta
+            // si se calculó con el formulario aún oculto (scrollHeight = 0)
+            const isCollapsed = wrapper.classList.contains('collapsed');
             if (isCollapsed) {
                 openSection(wrapper, icon, title);
                 wrapper.setAttribute('aria-hidden', 'false');
@@ -168,24 +169,5 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     } catch (e) {
         console.warn('Error al inicializar uiImputacion:', e);
-    }
-
-    // Ejecutar cálculo inicial por cada desplazamiento
-    try {
-        const grupos = document.querySelectorAll('.desplazamiento-grupo');
-        grupos.forEach(desp => {
-            if (window.calculoDesp?.calculaDesplazamientoFicha) {
-                // Usar requestAnimationFrame para esperar al siguiente frame de renderizado
-                requestAnimationFrame(() => {
-                    try { 
-                        window.calculoDesp.calculaDesplazamientoFicha(desp); 
-                    } catch (e) {
-                        console.warn('Error en cálculo inicial de desplazamiento:', e);
-                    }
-                });
-            }
-        });
-    } catch (e) {
-        console.warn('Error al procesar desplazamientos iniciales:', e);
     }
 });

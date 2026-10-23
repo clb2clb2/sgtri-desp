@@ -174,10 +174,7 @@
     const tipoValor = tipoSelect ? tipoSelect.value : '';
     const tipoNombre = tipoSelect ? tipoSelect.options[tipoSelect.selectedIndex]?.text : '';
     
-    // Determinar normativa aplicable según tipo de proyecto
-    const datos = window.__sgtriDatos;
-    const rdList = (datos && datos.normativasPorTipoProyecto && datos.normativasPorTipoProyecto.rd) || [];
-    const normativa = rdList.includes(tipoValor) ? 'rd' : 'decreto';
+    const normativa = global.utils.getNormativa(tipoValor);
     
     return {
       tipo: tipoValor,
@@ -303,8 +300,7 @@
       tipo: tipoVehiculo.value,
       marca: obtenerValorCampo('veh-marca'),
       modelo: obtenerValorCampo('veh-modelo'),
-      matricula: obtenerValorCampo('veh-matricula'),
-      justificarPernocta: obtenerValorCampo('justificar-pernocta', 'checkbox')
+      matricula: obtenerValorCampo('veh-matricula')
     };
   }
 
@@ -346,7 +342,10 @@
   function recopilarAjustes() {
     const ajustes = {
       financiacionMaxima: obtenerValorCampo('financiacion-maxima'),
-      importeAnticipado: obtenerValorCampo('importe-anticipado'),
+      // El anticipo solo aplica en GNRAL (ver uiAjustes.actualizarVisibilidadImporteAnticipado)
+      importeAnticipado: global.tipoLiquidacion?.getTipoActual?.() === 'GNRAL'
+        ? obtenerValorCampo('importe-anticipado')
+        : '',
       comentarios: normalizarComentarios(obtenerValorCampo('comentarios-liquidacion')),
       descuentos: []
     };
@@ -471,10 +470,7 @@
    * @returns {number}
    */
   function parseEuroStr(val) {
-    if (typeof val === 'number') return val;
-    if (!val || typeof val !== 'string') return 0;
-    const cleaned = val.replace(/€/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
-    return Number(cleaned) || 0;
+    return global.utils.parseNumber(val);
   }
 
   /**
@@ -771,7 +767,6 @@
       establecerValorCampo('veh-marca', datos.marca);
       establecerValorCampo('veh-modelo', datos.modelo);
       establecerValorCampo('veh-matricula', datos.matricula);
-      establecerValorCampo('justificar-pernocta', datos.justificarPernocta, 'checkbox');
     }, delay);
   }
 
@@ -913,7 +908,7 @@
    * @returns {boolean}
    */
   function seccionTieneContenido(sectionId, datos) {
-    if (sectionId === 'evento' || sectionId === 'congresos') {
+    if (sectionId === 'evento') {
       const e = datos.evento;
       return e && (e.nombre || e.lugar || e.fechaDesde || e.fechaHasta || e.gastosInscripcion);
     }
@@ -980,25 +975,14 @@
   }
 
   /**
-   * Restaura los datos del resultado de la liquidación.
-   * Nota: Los valores son calculados automáticamente, esta función es un placeholder.
-   * @param {Object} datos
-   */
-  function restaurarResultadoLiquidacion(datos) {
-    // Los valores de resultado de liquidación se calculan automáticamente
-    // por resultadoLiquidacion.js cuando se actualiza cualquier campo
-    // Esta función es un placeholder para mantener consistencia
-  }
-
-  /**
    * Restaura todos los datos del formulario
    * @param {Object} datos - Objeto con todos los datos
-   * @returns {Promise<boolean>} true si se restauró correctamente
+   * @returns {Promise<{ok: boolean, cargaParcial: boolean, motivo?: string, cancelado?: boolean}>}
    */
   async function restaurarTodo(datos) {
     if (!datos) {
       console.error('[serializacionDatos] No hay datos para restaurar');
-      return { ok: false, cargaParcial: false };
+      return { ok: false, cargaParcial: false, motivo: 'El archivo no contiene datos.' };
     }
 
     // Verificar versión del esquema
@@ -1010,7 +994,7 @@
         `Aplicación: ${VERSION_ESQUEMA}\n\n` +
         `¿Desea intentar cargarlo de todos modos?`
       );
-      if (!continuar) return { ok: false, cargaParcial: false };
+      if (!continuar) return { ok: false, cargaParcial: false, cancelado: true };
     }
 
     const tipoArchivo = normalizarTipoLiquidacion(datos.tipoLiquidacion);
@@ -1027,12 +1011,13 @@
     // se mantiene el modo actual y se restauran solo secciones compatibles.
     if (tipoDistinto) {
       restaurarBeneficiario(datos.beneficiario);
-      if (tipoArchivo !== 'AECC') {
+      const restaurarProyectoParcial = tipoArchivo !== 'AECC' && tipoActual !== 'AECC';
+      if (restaurarProyectoParcial) {
         restaurarProyecto(datos.proyecto);
       }
 
       const nombreTipoArchivo = obtenerNombreTipoLiquidacion(tipoArchivo);
-      if (tipoArchivo === 'AECC') {
+      if (!restaurarProyectoParcial) {
         alert(`La liquidacion cargada es de tipo "${nombreTipoArchivo}". Solamente se cargaron los datos de beneficiario.`);
       } else {
         alert(`La liquidacion cargada es de tipo "${nombreTipoArchivo}". Solamente se cargaron los datos de beneficiario y proyecto.`);
@@ -1043,19 +1028,16 @@
 
     if ((tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR') &&
         Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 1) {
-      alert('El archivo no es compatible con este tipo de liquidación: contiene más de un desplazamiento.');
-      return { ok: false, cargaParcial: false };
+      return { ok: false, cargaParcial: false, motivo: 'El archivo no es compatible con este tipo de liquidación: contiene más de un desplazamiento.' };
     }
 
     if (tipoArchivo === 'AECC' && Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 0) {
-      alert('El archivo no es compatible con este tipo de liquidación: incluye desplazamientos.');
-      return { ok: false, cargaParcial: false };
+      return { ok: false, cargaParcial: false, motivo: 'El archivo no es compatible con este tipo de liquidación: incluye desplazamientos.' };
     }
 
     const tieneAECC = Array.isArray(datos.desplazamientoAECC) && datos.desplazamientoAECC.length > 0;
     if ((tipoArchivo === 'DESPL' || tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR') && tieneAECC) {
-      alert('El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento AECC.');
-      return { ok: false, cargaParcial: false };
+      return { ok: false, cargaParcial: false, motivo: 'El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento AECC.' };
     }
 
     const tieneEspecial = !!(datos.desplazamientoEspecial &&
@@ -1063,8 +1045,7 @@
       datos.desplazamientoEspecial.lineas.length > 0);
 
     if ((tipoArchivo === 'DESPL' || tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR' || tipoArchivo === 'AECC') && tieneEspecial) {
-      alert('El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento especial.');
-      return { ok: false, cargaParcial: false };
+      return { ok: false, cargaParcial: false, motivo: 'El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento especial.' };
     }
 
     if (global.tipoLiquidacion?.aplicarModoDesdeArchivo) {
@@ -1102,8 +1083,7 @@
       global.uiDesplazamientoEspecial.restaurarDatos(datos.desplazamientoEspecial);
     }
 
-    // Restaurar resultado de liquidación (recalculará automáticamente)
-    restaurarResultadoLiquidacion(datos.resultadoLiquidacion);
+    // resultadoLiquidacion no se restaura: se recalcula a partir de los datos restaurados
 
     // Restaurar fecha de firma
     restaurarFechaFirma(datos.fechaFirma);
@@ -1182,6 +1162,7 @@
       defaultValue: nombreSinExt,
       suffix: '.dta',
       confirmText: 'Guardar',
+      confirmClass: 'btn-message-ok',
       cancelText: 'Cancelar',
       maxLength: 80
     });
@@ -1213,7 +1194,7 @@
   /**
    * Importa datos desde un archivo .dta
    * @param {File} archivo - Archivo seleccionado
-   * @returns {Promise<boolean>}
+   * @returns {Promise<{ok: boolean, cargaParcial: boolean, motivo?: string, cancelado?: boolean}>}
    */
   function importarArchivo(archivo) {
     return new Promise((resolve, reject) => {
@@ -1225,7 +1206,7 @@
       // Verificar extensión (.dta o .json para compatibilidad con Android)
       const nombreLower = archivo.name.toLowerCase();
       if (!nombreLower.endsWith('.dta') && !nombreLower.endsWith('.json')) {
-        reject(new Error('El archivo debe tener extensión .dta o .json'));
+        reject(new Error('El archivo debe tener extensión .dta'));
         return;
       }
 
@@ -1250,6 +1231,16 @@
   }
 
   /**
+   * Compone el mensaje de error de carga, con el motivo si se conoce
+   * @param {string} [motivo]
+   * @returns {string}
+   */
+  function mensajeFalloCarga(motivo) {
+    const base = 'Falló la carga de datos guardados.';
+    return motivo ? `${base}\n\n${motivo}` : base;
+  }
+
+  /**
    * Abre el diálogo de selección de archivo para importar
    */
   function abrirDialogoImportar() {
@@ -1266,11 +1257,11 @@
             if (!resultado.cargaParcial) {
               alert('Datos cargados correctamente');
             }
-          } else if (resultado === true) {
-            alert('Datos cargados correctamente');
+          } else if (!resultado || !resultado.cancelado) {
+            alert(mensajeFalloCarga(resultado && resultado.motivo));
           }
         } catch (error) {
-          alert(`Error: ${error.message}`);
+          alert(mensajeFalloCarga(error.message));
         }
       }
     };

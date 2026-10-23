@@ -176,6 +176,13 @@
     const esEspecial = t === 'GNRAL';
     row.classList.toggle('app-hidden', !esEspecial);
 
+    // Fuera de GNRAL el anticipo no aplica: vaciarlo para que no llegue al .dta ni al PDF
+    if (!esEspecial) {
+      const input = document.getElementById('importe-anticipado');
+      if (input) input.value = '';
+      global.resultadoLiquidacion?.actualizarImporteAnticipado?.();
+    }
+
     if (global.resultadoLiquidacion?.renderResultado) {
       global.resultadoLiquidacion.renderResultado();
     }

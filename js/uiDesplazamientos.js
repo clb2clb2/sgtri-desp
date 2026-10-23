@@ -238,7 +238,7 @@
 
     if (!paisSelect || !fronterasFields) return;
 
-    if (paisSelect.value !== 'España') {
+    if (global.utils.esPaisInternacional(paisSelect.value)) {
       fronterasFields.style.display = 'block';
       if (cruceIda) cruceIda.required = true;
       if (cruceVuelta) cruceVuelta.required = true;
@@ -293,7 +293,7 @@
   function actualizarTicketCena() {
     const tipoProyecto = document.getElementById('tipoProyecto');
     const tipoProyectoValor = tipoProyecto ? tipoProyecto.value : '';
-    const esRD462 = ['G24', 'PEI', 'NAL'].includes(tipoProyectoValor);
+    const esRD462 = global.utils.getNormativa(tipoProyectoValor) === 'rd';
 
     document.querySelectorAll('.desplazamiento-grupo').forEach(desp => {
       const id = desp.dataset.desplazamientoId;
@@ -327,14 +327,12 @@
   // =========================================================================
 
   /**
-   * Crea una línea de "otros gastos" dentro de una ficha de desplazamiento.
-   * @param {HTMLElement} despEl - Elemento del desplazamiento
-   * @returns {HTMLElement|null} La línea creada
+   * Construye (sin insertarla) una línea de "otros gastos": tipo, descripción, importe y botón eliminar.
+   * La usan las fichas normales y la ficha AECC.
+   * @param {Array<[string, string]>} catalogo - Pares [etiqueta, código] para el select de tipo
+   * @returns {HTMLElement}
    */
-  function crearLineaOtroGasto(despEl) {
-    const cont = despEl.querySelector('.otros-gastos-container');
-    if (!cont) return null;
-
+  function construirLineaOtroGasto(catalogo) {
     const linea = document.createElement('div');
     linea.className = 'otros-gasto-line form-row three-cols-25-50-25';
 
@@ -396,16 +394,26 @@
     linea.appendChild(colDesc);
     linea.appendChild(colImporte);
 
-    // Poblar el select desde los datos cargados
-    const otrosGastos = (global.utils?.getSgtriDatos()?.otrosGastos) || 
-                        (global.__sgtriDatos?.otrosGastos) || [];
-    otrosGastos.forEach(item => {
+    (catalogo || []).forEach(item => {
       const opt = document.createElement('option');
-      opt.value = item[1] || item[0];
-      opt.textContent = item[0];
+      opt.value = item[1] || item[0] || '';
+      opt.textContent = item[0] || item[1] || '';
       selectTipo.appendChild(opt);
     });
 
+    return linea;
+  }
+
+  /**
+   * Crea una línea de "otros gastos" dentro de una ficha de desplazamiento.
+   * @param {HTMLElement} despEl - Elemento del desplazamiento
+   * @returns {HTMLElement|null} La línea creada
+   */
+  function crearLineaOtroGasto(despEl) {
+    const cont = despEl.querySelector('.otros-gastos-container');
+    if (!cont) return null;
+
+    const linea = construirLineaOtroGasto(global.utils.getSgtriDatos().otrosGastos);
     cont.appendChild(linea);
     
     // Actualizar visibilidad del botón añadir otros gastos
@@ -440,10 +448,6 @@
     const nuevoDesplazamiento = document.createElement('div');
     nuevoDesplazamiento.className = 'desplazamiento-grupo';
     nuevoDesplazamiento.dataset.desplazamientoId = desplazamientoCounter;
-
-    const tipoProyecto = document.getElementById('tipoProyecto');
-    const tipoProyectoValor = tipoProyecto ? tipoProyecto.value : '';
-    const mostrarTicketCena = ['G24', 'PEI', 'NAL'].includes(tipoProyectoValor);
 
     nuevoDesplazamiento.innerHTML = `
       <h3 class="desplazamiento-titulo">Desplazamiento ${desplazamientoCounter}</h3>
@@ -768,8 +772,6 @@
     const nodes = desp.querySelectorAll(selector);
 
     nodes.forEach(n => {
-      n.addEventListener('input', () => { /* no recalc on input */ });
-
       if (n.tagName === 'SELECT') {
         if (n.id && n.id.indexOf('pais-destino-') === 0) {
           n.addEventListener('change', () => {
@@ -794,7 +796,6 @@
           });
         }
       } else {
-        n.addEventListener('change', () => { /* defer to blur */ });
         n.addEventListener('blur', () => {
           if (val.validateDateTimePairAndUpdateUI) val.validateDateTimePairAndUpdateUI(id);
           actualizarTicketCena();
@@ -818,12 +819,6 @@
         if (val.validateDateTimePairAndUpdateUI) val.validateDateTimePairAndUpdateUI(id);
         actualizarTicketCena();
       });
-    }
-
-    // Watch no-manutencion checkbox
-    const noManut = desp.querySelector(`#no-manutencion-${id}`);
-    if (noManut) {
-      noManut.addEventListener('change', () => { /* handled by logicaDesp */ });
     }
 
     // Cálculo inicial
@@ -996,6 +991,7 @@
     actualizarNumerosDesplazamientos,
     eliminarDesplazamiento,
     crearLineaOtroGasto,
+    construirLineaOtroGasto,
 
     // Límites
     actualizarBotonAddDesplazamiento,

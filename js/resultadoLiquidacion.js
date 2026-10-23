@@ -144,13 +144,7 @@
    * Delega a utils.fmt si está disponible.
    */
   function fmt(n) {
-    if (global.utils && typeof global.utils.fmt === 'function') {
-      return global.utils.fmt(n);
-    }
-    return (Number(n) || 0).toLocaleString('de-DE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    return global.utils.fmt(n);
   }
 
   /**
@@ -158,23 +152,7 @@
    * Delega a utils.parseNumber si está disponible.
    */
   function parseNumber(value) {
-    if (global.utils && typeof global.utils.parseNumber === 'function') {
-      return global.utils.parseNumber(value);
-    }
-    // Fallback
-    if (typeof value === 'number') return value;
-    if (!value) return 0;
-    let s = String(value).replace(/[^0-9,.\-]/g, '');
-    const lastComma = s.lastIndexOf(',');
-    const lastDot = s.lastIndexOf('.');
-    if (lastComma > lastDot) {
-      s = s.replace(/\./g, '').replace(',', '.');
-    } else if (lastDot > lastComma) {
-      s = s.replace(/,/g, '');
-    } else if (lastComma !== -1) {
-      s = s.replace(',', '.');
-    }
-    return parseFloat(s) || 0;
+    return global.utils.parseNumber(value);
   }
 
   /**
@@ -182,10 +160,7 @@
    * Delega a utils.round2 si está disponible.
    */
   function round2(n) {
-    if (global.utils && typeof global.utils.round2 === 'function') {
-      return global.utils.round2(n);
-    }
-    return Math.round((n + Number.EPSILON) * 100) / 100;
+    return global.utils.round2(n);
   }
 
   /**
@@ -193,14 +168,7 @@
    * Delega a utils.debounce si está disponible.
    */
   function debounce(fn, delay) {
-    if (global.utils && typeof global.utils.debounce === 'function') {
-      return global.utils.debounce(fn, delay);
-    }
-    let timeout;
-    return function(...args) {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => fn.apply(this, args), delay);
-    };
+    return global.utils.debounce(fn, delay);
   }
 
   // =========================================================================
@@ -644,6 +612,10 @@
 
     if (!hayContenido) {
       container.innerHTML = '<div class="resultado-empty">Complete los datos del formulario para ver el resultado.</div>';
+      // La imputación debe reflejar también el total a 0
+      if (global.uiImputacion && typeof global.uiImputacion.actualizar === 'function') {
+        global.uiImputacion.actualizar();
+      }
       return;
     }
 

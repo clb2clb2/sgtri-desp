@@ -5,13 +5,9 @@
  * Renderiza los campos IBAN, SWIFT o Tarjeta según el tipo de pago seleccionado.
  *
  * @module uiPagos
- * @requires limpiaDatos
  */
 (function (global) {
   'use strict';
-
-  // Dependencias
-  const ld = global.limpiaDatos || {};
 
   // =========================================================================
   // RENDERIZADO DE CAMPOS DE PAGO
@@ -119,18 +115,7 @@
         </label>
         <input type="text" id="numero-tarjeta" name="numero-tarjeta" class="card-number" maxlength="23" />
       `;
-      // Aplicar formateo agrupado
-      setTimeout(() => {
-        const cardEl = document.getElementById('numero-tarjeta');
-        if (cardEl && ld.processGroupedInput) {
-          ld.processGroupedInput(cardEl, {
-            groupSize: 4,
-            sep: ' ',
-            maxRawLen: 19,
-            validPattern: '\\d'
-          });
-        }
-      }, 10);
+      // El formateo agrupado (4 dígitos) lo aplica el listener 'input' global de formLogic.js
       return;
     }
 

@@ -204,6 +204,26 @@
   }
 
   /**
+   * Comprueba los dígitos de control de un IBAN (módulo 97, ISO 13616).
+   * @param {string} iban - IBAN sin espacios, en mayúsculas
+   * @returns {boolean}
+   */
+  function ibanMod97Valido(iban) {
+    // Mover los 4 primeros caracteres al final y convertir letras a números (A=10 … Z=35)
+    const reordenado = iban.substring(4) + iban.substring(0, 4);
+    let numerico = '';
+    for (const char of reordenado) {
+      numerico += /[0-9]/.test(char) ? char : (char.charCodeAt(0) - 55).toString();
+    }
+    // Módulo 97 por partes para evitar overflow
+    let resto = 0;
+    for (let i = 0; i < numerico.length; i++) {
+      resto = (resto * 10 + parseInt(numerico[i], 10)) % 97;
+    }
+    return resto === 1;
+  }
+
+  /**
    * Parsea una fecha en formato dd/mm/aa o d/m/aa (permisivo).
    * @param {string} ddmmaa - Fecha en formato dd/mm/aa o variantes
    * @returns {Date|null} Objeto Date o null si inválida
@@ -268,30 +288,7 @@
    * @returns {number} Número parseado (0 si no es válido)
    */
   function parseNumber(str) {
-    // Usar utils.parseNumber si está disponible
-    if (global.utils && typeof global.utils.parseNumber === 'function') {
-      return global.utils.parseNumber(str);
-    }
-    // Fallback para compatibilidad
-    if (!str && str !== 0) return 0;
-    try {
-      const s = String(str || '').trim();
-      if (s === '') return 0;
-      let cleaned = s.replace(/€/g, '').replace(/km/g, '').replace(/\s/g, '');
-      if (/,/.test(cleaned) && /\./.test(cleaned)) {
-        cleaned = cleaned.replace(/\./g, '');
-      } else if (/\./.test(cleaned) && !/,/.test(cleaned)) {
-        if (/\.\d{3}(?!\d)/.test(cleaned)) {
-          cleaned = cleaned.replace(/\./g, '');
-        }
-      }
-      cleaned = cleaned.replace(/,/g, '.');
-      cleaned = cleaned.replace(/[^0-9.\-]/g, '');
-      const n = parseFloat(cleaned);
-      return isNaN(n) ? 0 : n;
-    } catch (e) {
-      return 0;
-    }
+    return global.utils.parseNumber(str);
   }
 
   // =========================================================================
@@ -348,6 +345,7 @@
 
     // Parsers de fecha/hora
     isValidDate,
+    ibanMod97Valido,
     parseDateStrict,
     parseTimeStrict,
     formatFechaValue,

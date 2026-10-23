@@ -63,26 +63,23 @@
   }
 
   function parseDateStrict(v) {
-    return global.limpiaDatos?.parseDateStrict ? global.limpiaDatos.parseDateStrict(v) : null;
+    return global.limpiaDatos.parseDateStrict(v);
   }
 
   function parseTimeStrict(v) {
-    return global.limpiaDatos?.parseTimeStrict ? global.limpiaDatos.parseTimeStrict(v) : null;
+    return global.limpiaDatos.parseTimeStrict(v);
   }
 
   function parseNumber(v) {
-    return global.limpiaDatos?.parseNumber ? global.limpiaDatos.parseNumber(v) : 0;
+    return global.utils.parseNumber(v);
   }
 
   function round2(n) {
-    return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+    return global.utils.round2(n);
   }
 
   function fmtEuro(n) {
-    return (Number(n) || 0).toLocaleString('de-DE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }) + ' €';
+    return global.utils.fmt(n) + ' €';
   }
 
   function fmtEuroCompact(n) {
@@ -477,71 +474,7 @@
     const cont = getOtrosGastosContainerAecc();
     if (!cont) return null;
 
-    const line = document.createElement('div');
-    line.className = 'otros-gasto-line form-row three-cols-25-50-25';
-
-    const colTipo = document.createElement('div');
-    colTipo.className = 'form-group';
-    const labelTipo = document.createElement('label');
-    labelTipo.textContent = 'Tipo de gasto:';
-    const selectTipo = document.createElement('select');
-    selectTipo.className = 'otros-gasto-tipo';
-    selectTipo.setAttribute('aria-label', 'Tipo de gasto');
-    colTipo.appendChild(labelTipo);
-    colTipo.appendChild(selectTipo);
-
-    const colDesc = document.createElement('div');
-    colDesc.className = 'form-group';
-    const labelDesc = document.createElement('label');
-    labelDesc.textContent = 'Descripción:';
-    const inputDesc = document.createElement('input');
-    inputDesc.type = 'text';
-    inputDesc.className = 'otros-gasto-desc';
-    inputDesc.maxLength = 60;
-    inputDesc.setAttribute('aria-label', 'Descripción del gasto');
-    colDesc.appendChild(labelDesc);
-    colDesc.appendChild(inputDesc);
-
-    const colImp = document.createElement('div');
-    colImp.className = 'form-group';
-    const labelImp = document.createElement('label');
-    labelImp.textContent = 'Importe:';
-    const wrap = document.createElement('div');
-    wrap.style.display = 'flex';
-    wrap.style.alignItems = 'center';
-    wrap.style.gap = '0.5rem';
-    const inputImp = document.createElement('input');
-    inputImp.type = 'text';
-    inputImp.className = 'format-alojamiento otros-gasto-importe';
-    inputImp.placeholder = '0,00 €';
-    inputImp.maxLength = 12;
-    inputImp.setAttribute('aria-label', 'Importe del gasto');
-    const btnRemove = document.createElement('button');
-    btnRemove.type = 'button';
-    btnRemove.className = 'btn-remove-otros-gasto';
-    btnRemove.setAttribute('aria-label', 'Eliminar otro gasto');
-    const spanIcon = document.createElement('span');
-    spanIcon.className = 'btn-icon btn-icon-minus';
-    spanIcon.setAttribute('aria-hidden', 'true');
-    spanIcon.textContent = '+';
-    btnRemove.appendChild(spanIcon);
-
-    wrap.appendChild(inputImp);
-    wrap.appendChild(btnRemove);
-    colImp.appendChild(labelImp);
-    colImp.appendChild(wrap);
-
-    line.appendChild(colTipo);
-    line.appendChild(colDesc);
-    line.appendChild(colImp);
-
-    const catalogo = getOtrosGastosDataCatalogo();
-    catalogo.forEach((item) => {
-      const opt = document.createElement('option');
-      opt.value = item[1] || item[0] || '';
-      opt.textContent = item[0] || item[1] || '';
-      selectTipo.appendChild(opt);
-    });
+    const line = global.uiDesplazamientos.construirLineaOtroGasto(getOtrosGastosDataCatalogo());
 
     cont.appendChild(line);
     cont.style.display = 'block';
@@ -1237,7 +1170,8 @@
     reset,
     obtenerDatos,
     obtenerDatosSerializacion,
-    restaurarDatos
+    restaurarDatos,
+    getCatalogoOtrosGastos: getOtrosGastosDataCatalogo
   };
 
   if (document.readyState === 'loading') {

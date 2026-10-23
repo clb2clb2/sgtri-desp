@@ -213,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Configurar botón reiniciar (volver al menú inicial)
       const btnReiniciar = document.getElementById('btn-home');
       const appTitleReset = document.getElementById('app-title-reset');
+      const appLogoReset = document.querySelector('.Encabezado .logo');
       const ejecutarReinicio = async () => {
         const confirmed = await window.showConfirm(
           '¿Está seguro de que desea borrar todos los datos y volver al menú inicial?',
@@ -231,6 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (appTitleReset) {
         appTitleReset.addEventListener('click', () => {
+          if (!window.__sgtriTipoLiquidacion) return;
+          ejecutarReinicio();
+        });
+      }
+      if (appLogoReset) {
+        appLogoReset.addEventListener('click', () => {
           if (!window.__sgtriTipoLiquidacion) return;
           ejecutarReinicio();
         });
@@ -276,11 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function actualizarTextoDecreto(valor) {
     if (!infoDecreto) return;
 
-    // Obtener lista de tipos de proyecto que usan RD desde datos.json
-    const datos = window.__sgtriDatos;
-    const rdList = datos?.normativasPorTipoProyecto?.rd || [];
-
-    if (rdList.includes(valor)) {
+    if (window.utils.getNormativa(valor) === 'rd') {
       infoDecreto.innerHTML = `
         Los cálculos se efectuarán en base al 
         RD 462/2002 (Gobierno de España).  
@@ -378,9 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Determinar normativa
-      const rdList = datos.normativasPorTipoProyecto?.rd || [];
-      const normativa = rdList.includes(tipoProj) ? 'rd' : 'decreto';
+      const normativa = window.utils.getNormativa(tipoProj);
       
       // Obtener tabla de precios según normativa
       const tablas = normativa === 'rd'
@@ -395,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Obtener precio de manutención para el país
-      const precio = Number(tablas.manutencion[paisIndex]) || 50.55;
+      const precio = Number(tablas.manutencion[paisIndex]) || 0;
       const descuento = Math.round((precio * 0.5 * n + Number.EPSILON) * 100) / 100;
       hidden.value = descuento.toFixed(2);
       
@@ -983,22 +984,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Validar dígitos de control del IBAN (módulo 97)
         // Mover los 4 primeros caracteres al final y convertir letras a números
-        const reordenado = iban.substring(4) + iban.substring(0, 4);
-        let numerico = '';
-        for (const char of reordenado) {
-          if (/\d/.test(char)) {
-            numerico += char;
-          } else {
-            // A=10, B=11, ..., Z=35
-            numerico += (char.charCodeAt(0) - 55).toString();
-          }
-        }
-        // Calcular módulo 97 (en partes para evitar overflow)
-        let resto = 0;
-        for (let i = 0; i < numerico.length; i++) {
-          resto = (resto * 10 + parseInt(numerico[i], 10)) % 97;
-        }
-        return resto === 1;
+        return ld.ibanMod97Valido(iban);
       }
 
       let esValida = false;
@@ -1049,22 +1035,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) return false;
 
         // Mover los 4 primeros caracteres al final y convertir letras a números
-        const reordenado = iban.substring(4) + iban.substring(0, 4);
-        let numerico = '';
-        for (const char of reordenado) {
-          if (/\d/.test(char)) {
-            numerico += char;
-          } else {
-            // A=10, B=11, ..., Z=35
-            numerico += (char.charCodeAt(0) - 55).toString();
-          }
-        }
-        // Calcular módulo 97 (en partes para evitar overflow)
-        let resto = 0;
-        for (let i = 0; i < numerico.length; i++) {
-          resto = (resto * 10 + parseInt(numerico[i], 10)) % 97;
-        }
-        return resto === 1;
+        return ld.ibanMod97Valido(iban);
       }
 
       const esValida = validarIBANInternacional(val);
@@ -1368,15 +1339,18 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function expandirSeccion(section) {
     if (!section) return;
+    const title = section.querySelector('.section-title');
     const toggle = section.querySelector('.toggle-section');
     const wrapper = section.querySelector('.section-content-wrapper');
-    if (toggle && !toggle.classList.contains('open')) {
-      toggle.classList.add('open');
-      if (wrapper) {
-        wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
-        wrapper.style.opacity = '1';
-      }
-    }
+    if (!wrapper || !wrapper.classList.contains('collapsed')) return;
+
+    // Mismo estado que openSection() de main.js, para que el acordeón no se desincronice
+    const content = wrapper.querySelector('.section-content') || wrapper;
+    wrapper.style.maxHeight = content.scrollHeight + 'px';
+    wrapper.classList.remove('collapsed');
+    wrapper.setAttribute('aria-hidden', 'false');
+    if (toggle) toggle.classList.add('open');
+    if (title) title.setAttribute('aria-expanded', 'true');
   }
 
   /**
@@ -1409,9 +1383,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return false;
   }
 
-  /**
-   * Comprueba todos los datos obligatorios del formulario.
-   */
   /**
    * Valida datos obligatorios sin mostrar mensaje.
    * @returns {boolean} true si hay errores, false si todo está correcto
@@ -1475,7 +1446,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Verificar si el país es diferente de España
       const paisDestino = document.getElementById(`pais-destino-${id}`);
-      if (paisDestino && paisDestino.value && paisDestino.value !== 'España' && paisDestino.value !== 'ES') {
+      if (paisDestino && window.utils.esPaisInternacional(paisDestino.value)) {
         const cruceIda = document.getElementById(`cruce-ida-${id}`);
         const cruceVuelta = document.getElementById(`cruce-vuelta-${id}`);
         if (marcarCampoError(cruceIda)) hayErrores = true;
@@ -1683,7 +1654,9 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function limpiarSeccionProyecto() {
     // Tipo de proyecto
-    if (tipoProyecto) {
+    // En modo AECC el tipo de proyecto está fijado ("Reto AECC") y no se borra
+    const esModoAecc = window.tipoLiquidacion?.getTipoActual?.() === 'AECC';
+    if (tipoProyecto && !esModoAecc) {
       tipoProyecto.selectedIndex = 0;
       tipoProyecto.classList.remove('field-error');
       // Disparar cambio para actualizar info decreto
@@ -1954,31 +1927,27 @@ document.addEventListener('DOMContentLoaded', () => {
     limpiarSeccionAjustes();
     limpiarSeccionComentarios();
     limpiarFechaFirma();
+    // (el desplazamiento especial ya lo resetea limpiarSeccionDesplazamientos)
 
-    // 2. Resetear estado interno del desplazamiento especial
-    if (window.uiDesplazamientoEspecial?.reset) {
-      window.uiDesplazamientoEspecial.reset();
-    }
-
-    // 3. Resetear registro centralizado de totales
+    // 2. Resetear registro centralizado de totales
     if (window.resultadoLiquidacion?.resetTotales) {
       window.resultadoLiquidacion.resetTotales();
     }
 
-    // 4. Resetear módulo de imputación
+    // 3. Resetear módulo de imputación
     if (window.uiImputacion?.reset) {
       window.uiImputacion.reset();
     }
 
-    // 5. Limpiar residuos de mapeo temporal
+    // 4. Limpiar residuos de mapeo temporal
     delete window.__tempMapeoDesplazamientos;
 
-    // 6. Renderizar resultado vacío
+    // 5. Renderizar resultado vacío
     if (window.resultadoLiquidacion?.renderResultado) {
       window.resultadoLiquidacion.renderResultado();
     }
 
-    // 7. Restaurar estado inicial de las secciones:
+    // 6. Restaurar estado inicial de las secciones:
     //    - Las que tienen data-start-collapsed="true" se colapsan
     //    - Las demás se abren (beneficiario, proyecto, desplazamientos)
     document.querySelectorAll('.section-title').forEach(title => {

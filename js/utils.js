@@ -112,7 +112,7 @@
    * @returns {number} Número redondeado
    */
   function round2(n) {
-    return Math.round((n + Number.EPSILON) * 100) / 100;
+    return Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
   }
 
   // =========================================================================
@@ -133,23 +133,6 @@
     };
   }
 
-  /**
-   * Crea una función con throttle que limita su frecuencia de ejecución.
-   * @param {Function} fn - Función a ejecutar
-   * @param {number} limit - Milisegundos mínimos entre ejecuciones
-   * @returns {Function} Función con throttle
-   */
-  function throttle(fn, limit) {
-    let inThrottle;
-    return function(...args) {
-      if (!inThrottle) {
-        fn.apply(this, args);
-        inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
-      }
-    };
-  }
-
   // =========================================================================
   // ACCESO A DATOS GLOBALES
   // =========================================================================
@@ -162,59 +145,46 @@
     return global.__sgtriDatos || {};
   }
 
+  // =========================================================================
+  // REGLAS COMPARTIDAS
+  // =========================================================================
+
   /**
-   * Obtiene una sección específica de los datos globales.
-   * @param {string} section - Nombre de la sección
-   * @returns {*} Datos de la sección o array/objeto vacío según el caso
+   * Normativa aplicable según el tipo de proyecto (datos.json → normativasPorTipoProyecto.rd).
+   * Todo lo que no es RD 462/2002 se calcula con el Decreto 42/2025.
+   * @param {string} tipoProyecto - Código del tipo de proyecto (G24, UEX…)
+   * @returns {'rd'|'decreto'}
    */
-  function getSgtriDatosSection(section) {
-    const datos = getSgtriDatos();
-    return datos[section] || (Array.isArray(datos[section]) ? [] : null);
+  function getNormativa(tipoProyecto) {
+    const rd = getSgtriDatos().normativasPorTipoProyecto?.rd;
+    return Array.isArray(rd) && rd.includes(tipoProyecto) ? 'rd' : 'decreto';
   }
 
-  // =========================================================================
-  // LOGGING CENTRALIZADO
-  // =========================================================================
+  /**
+   * Indica si un país (nombre del select) es extranjero. España es el país de origen.
+   * @param {string} pais - Nombre del país
+   * @returns {boolean}
+   */
+  function esPaisInternacional(pais) {
+    const nombre = String(pais || '').trim();
+    return nombre !== '' && nombre !== 'España';
+  }
 
   /**
-   * Logger centralizado con niveles.
-   * En producción se pueden desactivar ciertos niveles.
+   * Validación del orden de los cruces de frontera:
+   * fechaIda <= cruceIda <= cruceVuelta <= fechaRegreso (solo se comparan las fechas presentes).
+   * @param {Date|null} fechaIda
+   * @param {Date|null} cruceIda
+   * @param {Date|null} cruceVuelta
+   * @param {Date|null} fechaRegreso
+   * @returns {boolean} true si el orden es correcto
    */
-  const logger = {
-    /**
-     * Log de error (siempre visible).
-     * @param {string} msg - Mensaje
-     * @param {Error} [e] - Error opcional
-     */
-    error(msg, e) {
-      console.error(`[SGTRI] ${msg}`, e || '');
-    },
-
-    /**
-     * Log de advertencia.
-     * @param {string} msg - Mensaje
-     */
-    warn(msg) {
-      console.warn(`[SGTRI] ${msg}`);
-    },
-
-    /**
-     * Log informativo.
-     * @param {string} msg - Mensaje
-     */
-    info(msg) {
-      console.log(`[SGTRI] ${msg}`);
-    },
-
-    /**
-     * Log de debug (solo en desarrollo).
-     * @param {string} msg - Mensaje
-     */
-    debug(msg) {
-      // Descomentar para debug:
-      // console.log(`[SGTRI:DEBUG] ${msg}`);
-    }
-  };
+  function ordenCrucesValido(fechaIda, cruceIda, cruceVuelta, fechaRegreso) {
+    if (fechaIda && cruceIda && cruceIda < fechaIda) return false;
+    if (cruceIda && cruceVuelta && cruceVuelta < cruceIda) return false;
+    if (cruceVuelta && fechaRegreso && cruceVuelta > fechaRegreso) return false;
+    return true;
+  }
 
   // =========================================================================
   // EXPORTACIÓN
@@ -233,14 +203,14 @@
 
     // Timing
     debounce,
-    throttle,
 
     // Datos globales
     getSgtriDatos,
-    getSgtriDatosSection,
 
-    // Logging
-    logger
+    // Reglas compartidas
+    getNormativa,
+    esPaisInternacional,
+    ordenCrucesValido
   };
 
   global.utils = utils;

@@ -9,71 +9,10 @@
   // ACCESO A MÓDULOS DE UTILIDADES
   // =========================================================================
 
-  /**
-   * Obtiene parseNumber de utils o limpiaDatos con fallback.
-   * @returns {Function}
-   */
-  function getParseNumber() {
-    if (global.utils && typeof global.utils.parseNumber === 'function') {
-      return global.utils.parseNumber;
-    }
-    if (global.limpiaDatos && typeof global.limpiaDatos.parseNumber === 'function') {
-      return global.limpiaDatos.parseNumber;
-    }
-    // Fallback mínimo
-    return v => {
-      if (!v && v !== 0) return 0;
-      const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '').replace(/,/g, '.'));
-      return isNaN(n) ? 0 : n;
-    };
-  }
-
-  /**
-   * Obtiene parseDateStrict de limpiaDatos con fallback.
-   * @returns {Function}
-   */
-  function getParseDateStrict() {
-    if (global.limpiaDatos && typeof global.limpiaDatos.parseDateStrict === 'function') {
-      return global.limpiaDatos.parseDateStrict;
-    }
-    // Fallback
-    return ddmmaa => {
-      if (!ddmmaa) return null;
-      const parts = String(ddmmaa).split('/').map(p => p.trim());
-      if (parts.length < 3) return null;
-      const d = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      let y = parseInt(parts[2], 10);
-      if (y < 100) y = 2000 + y;
-      const date = new Date(y, m, d, 0, 0, 0, 0);
-      return isNaN(date.getTime()) ? null : date;
-    };
-  }
-
-  /**
-   * Obtiene parseTimeStrict de limpiaDatos con fallback.
-   * @returns {Function}
-   */
-  function getParseTimeStrict() {
-    if (global.limpiaDatos && typeof global.limpiaDatos.parseTimeStrict === 'function') {
-      return global.limpiaDatos.parseTimeStrict;
-    }
-    // Fallback
-    return hhmm => {
-      if (!hhmm) return null;
-      const m = String(hhmm).trim().match(/^(\d{1,2}):(\d{1,2})$/);
-      if (!m) return null;
-      const hh = parseInt(m[1], 10);
-      const mm = parseInt(m[2], 10);
-      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
-      return { hh, mm };
-    };
-  }
-
-  // Parsers con resolución dinámica
-  const parseNumber = () => getParseNumber();
-  const parseDateStrict = () => getParseDateStrict();
-  const parseTimeStrict = () => getParseTimeStrict();
+  // utils.js y limpiaDatos.js se cargan antes que este módulo (ver index.html)
+  const parseNumber = () => global.utils.parseNumber;
+  const parseDateStrict = () => global.limpiaDatos.parseDateStrict;
+  const parseTimeStrict = () => global.limpiaDatos.parseTimeStrict;
 
   // =========================================================================
   // HELPERS DE DOM
@@ -99,8 +38,7 @@
     if (typeof paisIndex === 'number' && paisIndex >= 0) {
       return paisIndex > 0; // índice 0 = España
     }
-    const paisLower = (pais || '').toLowerCase().trim();
-    return paisLower !== '' && paisLower !== 'españa';
+    return global.utils.esPaisInternacional(pais);
   }
 
   /**
@@ -137,14 +75,8 @@
       if (!datos.cruceIda) errores.push('Fecha de cruce de ida no válida para viaje internacional');
       if (!datos.cruceVuelta) errores.push('Fecha de cruce de vuelta no válida para viaje internacional');
 
-      if (datos.cruceIda && datos.fechaIda && datos.cruceIda < datos.fechaIda) {
-        errores.push('El cruce de ida no puede ser anterior a la fecha de ida');
-      }
-      if (datos.cruceVuelta && datos.fechaRegreso && datos.cruceVuelta > datos.fechaRegreso) {
-        errores.push('El cruce de vuelta no puede ser posterior a la fecha de regreso');
-      }
-      if (datos.cruceIda && datos.cruceVuelta && datos.cruceIda > datos.cruceVuelta) {
-        errores.push('El cruce de ida debe ser anterior o igual al cruce de vuelta');
+      if (!global.utils.ordenCrucesValido(datos.fechaIda, datos.cruceIda, datos.cruceVuelta, datos.fechaRegreso)) {
+        errores.push('Los cruces de frontera deben cumplir: ida <= cruce de ida <= cruce de vuelta <= regreso');
       }
     }
 
@@ -307,7 +239,6 @@
   global.cogeDatosDesp = {
     collectDataFromFicha,
     parseNumber: v => parseNumber()(v),
-    parseNumericLoose: v => parseNumber()(v),
     esInternacional,
     validarFechas
   };

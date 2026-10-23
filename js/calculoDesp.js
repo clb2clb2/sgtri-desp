@@ -14,56 +14,21 @@
 // 1.1 Parsers (wrappers de limpiaDatos con fallback)
 // -----------------------------------------------------------------------------
 
-/**
- * Parsea fecha dd/mm/aa a Date.
- * Usa limpiaDatos si está disponible.
- */
+// limpiaDatos.js y utils.js se cargan antes que este archivo (ver index.html)
+
+/** Parsea fecha dd/mm/aa a Date (o null). */
 function parseDate(ddmmaa) {
-  if (window.limpiaDatos && window.limpiaDatos.parseDateStrict) {
-    return window.limpiaDatos.parseDateStrict(ddmmaa);
-  }
-  // Fallback
-  if (!ddmmaa) return null;
-  const parts = String(ddmmaa).split('/').map(p => p.trim());
-  if (parts.length < 3) return null;
-  const d = parseInt(parts[0], 10);
-  const m = parseInt(parts[1], 10) - 1;
-  let y = parseInt(parts[2], 10);
-  if (y < 100) y = 2000 + y;
-  return new Date(y, m, d);
+  return window.limpiaDatos.parseDateStrict(ddmmaa);
 }
 
-/**
- * Parsea hora hh:mm a {hh, mm}.
- * Usa limpiaDatos si está disponible.
- */
+/** Parsea hora hh:mm a {hh, mm} (o null). */
 function parseTime(hhmm) {
-  if (window.limpiaDatos && window.limpiaDatos.parseTimeStrict) {
-    return window.limpiaDatos.parseTimeStrict(hhmm);
-  }
-  // Fallback
-  if (!hhmm) return null;
-  const parts = String(hhmm).split(':').map(p => p.trim());
-  if (parts.length < 2) return null;
-  const hh = parseInt(parts[0], 10);
-  const mm = parseInt(parts[1], 10);
-  if (isNaN(hh) || isNaN(mm)) return null;
-  return { hh, mm };
+  return window.limpiaDatos.parseTimeStrict(hhmm);
 }
 
-/**
- * Parsea número con tolerancia a formatos europeos.
- * Usa limpiaDatos si está disponible.
- */
+/** Parsea número con tolerancia a formatos europeos. */
 function parseNumber(value) {
-  if (window.limpiaDatos && window.limpiaDatos.parseNumber) {
-    return window.limpiaDatos.parseNumber(value);
-  }
-  // Fallback
-  if (typeof value === 'number') return value;
-  if (!value) return 0;
-  const s = String(value).replace(/[^0-9,.\-]/g, '').replace(/\./g, '').replace(/,/g, '.');
-  return parseFloat(s) || 0;
+  return window.utils.parseNumber(value);
 }
 
 // -----------------------------------------------------------------------------
@@ -126,50 +91,30 @@ function formatDateDMY(d) {
  * Redondea a 2 decimales.
  */
 function round2(n) {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+  return window.utils.round2(n);
 }
 
 /**
- * Calcula meses naturales entre dos fechas.
- * Ej: 24/02 → 24/03 = 1 mes exacto, 24/02 → 25/03 = 1 mes + 1 día (> 1 mes)
- * 
- * @param {Date} fechaIda - Fecha de inicio
- * @param {Date} fechaRegreso - Fecha de fin
- * @returns {number} Meses naturales (con decimales si hay días extra)
+ * Suma meses naturales a una fecha, de fecha a fecha (art. 5 del Código Civil):
+ * si el mes de vencimiento no tiene ese día, vence el último día del mes.
+ * Ej: 24/02 + 1 mes = 24/03; 31/01 + 1 mes = 28/02 (29/02 en bisiesto).
+ *
+ * @param {Date} fecha - Fecha de inicio
+ * @param {number} meses - Meses a sumar
+ * @returns {Date} Fecha de vencimiento (00:00)
  */
-function monthsBetween(fechaIda, fechaRegreso) {
-  if (!fechaIda || !fechaRegreso) return 0;
-  
-  const yearDiff = fechaRegreso.getFullYear() - fechaIda.getFullYear();
-  const monthDiff = fechaRegreso.getMonth() - fechaIda.getMonth();
-  const dayDiff = fechaRegreso.getDate() - fechaIda.getDate();
-  
-  // Meses completos
-  let months = yearDiff * 12 + monthDiff;
-  
-  // Si el día de regreso es menor que el día de salida, no ha completado el mes
-  if (dayDiff < 0) {
-    months -= 1;
-    // Calcular fracción de mes (días extra / días del mes anterior)
-    const prevMonth = new Date(fechaRegreso.getFullYear(), fechaRegreso.getMonth(), 0);
-    const daysInPrevMonth = prevMonth.getDate();
-    const daysExtra = daysInPrevMonth + dayDiff;
-    return months + (daysExtra / daysInPrevMonth);
-  }
-  
-  // Si hay días extra después de completar meses enteros
-  if (dayDiff > 0) {
-    const daysInMonth = new Date(fechaRegreso.getFullYear(), fechaRegreso.getMonth() + 1, 0).getDate();
-    return months + (dayDiff / daysInMonth);
-  }
-  
-  return months;
+function sumarMesesNaturales(fecha, meses) {
+  const y = fecha.getFullYear();
+  const m = fecha.getMonth() + meses;
+  // Último día del mes de vencimiento (new Date(y, m + 1, 0) normaliza años)
+  const ultimoDia = new Date(y, m + 1, 0).getDate();
+  return new Date(y, m, Math.min(fecha.getDate(), ultimoDia));
 }
 
 /**
- * Determina si un desplazamiento es residencia eventual.
- * - España: > 1 mes
- * - Extranjero: > 3 meses
+ * Determina si un desplazamiento es residencia eventual: el regreso es posterior
+ * a la fecha de ida más 1 mes (España) o 3 meses (extranjero).
+ * Ej: 24/02 → 24/03 no lo es (1 mes exacto); 24/02 → 25/03 sí.
  * 
  * @param {Date} fechaIda - Fecha de salida
  * @param {Date} fechaRegreso - Fecha de regreso
@@ -177,9 +122,11 @@ function monthsBetween(fechaIda, fechaRegreso) {
  * @returns {boolean}
  */
 function isResidenciaEventual(fechaIda, fechaRegreso, esEspana) {
-  const meses = monthsBetween(fechaIda, fechaRegreso);
+  if (!fechaIda || !fechaRegreso) return false;
   const umbral = esEspana ? 1 : 3;
-  return meses > umbral;
+  const limite = sumarMesesNaturales(fechaIda, umbral);
+  const regreso = new Date(fechaRegreso.getFullYear(), fechaRegreso.getMonth(), fechaRegreso.getDate());
+  return regreso > limite;
 }
 
 // -----------------------------------------------------------------------------
@@ -203,7 +150,6 @@ function extractFlags(input) {
     justificarPernocta: get('justificarPernocta', false),
     isLastIntlSegment: get('_isLastIntlSegment', false),      // Último tramo de viaje internacional (manutención)
     forceAllNights: get('_forceAllNights', false),            // Forzar todas las noches (tramos no-finales)
-    comesFromPreviousDay: get('_comesFromPreviousDay', false), // Viene del día anterior (último tramo intl mismo día)
     forceZeroNights: get('_forceZeroNights', false),          // Forzar 0 noches (cuando la noche ambigua pertenece al tramo anterior)
     lastNightAmbiguousByHour: get('_lastNightAmbiguousByHour', null), // Hora para decidir si la última noche cuenta (formato 'HH:MM')
     lastNightJustified: get('_lastNightJustified', false)     // Si la última noche está justificada (checkbox marcado)
@@ -221,17 +167,15 @@ function getDatos() {
  * Determina la normativa aplicable según el tipo de proyecto.
  */
 function getNormativa(tipoProyecto) {
-  const datos = getDatos();
-  if (!datos || !datos.normativasPorTipoProyecto) return 'decreto';
-  const rdList = datos.normativasPorTipoProyecto.rd || [];
-  return rdList.includes(tipoProyecto) ? 'rd' : 'decreto';
+  return window.utils.getNormativa(tipoProyecto);
 }
 
 /**
  * Obtiene precios de manutención y alojamiento según país y normativa.
  */
 function getPrecios(paisIndex, pais, normativa) {
-  const defaults = { manutencion: 50.55, noche: 98.88 };
+  // Sin tarifas no se puede calcular: los importes quedan a 0
+  const defaults = { manutencion: 0, noche: 0 };
   const datos = getDatos();
 
   if (!datos || !datos.dietasPorPais || !Array.isArray(datos.dietasPorPais.paises)) {
@@ -255,11 +199,14 @@ function getPrecios(paisIndex, pais, normativa) {
   };
 }
 
+// Límites exentos de IRPF (España) si no hay datos.json: [día con pernocta parcial, día completo]
+const LIMITES_IRPF_POR_DEFECTO = [26.67, 53.34];
+
 /**
  * Obtiene límites IRPF según país.
  */
 function getLimitesIRPF(paisIndex, pais) {
-  const defaults = [26.67, 53.34];
+  const defaults = LIMITES_IRPF_POR_DEFECTO;
   const datos = getDatos();
 
   if (!datos || !datos.limitesIRPF) return { limites: defaults, source: 'default' };
@@ -354,7 +301,7 @@ function buildEmptyResult(input, kmAmount, precioKm) {
     km: parseNumber(input.km),
     kmAmount: kmAmount,
     precioKm: precioKm,
-    irpf: { sujeto: 0, breakdown: [], limitesUsed: [26.67, 53.34] }
+    irpf: { sujeto: 0, breakdown: [], limitesUsed: LIMITES_IRPF_POR_DEFECTO }
   };
 }
 
@@ -401,37 +348,34 @@ function calcManutencionesSameDay(tDep, tRet, dtIda, dtVuelta, normativa, ticket
 
 /**
  * Calcula manutenciones para un viaje de varios días.
- * @param {boolean} isLastIntlSegment - Si es el último tramo de un viaje internacional,
- *   basta con volver estrictamente después de las 14:00 para sumar media manutención.
+ * (El umbral de >14:00 del día de regreso es el mismo en todos los tramos.)
  */
-function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena, isLastIntlSegment = false) {
-  let total = 0;
+function calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena) {
+  // Días intermedios: 1 manutención completa cada uno
+  return unidadesDiaIda(tDep) + diasIntermedios + unidadesDiaRegreso(tRet, normativa, ticketCena);
+}
 
-  // Día de ida
-  if (tDep !== null) {
-    if (tDep < HORA_COMIDA) {
-      total += 1;
-    } else if (tDep < HORA_CENA) {
-      total += 0.5;
-    }
-  }
+/**
+ * Manutenciones del día de ida en un viaje de varios días:
+ * 1 si sale antes de las 14:00, 0,5 si sale antes de las 22:00, 0 en otro caso.
+ */
+function unidadesDiaIda(tDep) {
+  if (tDep === null) return 0;
+  if (tDep < HORA_COMIDA) return 1;
+  if (tDep < HORA_CENA) return 0.5;
+  return 0;
+}
 
-  // Días intermedios (1 manutención completa cada uno)
-  total += diasIntermedios;
-
-  // Día de regreso
-  // En el último tramo internacional, basta con >14:00 para media manutención
-  if (tRet !== null) {
-    const cenaCuenta = (normativa === 'rd') ? (tRet > HORA_CENA && ticketCena) : (tRet > HORA_CENA);
-    if (cenaCuenta) {
-      total += 1;
-    } else if (tRet > HORA_COMIDA) {
-      // En este cálculo de varios días se aplica umbral estricto > 14:00
-      total += 0.5;
-    }
-  }
-
-  return total;
+/**
+ * Manutenciones del día de regreso en un viaje de varios días:
+ * 1 si cuenta la cena (>22:00; con RD además hace falta ticket), 0,5 si vuelve después de las 14:00.
+ */
+function unidadesDiaRegreso(tRet, normativa, ticketCena) {
+  if (tRet === null) return 0;
+  const cenaCuenta = (normativa === 'rd') ? (tRet > HORA_CENA && ticketCena) : (tRet > HORA_CENA);
+  if (cenaCuenta) return 1;
+  if (tRet > HORA_COMIDA) return 0.5;
+  return 0;
 }
 
 /**
@@ -449,7 +393,7 @@ function calcManutenciones(parsed, normativa, ticketCena, isLastIntlSegment = fa
 
   const dias = daysBetween(fechaIda, fechaRegreso);
   const diasIntermedios = Math.max(0, dias - 1);
-  return calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena, isLastIntlSegment);
+  return calcManutencionesSeveralDays(tDep, tRet, diasIntermedios, normativa, ticketCena);
 }
 
 // -----------------------------------------------------------------------------
@@ -519,8 +463,8 @@ function evalLastNightByHour(tRet, justified = false) {
  *    - forceZeroNights=true: 0 noches (la noche ambigua está en el tramo extranjero)
  * 
  * 4. TRAMO ESPAÑA VUELTA con regreso posterior a cruceVuelta:
- *    - comesFromPreviousDay=true: aplica ambigüedad aunque el tramo sea de un solo día
- *    - Usa la hora de regreso normal para evaluar la ambigüedad
+ *    - Siempre abarca al menos un día: se aplica la lógica estándar (caso 5),
+ *      con la ambigüedad de la última noche según la hora de regreso
  * 
  * 5. TRAMO NORMAL (nacional o sin flags especiales):
  *    - Usa la lógica estándar de días entre fechas y hora de regreso
@@ -534,7 +478,6 @@ function calcNoches(parsed, flags = {}) {
   const { 
     forceAllNights, 
     forceZeroNights, 
-    comesFromPreviousDay, 
     lastNightAmbiguousByHour, 
     lastNightJustified 
   } = flags;
@@ -569,16 +512,6 @@ function calcNoches(parsed, flags = {}) {
     
     // Subcaso 2b: Sin ambigüedad, todas las noches cuentan
     return nochesResult(nochesBase, nochesBase, nochesBase, false);
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // CASO 3: Mismo día con viaje que viene del día anterior
-  // ─────────────────────────────────────────────────────────────────────────
-  if (diasEntre <= 0 && comesFromPreviousDay) {
-    const tRet = toMinutes(horaRegreso);
-    const { counts, ambiguous } = evalLastNightByHour(tRet, false);
-    const noches = counts ? 1 : 0;
-    return nochesResult(noches, 1, 0, ambiguous);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -617,22 +550,12 @@ function calcNoches(parsed, flags = {}) {
  */
 function getPerDayManutencionUnits(parsed, normativa, ticketCena, manutencionesSameDay) {
   const { fechaIda, fechaRegreso, horaIda, horaRegreso } = parsed;
-  const tDep = toMinutes(horaIda);
-  const tRet = toMinutes(horaRegreso);
 
   if (isSameDay(fechaIda, fechaRegreso)) {
     return [manutencionesSameDay];
   }
 
-  const units = [];
-
-  // Día de ida
-  let depUnits = 0;
-  if (tDep !== null) {
-    if (tDep < HORA_COMIDA) depUnits = 1;
-    else if (tDep < HORA_CENA) depUnits = 0.5;
-  }
-  units.push(depUnits);
+  const units = [unidadesDiaIda(toMinutes(horaIda))];
 
   // Días intermedios
   const dias = daysBetween(fechaIda, fechaRegreso);
@@ -640,15 +563,7 @@ function getPerDayManutencionUnits(parsed, normativa, ticketCena, manutencionesS
     units.push(1);
   }
 
-  // Día de regreso
-  let retUnits = 0;
-  if (tRet !== null) {
-    const cenaCuenta = (normativa === 'rd') ? (tRet > HORA_CENA && ticketCena) : (tRet > HORA_CENA);
-    if (cenaCuenta) retUnits = 1;
-    else if (tRet > HORA_COMIDA) retUnits = 0.5;
-  }
-  units.push(retUnits);
-
+  units.push(unidadesDiaRegreso(toMinutes(horaRegreso), normativa, ticketCena));
   return units;
 }
 
@@ -729,7 +644,7 @@ function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCen
 /**
  * Aplica el flag justificarPernocta (añade una noche extra).
  */
-function applyJustificarPernocta(result, precioNoche) {
+function applyJustificarPernocta(result) {
   // Solo aplica si hay ambigüedad: asigna nochesIfCounted como valor final
   // Mantiene nochesAmbiguous = true para que la UI siga mostrando el aviso
   if (result.nochesAmbiguous) {
@@ -823,7 +738,6 @@ function calculateDesplazamiento(input) {
   // Calcular noches (pasando flags para viajes internacionales)
   const nochesCalc = calcNoches(parsed, {
     forceAllNights: flags.forceAllNights,
-    comesFromPreviousDay: flags.comesFromPreviousDay,
     forceZeroNights: flags.forceZeroNights,
     lastNightAmbiguousByHour: flags.lastNightAmbiguousByHour,
     lastNightJustified: flags.lastNightJustified
@@ -894,7 +808,7 @@ function calculateDesplazamiento(input) {
 
   // Aplicar flags post-cálculo
   if (flags.justificarPernocta) {
-    applyJustificarPernocta(result, precios.noche);
+    applyJustificarPernocta(result);
   }
 
   if (flags.excludeAlojamiento) {
@@ -958,15 +872,6 @@ window.calculoDesp._daysBetween = daysBetween;
     return datos?.kmTarifas?.[tipoVeh] || 0.26;
   }
 
-  /**
-   * Determina la normativa a aplicar según el tipo de proyecto.
-   */
-  function getWrapperNormativa(tipoProyecto) {
-    const datos = window.__sgtriDatos;
-    const rdList = datos?.normativasPorTipoProyecto?.rd || [];
-    return rdList.includes(tipoProyecto) ? 'rd' : 'decreto';
-  }
-
   // ---------------------------------------------------------------------------
   // 2.2 Construcción de segmentos internacionales
   // ---------------------------------------------------------------------------
@@ -976,7 +881,7 @@ window.calculoDesp._daysBetween = daysBetween;
    * Incluye flags especiales para el cálculo de noches en viajes internacionales.
    */
   function createSegmentInput(opts) {
-    const { fechaIda, horaIda, fechaRegreso, horaRegreso, pais, paisIndex, ticketCena, tipoProyecto, kmTarifa, excludeManutencion, excludeAlojamiento, isLastIntlSegment, forceAllNights, comesFromPreviousDay, forceZeroNights, lastNightAmbiguousByHour, lastNightJustified, justificarPernocta } = opts;
+    const { fechaIda, horaIda, fechaRegreso, horaRegreso, pais, paisIndex, ticketCena, tipoProyecto, kmTarifa, excludeManutencion, excludeAlojamiento, isLastIntlSegment, forceAllNights, forceZeroNights, lastNightAmbiguousByHour, lastNightJustified, justificarPernocta } = opts;
 
     return {
       fechaIda: formatDateStr(fechaIda),
@@ -998,7 +903,6 @@ window.calculoDesp._daysBetween = daysBetween;
       _segmentMode: true,
       _isLastIntlSegment: !!isLastIntlSegment,       // Último tramo internacional (manutención)
       _forceAllNights: !!forceAllNights,             // Forzar todas las noches (tramos no-finales)
-      _comesFromPreviousDay: !!comesFromPreviousDay, // Viene del día anterior (último tramo intl mismo día)
       _forceZeroNights: !!forceZeroNights,           // Forzar 0 noches (noche ambigua en tramo anterior)
       _lastNightAmbiguousByHour: lastNightAmbiguousByHour || null,  // Hora para ambigüedad de última noche
       _lastNightJustified: !!lastNightJustified      // Si la última noche está justificada
@@ -1039,14 +943,12 @@ window.calculoDesp._daysBetween = daysBetween;
    * │ CASO B: cruceVuelta < fechaRegreso (regreso posterior)                  │
    * │   - La última noche pertenece al TRAMO ESPAÑA VUELTA                    │
    * │   - Tramo extranjero: forceAllNights (todas las noches)                 │
-   * │   - Tramo España vuelta: comesFromPreviousDay + justificarPernocta      │
+   * │   - Tramo España vuelta: lógica estándar + justificarPernocta           │
    * │                                                                         │
    * └─────────────────────────────────────────────────────────────────────────┘
    */
   function buildSegmentInputs(data, baseInput) {
     const segments = [];
-    const normativa = getWrapperNormativa(data.tipoProyecto);
-    const nonFinalAssumeCena = (normativa === 'decreto');
 
     const baseOpts = {
       tipoProyecto: data.tipoProyecto,
@@ -1076,7 +978,7 @@ window.calculoDesp._daysBetween = daysBetween;
           horaRegreso: '00:00',
           pais: 'España',
           paisIndex: 0,
-          ticketCena: nonFinalAssumeCena,
+          ticketCena: false, // termina a las 00:00: la cena no cuenta
           forceAllNights: true
         }),
         titulo: 'España (ida)',
@@ -1103,7 +1005,7 @@ window.calculoDesp._daysBetween = daysBetween;
             horaRegreso: '00:00',
             pais: data.pais,
             paisIndex: data.paisIndex,
-            ticketCena: nonFinalAssumeCena,
+            ticketCena: false, // termina a las 00:00: la cena no cuenta
             forceAllNights: true,
             lastNightAmbiguousByHour: formatTimeStr(data.horaRegreso),
             lastNightJustified: !!data.justificarPernocta
@@ -1122,7 +1024,7 @@ window.calculoDesp._daysBetween = daysBetween;
             horaRegreso: '00:00',
             pais: data.pais,
             paisIndex: data.paisIndex,
-            ticketCena: nonFinalAssumeCena,
+            ticketCena: false, // termina a las 00:00: la cena no cuenta
             forceAllNights: true
           }),
           titulo: data.pais || 'Extranjero',
@@ -1166,7 +1068,6 @@ window.calculoDesp._daysBetween = daysBetween;
             paisIndex: 0,
             ticketCena: !!data.ticketCena,
             isLastIntlSegment: true,
-            comesFromPreviousDay: true,
             justificarPernocta: !!data.justificarPernocta
           }),
           titulo: 'España (vuelta)',
@@ -1360,12 +1261,6 @@ window.calculoDesp._daysBetween = daysBetween;
         factorResidencia
       },
 
-      // Estado de exclusiones
-      exclusiones: {
-        manutencion: !!data.noManutencion,
-        alojamiento: !!data.dtInvalid
-      },
-
       // Datos crudos para compatibilidad
       _canonical: canonical,
       _data: data
@@ -1421,7 +1316,7 @@ window.calculoDesp._daysBetween = daysBetween;
         nochesAmount: 0,
         km: data.km,
         kmAmount: round2(data.km * kmTarifa),
-        irpf: { sujeto: 0, breakdown: [], limitesUsed: [26.67, 53.34] }
+        irpf: { sujeto: 0, breakdown: [], limitesUsed: LIMITES_IRPF_POR_DEFECTO }
       };
     }
 
@@ -1446,16 +1341,6 @@ window.calculoDesp._daysBetween = daysBetween;
     if (data.esInternacional && data.cruceIda && data.cruceVuelta && !fechasInvalidas) {
       const segmentDefs = buildSegmentInputs(data, calcInput);
       segmentos = calculateSegments(segmentDefs);
-
-      if (fechasInvalidas && segmentos) {
-        segmentos.forEach(seg => {
-          seg.manutenciones = 0;
-          seg.manutencionesAmount = 0;
-          seg.noches = 0;
-          seg.nochesAmount = 0;
-          seg.irpf && (seg.irpf.sujeto = 0);
-        });
-      }
     }
 
     // 6. Calcular residencia eventual para internacionales
@@ -1548,13 +1433,7 @@ window.calculoDesp._daysBetween = daysBetween;
     return window.cogeDatosDesp?.collectDataFromFicha?.(...args) || null;
   };
 
-  window.calculoDesp.parseNumber = function(v) {
-    return window.cogeDatosDesp?.parseNumber?.(v) ||
-           window.limpiaDatos?.parseNumber?.(v) ||
-           parseNumber(v);
-  };
-
-  window.calculoDesp.parseNumericLoose = window.calculoDesp.parseNumber;
+  window.calculoDesp.parseNumber = parseNumber;
 
   // Exponer helpers para testing
   window.calculoDesp._buildSalidaData = buildSalidaData;

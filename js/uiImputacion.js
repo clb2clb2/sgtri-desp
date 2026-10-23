@@ -54,35 +54,21 @@
    * Formatea número a string con 2 decimales y separador europeo.
    */
   function fmt(n) {
-    if (global.utils && typeof global.utils.fmt === 'function') {
-      return global.utils.fmt(n);
-    }
-    return (Number(n) || 0).toLocaleString('de-DE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    return global.utils.fmt(n);
   }
 
   /**
    * Parsea número con tolerancia a formatos europeos.
    */
   function parseNumber(value) {
-    if (global.utils && typeof global.utils.parseNumber === 'function') {
-      return global.utils.parseNumber(value);
-    }
-    // Fallback básico
-    if (typeof value === 'number') return value;
-    if (!value) return 0;
-    let s = String(value).replace(/[^0-9,.\-]/g, '');
-    s = s.replace(/\./g, '').replace(',', '.');
-    return parseFloat(s) || 0;
+    return global.utils.parseNumber(value);
   }
 
   /**
    * Redondea a 2 decimales.
    */
   function round2(n) {
-    return Math.round((Number(n) || 0) * 100) / 100;
+    return global.utils.round2(n);
   }
 
   /**
@@ -298,6 +284,9 @@
         if (input) input.focus();
       }
     }
+
+    // El botón de añadir se recrea con las líneas: reaplicar el límite
+    actualizarBotonAddImputacion();
   }
 
   // =========================================================================
@@ -308,6 +297,8 @@
    * Maneja el click en el botón de añadir línea.
    */
   function onAddLinea() {
+    if (lineasImputacion.length >= getLimites().maxLineasImputacion) return;
+
     const newLinea = {
       id: nextId++,
       organica: '18.',
@@ -319,7 +310,6 @@
     lineasImputacion.push(newLinea);
     actualizarLineaPrincipal();
     renderLineas();
-    actualizarBotonAddImputacion();
 
     // Focus en la nueva línea
     setTimeout(() => {
@@ -341,7 +331,6 @@
     lineasImputacion.splice(idx, 1);
     actualizarLineaPrincipal();
     renderLineas();
-    actualizarBotonAddImputacion();
   }
 
   /**
@@ -570,7 +559,6 @@
 
     actualizarLineaPrincipal();
     renderLineas();
-    actualizarBotonAddImputacion();
   }
 
   /**

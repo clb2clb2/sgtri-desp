@@ -41,6 +41,9 @@
     fallbackPng: 'assets/img/logo-uex.png'
   };
 
+  // PNG transparente de 1x1 px: sustituto del logo si no se puede cargar ninguno
+  const IMAGEN_VACIA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
   /**
    * Calcula la altura del pie de página en función de los datos.
    *  - Base: 152 pt
@@ -71,22 +74,24 @@
    * @returns {number} Número parseado
    */
   function parseEuroNumber(val) {
-    if (typeof val === 'number') return val;
-    if (!val || typeof val !== 'string') return 0;
-    // Quitar símbolo €, espacios, puntos de miles, y reemplazar coma decimal por punto
-    const cleaned = val.replace(/€/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
-    return Number(cleaned) || 0;
+    return global.utils.parseNumber(val);
+  }
+
+  /**
+   * Nombre legible de un tipo de "otros gastos" (catálogo de datos.json más la opción AECC "ICG").
+   * @param {string} codigo - Código del tipo (AVN, TAX…)
+   * @returns {string}
+   */
+  function nombreTipoOtroGasto(codigo) {
+    const catalogo = global.uiDesplazamientoAecc?.getCatalogoOtrosGastos?.() ||
+      global.utils.getSgtriDatos().otrosGastos || [];
+    const item = catalogo.find((it) => it[1] === codigo);
+    return item ? item[0] : (codigo || 'Otro');
   }
 
   function obtenerTituloLiquidacion(datos) {
     const tipoLiquidacion = String(datos?.tipoLiquidacion || 'GNRAL').trim().toUpperCase();
-    const tituloPorTipo = {
-      DESPL: 'Liquidación de Desplazamientos',
-      CONGR: 'Liquidación por Asistencia a Congresos',
-      HONOR: 'Liquidación de Honorarios',
-      AECC: 'Liquidación de Desplazamientos AECC',
-      GNRAL: 'Liquidación de Desplazamientos, Honorarios y Congresos'
-    };
+    const tituloPorTipo = global.tipoLiquidacion.TITULO_POR_TIPO;
 
     if (tipoLiquidacion !== 'GNRAL') {
       return tituloPorTipo[tipoLiquidacion] || tituloPorTipo.GNRAL;
@@ -125,10 +130,7 @@
    * Formatea número a string con 2 decimales y separador alemán.
    */
   function fmt(n) {
-    return (Number(n) || 0).toLocaleString('de-DE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    return global.utils.fmt(n);
   }
 
   /**
@@ -1027,20 +1029,6 @@
       .filter(({ desp }) => tieneDatosDesplazamiento(desp));
 
     // Mapa de tipos de otros gastos
-    const TIPOS_OTROS_GASTOS = {
-      'AVN': 'Avión / Tren / Autobús',
-      'PJE': 'Peaje',
-      'TAX': 'Taxi',
-      'PRK': 'Aparcamiento',
-      'TRF': 'Transfer o Traslados',
-      'INS': 'Gastos de instalación',
-      'ALQ': 'Alquiler de coche',
-      'SAC': 'Seguro de accidentes',
-      'SME': 'Seguro médico',
-      'TTR': 'Tasa turística',
-      'TAG': 'Tasa agencia de viajes',
-      'OTR': 'Otros gastos'
-    };
 
     // Layout: bordes verticales + horizontales internos + borde inferior (sin borde superior)
     const layoutSinBordeSuperior = {
@@ -1073,7 +1061,7 @@
       const desp = item.desp;
       const despIdx = item.idx;
       const dc = desp.datosCalculados || {};
-      const esInternacional = desp.paisDestino !== 'España';
+      const esInternacional = global.utils.esPaisInternacional(desp.paisDestino);
 
       // ─── 1. Encabezado con línea verde ───────────────────────────────────
       const encabezado = buildEncabezadoSeccion(`DESPLAZAMIENTO #${despIdx + 1}`);
@@ -1202,7 +1190,7 @@
 
       // Otros gastos (una línea por cada uno)
       for (const gasto of otrosGastos) {
-        const nombreTipo = TIPOS_OTROS_GASTOS[gasto.tipo] || gasto.tipo || 'Otro';
+        const nombreTipo = nombreTipoOtroGasto(gasto.tipo);
         const concepto = gasto.concepto || '';
         const importeGasto = parseEuroNumber(gasto.importe);
 
@@ -1522,21 +1510,6 @@
     const textoManut = dc.textoManutencion || '';
     const textoKm = `${Math.round(kmValor).toLocaleString('de-DE')} km × ${fmtEuroCompact(kmPrecio)}`;
     const otrosArray = Array.isArray(aecc.otrosGastos) ? aecc.otrosGastos : [];
-    const TIPOS_OTROS_GASTOS = {
-      'ICG': 'Inscripción Congreso',
-      'AVN': 'Avión / Tren / Autobús',
-      'PJE': 'Peaje',
-      'TAX': 'Taxi',
-      'PRK': 'Aparcamiento',
-      'TRF': 'Transfer o Traslados',
-      'INS': 'Gastos de instalación',
-      'ALQ': 'Alquiler de coche',
-      'SAC': 'Seguro de accidentes',
-      'SME': 'Seguro médico',
-      'TTR': 'Tasa turística',
-      'TAG': 'Tasa agencia de viajes',
-      'OTR': 'Otros gastos'
-    };
     const lineasEtiquetas = [];
     const lineasImportes = [];
 
@@ -1563,7 +1536,7 @@
     }
 
     for (const gasto of otrosArray) {
-      const nombreTipo = TIPOS_OTROS_GASTOS[gasto.tipo] || gasto.tipo || 'Otro';
+      const nombreTipo = nombreTipoOtroGasto(gasto.tipo);
       const concepto = gasto.concepto || '';
       const importeGasto = parseEuroNumber(gasto.importe);
 
@@ -1755,9 +1728,8 @@
     const descuentoComidas = parseEuroNumber(evento.descuentoComidas);
     const tieneDescuentos = descuentoComidas > 0 || descuentos.length > 0;
     const tieneFinanciacion = ajustes.financiacionMaxima && parseEuroNumber(ajustes.financiacionMaxima) > 0;
-    const importeAnticipado = parseEuroNumber(
-      resultadoLiquidacion.importeAnticipado || ajustes.importeAnticipado
-    );
+    // calcularResultado ya devuelve 0 fuera de GNRAL; no usar el campo crudo de ajustes
+    const importeAnticipado = parseEuroNumber(resultadoLiquidacion.importeAnticipado);
     const tieneImporteAnticipado = importeAnticipado > 0;
     const mostrarResumenPrevio = tieneFinanciacion || tieneImporteAnticipado;
     const resultadoPrevioAjustes = parseEuroNumber(
@@ -1908,8 +1880,8 @@
     const layoutResultadoFinal = {
       hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0,
       vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 1 : 0,
-      hLineColor: () => '#407C2E',
-      vLineColor: () => '#407C2E',
+      hLineColor: () => '#F4B223',
+      vLineColor: () => '#F4B223',
       paddingTop: () => 5
     };
 
@@ -2281,86 +2253,29 @@
   // =========================================================================
 
   /**
-   * Genera y descarga el PDF.
-   * @param {Object} [datos] - Datos de la liquidación (si no se proporciona, se obtienen del formulario)
+   * Carga el logo de cabecera: SVG, si no PNG principal, si no PNG de respaldo.
+   * Si no hay ninguno devuelve una imagen vacía para no romper el documento.
+   * @returns {Promise<{logoData: string, isSVG: boolean}>}
    */
-  async function generar(datos) {
-    // Obtener datos del formulario si no se proporcionan
-    const d = datos || obtenerDatosFormulario();
-    
-    if (!d) {
-      alert('Error: No se pudieron obtener los datos del formulario.');
-      return;
-    }
-
-    // Verificar que pdfMake está disponible
-    if (typeof pdfMake === 'undefined') {
-      console.error('[pdfGen] pdfMake no está cargado');
-      alert('Error: La librería pdfMake no está disponible.');
-      return;
-    }
-
-    // Verificar que las fuentes están cargadas
-    if (!pdfMake.fonts || !pdfMake.fonts['HelveticaNeue-MediumCondensed']) {
-      console.error('[pdfGen] Fuentes personalizadas no cargadas. Asegúrate de incluir pdfFonts.js');
-      alert('Error: Las fuentes no están cargadas. Verifica pdfFonts.js');
-      return;
-    }
-
+  async function cargarLogoCabecera() {
     try {
-      console.log('[pdfGen] Datos del formulario:', d);
-      console.log('[pdfGen] Tipo de liquidación:', d.tipoLiquidacion || 'GNRAL');
-      console.log('[pdfGen] Cargando logo...');
-
-      // Intentar cargar como SVG primero
-      let logoData;
-      let isSVG = false;
-
+      return { logoData: await loadSVG(PDF_LOGO.svg), isSVG: true };
+    } catch {
       try {
-        logoData = await loadSVG(PDF_LOGO.svg);
-        isSVG = true;
-        console.log('[pdfGen] Logo SVG cargado');
-      } catch (svgError) {
-        console.warn('[pdfGen] No se pudo cargar SVG, intentando PNG...');
+        return { logoData: await loadImageAsBase64(PDF_LOGO.png), isSVG: false };
+      } catch {
         try {
-          logoData = await loadImageAsBase64(PDF_LOGO.png);
-          console.log('[pdfGen] Logo PNG cargado');
-        } catch (pngError) {
-          console.warn('[pdfGen] No se pudo cargar PNG principal, intentando PNG de respaldo...');
-          try {
-            logoData = await loadImageAsBase64(PDF_LOGO.fallbackPng);
-            console.log('[pdfGen] Logo PNG de respaldo cargado');
-          } catch (fallbackPngError) {
-            console.error('[pdfGen] No se pudo cargar ningún logo');
-            // Continuar sin logo
-            logoData = null;
-          }
+          return { logoData: await loadImageAsBase64(PDF_LOGO.fallbackPng), isSVG: false };
+        } catch {
+          console.error('[pdfGen] No se pudo cargar ningún logo; se usa una imagen vacía');
+          return { logoData: IMAGEN_VACIA, isSVG: false };
         }
       }
-
-      // Cargar logos GR24 (para pie de página)
-      let logosGr24Base64 = null;
-      try {
-        logosGr24Base64 = await loadImageAsBase64('assets/img/logos_gr24.png');
-        console.log('[pdfGen] Logos GR24 cargado');
-      } catch (e) {
-        console.warn('[pdfGen] No se pudo cargar logos_gr24.png');
-      }
-
-      console.log('[pdfGen] Generando PDF...');
-      const docDefinition = buildDocDefinition(d, logoData, isSVG, logosGr24Base64);
-      const tituloLiquidacion = obtenerTituloLiquidacion(d);
-      pdfMake.createPdf(docDefinition).download(`${tituloLiquidacion}.pdf`);
-      console.log('[pdfGen] PDF generado correctamente');
-
-    } catch (error) {
-      console.error('[pdfGen] Error generando PDF:', error);
-      alert('Error generando el PDF: ' + error.message);
     }
   }
 
   /**
-   * Abre el PDF en una nueva pestaña (previsualización).
+   * Abre el PDF en una nueva pestaña.
    * @param {Object} [datos] - Datos de la liquidación (si no se proporciona, se obtienen del formulario)
    */
   async function preview(datos) {
@@ -2378,24 +2293,14 @@
       return;
     }
 
-    try {
-      let logoData;
-      let isSVG = false;
+    if (!pdfMake.fonts || !pdfMake.fonts['HelveticaNeue-MediumCondensed']) {
+      console.error('[pdfGen] Fuentes personalizadas no cargadas. Asegúrate de incluir pdfFonts.js');
+      alert('Error: Las fuentes no están cargadas. Verifica pdfFonts.js');
+      return;
+    }
 
-      try {
-        logoData = await loadSVG(PDF_LOGO.svg);
-        isSVG = true;
-      } catch {
-        try {
-          logoData = await loadImageAsBase64(PDF_LOGO.png);
-        } catch {
-          try {
-            logoData = await loadImageAsBase64(PDF_LOGO.fallbackPng);
-          } catch {
-            logoData = null;
-          }
-        }
-      }
+    try {
+      const { logoData, isSVG } = await cargarLogoCabecera();
 
       // Cargar logos GR24 (para pie de página)
       let logosGr24Base64 = null;
@@ -2458,7 +2363,7 @@
           return;
         }
       
-        preview();
+        preview(datosActuales);
       });
     }
   }
@@ -2469,7 +2374,6 @@
 
   global.pdfGen = {
     init,
-    generar,
     preview,
     PDF_CONFIG,
     obtenerDatosFormulario
