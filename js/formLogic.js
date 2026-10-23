@@ -1269,59 +1269,7 @@ document.addEventListener('DOMContentLoaded', () => {
    * @returns {Promise} Se resuelve cuando se cierra el modal
    */
   function mostrarMensaje(mensaje, esError = false) {
-    return new Promise((resolve) => {
-      // Crear overlay si no existe
-      let overlay = document.querySelector('.message-overlay');
-      if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.className = 'message-overlay';
-        overlay.innerHTML = `
-          <div class="message-dialog">
-            <div class="message-icon"></div>
-            <div class="message-body"></div>
-            <div class="message-actions">
-              <button type="button" class="btn-message-ok">Aceptar</button>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(overlay);
-      }
-
-      const dialog = overlay.querySelector('.message-dialog');
-      const iconEl = overlay.querySelector('.message-icon');
-      const bodyEl = overlay.querySelector('.message-body');
-      const btnOk = overlay.querySelector('.btn-message-ok');
-
-      // Configurar contenido
-      dialog.className = 'message-dialog ' + (esError ? 'message-error' : 'message-success');
-      iconEl.textContent = esError ? '⚠️' : '✅';
-      bodyEl.textContent = mensaje;
-
-      // Mostrar
-      overlay.classList.add('visible');
-      btnOk.focus();
-
-      // Handler de cierre
-      const cerrar = () => {
-        overlay.classList.remove('visible');
-        btnOk.removeEventListener('click', cerrar);
-        overlay.removeEventListener('click', cerrarOverlay);
-        document.removeEventListener('keydown', cerrarEsc);
-        resolve();
-      };
-
-      const cerrarOverlay = (e) => {
-        if (e.target === overlay) cerrar();
-      };
-
-      const cerrarEsc = (e) => {
-        if (e.key === 'Escape') cerrar();
-      };
-
-      btnOk.addEventListener('click', cerrar);
-      overlay.addEventListener('click', cerrarOverlay);
-      document.addEventListener('keydown', cerrarEsc);
-    });
+    return window.showMessage(mensaje, esError);
   }
 
   // =========================================================================
@@ -1556,7 +1504,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const confirmed = await showConfirm('¿Estás seguro de que quieres borrar el contenido de esta sección?', {
       confirmText: 'Borrar',
-      cancelText: 'Cancelar'
+      cancelText: 'Cancelar',
+      icon: '⚠️'
     });
     
     if (!confirmed) return;
@@ -1715,11 +1664,9 @@ document.addEventListener('DOMContentLoaded', () => {
       window.uiDesplazamientoEspecial.reset();
     }
 
-    // Ocultar ficha de vehículo
-    const vehiculoContainer = document.getElementById('vehiculo-particular-container');
-    if (vehiculoContainer) {
-      vehiculoContainer.innerHTML = '';
-      vehiculoContainer.style.display = 'none';
+    // Eliminar ficha de vehículo (también su estado en uiDesplazamientos, para que se recree)
+    if (uiDesp.resetFichaVehiculo) {
+      uiDesp.resetFichaVehiculo();
     }
 
     // Resetear contador de desplazamientos

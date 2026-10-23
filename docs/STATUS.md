@@ -43,6 +43,9 @@
 | IRPF del tramo "España (ida)" en viajes internacionales: los días antes del cruce usaban el exento bajo (26,67) porque el corte técnico de las 00:00 se tomaba como un regreso de madrugada. Ahora se considera que hay pernocta. Ejemplo: Decreto, cruce un día después de salir → 26,67 € menos de IRPF sujeto (10,73 € con RD) | `calculoDesp.calcIRPF` (`isSpainOutboundSegment`) |
 | Carga de `.dta` sin `setTimeout`. Antes había pausas fijas (50/100/120×10/150/300 ms) y el aviso de "cargado" aparecía ~400 ms antes de terminar. Ahora es síncrona y ordenada, y `restaurarTodo` responde al acabar | `serializacionDatos.restaurarTodo`, `restaurarPago`, `restaurarDesplazamientos`, `restaurarJustificaPernoctaDesplazamiento`, `restaurarVehiculo` |
 | Cada clic en "Añadir línea" de la ficha especial lanzaba un error en consola: comparte la clase `btn-otros-gastos` con las fichas normales | `uiDesplazamientos` (delegación de clics) |
+| Carga de `.dta` de otro tipo: la carga parcial incluye ahora la forma de pago; un formulario GNRAL abierto carga completo cualquier archivo salvo AECC; erratas del aviso ("liquidación") | `serializacionDatos.restaurarTodo`, `obtenerNombreTipoLiquidacion` |
+| Carga de `.dta` de otro tipo: diálogo con tres opciones (abrir como el tipo del archivo / copiar solo datos comunes / cancelar); sin pregunta de versión de esquema; mensajes de éxito y error en modal, sin `alert()`/`confirm()` | `serializacionDatos.restaurarTodo`, `abrirDialogoImportar`, `confirmDialog.showChoice`, `showMessage` |
+| "Borrar todo" vaciaba la ficha de vehículo sin avisar a `uiDesplazamientos`, así que no se volvía a crear: se perdía el vehículo al cargar un `.dta` sobre un formulario que lo mostraba, y no reaparecía al volver a poner km | `uiDesplazamientos.resetFichaVehiculo`, `formLogic.limpiarSeccionDesplazamientos` |
 
 **Lógica duplicada unificada:**
 - `utils.getNormativa`, que antes estaba en 5 sitios.
@@ -111,7 +114,6 @@
 - **Archivos grandes con varias responsabilidades:** `pdfGen.js`, `formLogic.js`, `calculoDesp.js`, `serializacionDatos.js` y `uiDesplazamientoAecc.js`.
 - **Dependencia del orden de `<script>` y del estado global en `window`.** Desde 2026-10-23 los módulos usan `window.utils` y `window.limpiaDatos` **sin respaldo**, así que `utils.js` y `limpiaDatos.js` tienen que cargarse los primeros.
 - **`MutationObserver` sobre el atributo `value`** de un input oculto como canal de comunicación (`resultadoLiquidacion.js`, `#descuento-manut-congreso`).
-- **Diálogos mezclados.** La carga de archivos sigue usando `confirm()` y `alert()` nativos.
 - **Criterios distintos de validación de fechas:** el motor permite regreso = ida, pero `logicaDesp` y `validaciones` lo rechazan.
 - **Una ficha especial sin líneas** (solo título o IRPF) no se guarda al recargar: `uiDesplazamientoEspecial.restaurarDatos` la ignora. Ya era así antes; está sin decidir.
 - **Sincronía manual con `sgtri-desp-prod`.**

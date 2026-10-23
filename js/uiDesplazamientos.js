@@ -168,6 +168,17 @@
   }
 
   /**
+   * Elimina la ficha de vehículo y sus datos (al borrar el formulario).
+   * La próxima vez que se muestre se creará de nuevo.
+   */
+  function resetFichaVehiculo() {
+    if (!vehiculoContainer) return;
+    vehiculoContainer.innerHTML = '';
+    vehiculoContainer.style.display = 'none';
+    vehiculoVisible = false;
+  }
+
+  /**
    * Evalúa si algún desplazamiento tiene km > 0 y muestra/oculta la ficha.
    * También considera si existe el desplazamiento especial.
    */
@@ -1003,6 +1014,7 @@
     crearFichaVehiculo,
     mostrarFichaVehiculo,
     ocultarFichaVehiculo,
+    resetFichaVehiculo,
     evaluarKmParaMostrarFicha,
 
     // Países

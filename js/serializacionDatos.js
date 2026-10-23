@@ -98,19 +98,19 @@
   }
 
   /**
-   * Devuelve el nombre legible del tipo de liquidacion.
+   * Devuelve el nombre legible del tipo de liquidación.
    * @param {'DESPL'|'CONGR'|'HONOR'|'AECC'|'GNRAL'} tipo
    * @returns {string}
    */
   function obtenerNombreTipoLiquidacion(tipo) {
     const mapa = {
-      DESPL: 'Liquidacion de desplazamientos',
-      CONGR: 'Asistencia a Congresos',
+      DESPL: 'Desplazamientos',
+      CONGR: 'Congresos',
       HONOR: 'Honorarios',
       AECC: 'AECC',
-      GNRAL: 'Especial'
+      GNRAL: 'General'
     };
-    return mapa[tipo] || 'Especial';
+    return mapa[tipo] || mapa.GNRAL;
   }
 
   // =========================================================================
@@ -953,7 +953,7 @@
   /**
    * Restaura todos los datos del formulario
    * @param {Object} datos - Objeto con todos los datos
-   * @returns {Promise<{ok: boolean, cargaParcial: boolean, motivo?: string, cancelado?: boolean}>}
+   * @returns {Promise<{ok: boolean, cargaParcial: boolean, motivo?: string, mensaje?: string, cancelado?: boolean}>}
    */
   async function restaurarTodo(datos) {
     if (!datos) {
@@ -961,16 +961,9 @@
       return { ok: false, cargaParcial: false, motivo: 'El archivo no contiene datos.' };
     }
 
-    // Verificar versión del esquema
+    // Versión de esquema distinta: se intenta cargar igualmente (solo se registra en consola)
     if (datos.versionEsquema !== VERSION_ESQUEMA) {
       console.warn(`[serializacionDatos] Versión diferente: archivo=${datos.versionEsquema}, app=${VERSION_ESQUEMA}`);
-      const continuar = confirm(
-        `El archivo fue guardado con una versión diferente del esquema.\n` +
-        `Archivo: ${datos.versionEsquema}\n` +
-        `Aplicación: ${VERSION_ESQUEMA}\n\n` +
-        `¿Desea intentar cargarlo de todos modos?`
-      );
-      if (!continuar) return { ok: false, cargaParcial: false, cancelado: true };
     }
 
     const tipoArchivo = normalizarTipoLiquidacion(datos.tipoLiquidacion);
@@ -981,38 +974,60 @@
       : normalizarTipoLiquidacion(global.__sgtriTipoLiquidacion);
 
     const hayFormularioAbierto = !!global.__sgtriTipoLiquidacion;
-    const tipoDistinto = hayFormularioAbierto && (tipoArchivo !== tipoActual);
 
-    // Si el usuario ya esta en un tipo de formulario y carga otro tipo distinto,
-    // se mantiene el modo actual y se restauran solo secciones compatibles.
+    // Un formulario GNRAL admite cualquier liquidación salvo AECC: se carga completa
+    // y el formulario sigue siendo GNRAL
+    const gnralAdmiteArchivo = hayFormularioAbierto && tipoActual === 'GNRAL' && tipoArchivo !== 'AECC';
+    const tipoDistinto = hayFormularioAbierto && (tipoArchivo !== tipoActual) && !gnralAdmiteArchivo;
+    const tipoDestino = gnralAdmiteArchivo ? 'GNRAL' : tipoArchivo;
+
+    // Tipo distinto al del formulario abierto: el usuario elige cambiar de tipo y cargarlo todo,
+    // copiar solo los datos comunes en la liquidación actual o cancelar
     if (tipoDistinto) {
-      restaurarBeneficiario(datos.beneficiario);
-      const restaurarProyectoParcial = tipoArchivo !== 'AECC' && tipoActual !== 'AECC';
-      if (restaurarProyectoParcial) {
-        restaurarProyecto(datos.proyecto);
-      }
+      const conProyecto = tipoArchivo !== 'AECC' && tipoActual !== 'AECC';
+      const datosComunes = conProyecto ? 'beneficiario, forma de pago y proyecto' : 'beneficiario y forma de pago';
+      // La forma de pago también se copia, pero no se menciona en la opción
+      const datosOpcion = conProyecto ? 'beneficiario y proyecto' : 'beneficiario';
+      const nombreArchivo = obtenerNombreTipoLiquidacion(tipoArchivo);
+      const nombreActual = obtenerNombreTipoLiquidacion(tipoActual);
 
-      const nombreTipoArchivo = obtenerNombreTipoLiquidacion(tipoArchivo);
-      if (!restaurarProyectoParcial) {
-        alert(`La liquidacion cargada es de tipo "${nombreTipoArchivo}". Solamente se cargaron los datos de beneficiario.`);
-      } else {
-        alert(`La liquidacion cargada es de tipo "${nombreTipoArchivo}". Solamente se cargaron los datos de beneficiario y proyecto.`);
-      }
+      const eleccion = await global.showChoice(
+        `El archivo corresponde a una liquidación de «${nombreArchivo}»,\npero la liquidación actual es de «${nombreActual}».`,
+        {
+          pregunta: '¿Cómo quiere que se carguen los datos?',
+          opciones: [
+            { id: 'parcial', texto: `Seguir en la liquidación actual y cargar solamente los datos de ${datosOpcion}.` },
+            { id: 'cambiar', texto: `Abrir como liquidación de «${nombreArchivo}» y cargar todos los datos (se sustituirán los datos actuales).` }
+          ],
+          // Primera y marcada por defecto: la opción que no borra datos
+          seleccion: 'parcial'
+        }
+      );
 
-      return { ok: true, cargaParcial: true };
+      if (!eleccion) return { ok: false, cargaParcial: false, cancelado: true };
+
+      if (eleccion === 'parcial') {
+        restaurarBeneficiario(datos.beneficiario);
+        restaurarPago(datos.pago);
+        if (conProyecto) restaurarProyecto(datos.proyecto);
+        return { ok: true, cargaParcial: true, mensaje: `Se han cargado los datos de ${datosComunes}.` };
+      }
+      // 'cambiar': continúa con la carga completa en el tipo del archivo (tipoDestino)
     }
 
-    if ((tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR') &&
+    // A partir de aquí, las comprobaciones son respecto al tipo con el que quedará el formulario
+
+    if ((tipoDestino === 'CONGR' || tipoDestino === 'HONOR') &&
         Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 1) {
       return { ok: false, cargaParcial: false, motivo: 'El archivo no es compatible con este tipo de liquidación: contiene más de un desplazamiento.' };
     }
 
-    if (tipoArchivo === 'AECC' && Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 0) {
+    if (tipoDestino === 'AECC' && Array.isArray(datos.desplazamientos) && datos.desplazamientos.length > 0) {
       return { ok: false, cargaParcial: false, motivo: 'El archivo no es compatible con este tipo de liquidación: incluye desplazamientos.' };
     }
 
     const tieneAECC = Array.isArray(datos.desplazamientoAECC) && datos.desplazamientoAECC.length > 0;
-    if ((tipoArchivo === 'DESPL' || tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR') && tieneAECC) {
+    if ((tipoDestino === 'DESPL' || tipoDestino === 'CONGR' || tipoDestino === 'HONOR') && tieneAECC) {
       return { ok: false, cargaParcial: false, motivo: 'El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento AECC.' };
     }
 
@@ -1020,12 +1035,12 @@
       Array.isArray(datos.desplazamientoEspecial.lineas) &&
       datos.desplazamientoEspecial.lineas.length > 0);
 
-    if ((tipoArchivo === 'DESPL' || tipoArchivo === 'CONGR' || tipoArchivo === 'HONOR' || tipoArchivo === 'AECC') && tieneEspecial) {
+    if ((tipoDestino === 'DESPL' || tipoDestino === 'CONGR' || tipoDestino === 'HONOR' || tipoDestino === 'AECC') && tieneEspecial) {
       return { ok: false, cargaParcial: false, motivo: 'El archivo no es compatible con este tipo de liquidación: incluye un desplazamiento especial.' };
     }
 
     if (global.tipoLiquidacion?.aplicarModoDesdeArchivo) {
-      global.tipoLiquidacion.aplicarModoDesdeArchivo(tipoArchivo);
+      global.tipoLiquidacion.aplicarModoDesdeArchivo(tipoDestino);
     }
 
     // Limpiar formulario completo antes de restaurar
@@ -1222,14 +1237,12 @@
         try {
           const resultado = await importarArchivo(archivo);
           if (resultado && resultado.ok) {
-            if (!resultado.cargaParcial) {
-              alert('Datos cargados correctamente');
-            }
+            await global.showMessage(resultado.mensaje || 'Datos cargados correctamente.');
           } else if (!resultado || !resultado.cancelado) {
-            alert(mensajeFalloCarga(resultado && resultado.motivo));
+            await global.showMessage(mensajeFalloCarga(resultado && resultado.motivo), true);
           }
         } catch (error) {
-          alert(mensajeFalloCarga(error.message));
+          await global.showMessage(mensajeFalloCarga(error.message), true);
         }
       }
     };

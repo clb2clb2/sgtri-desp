@@ -276,13 +276,176 @@
     });
   }
 
+  /**
+   * Muestra un diálogo modal con icono, mensaje centrado, una lista de opciones (radio)
+   * y los botones Aceptar / Cancelar. Escape y el clic fuera equivalen a cancelar.
+   * @param {string} message - Mensaje (texto plano; los saltos de línea se respetan)
+   * @param {Object} options
+   * @param {string} [options.pregunta] - Pregunta destacada bajo el mensaje (estilo .desplazamiento-titulo)
+   * @param {Array<{id: string, texto: string}>} options.opciones - Opciones en orden
+   * @param {string} [options.seleccion] - id de la opción marcada al abrir (por defecto, la primera)
+   * @param {string} [options.icon='⚠️']
+   * @param {string} [options.confirmText='Aceptar']
+   * @param {string} [options.cancelText='Cancelar']
+   * @returns {Promise<string|null>} id de la opción elegida, o null si se cancela
+   */
+  function showChoice(message, options = {}) {
+    return new Promise(resolve => {
+      const {
+        opciones = [],
+        pregunta = '',
+        seleccion = opciones[0] && opciones[0].id,
+        icon = '⚠️',
+        confirmText = 'Aceptar',
+        cancelText = 'Cancelar'
+      } = options;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'confirm-overlay';
+      overlay.tabIndex = -1;
+      const grupo = `choice-${Date.now()}`;
+      const radios = opciones.map(op => `
+            <label class="choice-opcion">
+              <input type="radio" name="${grupo}" value="${escapeHtml(op.id)}"${op.id === seleccion ? ' checked' : ''} />
+              <span>${escapeHtml(op.texto)}</span>
+            </label>`).join('');
+      overlay.innerHTML = `
+        <div class="confirm-dialog choice-dialog" role="dialog" aria-modal="true">
+          ${icon ? `<div class="confirm-icon">${escapeHtml(icon)}</div>` : ''}
+          <div class="confirm-body choice-body">${mensajeHtml(message)}</div>
+          ${pregunta ? `<div class="desplazamiento-titulo choice-pregunta">${escapeHtml(pregunta)}</div>` : ''}
+          <div class="choice-opciones" role="radiogroup">${radios}
+          </div>
+          <div class="confirm-actions">
+            <button type="button" class="btn-message-ok" data-accion="confirmar">${escapeHtml(confirmText)}</button>
+            <button type="button" class="btn-confirm-no" data-accion="cancelar">${escapeHtml(cancelText)}</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      requestAnimationFrame(() => overlay.classList.add('visible'));
+
+      let resuelto = false;
+      function cleanup(result) {
+        if (resuelto) return;
+        resuelto = true;
+        overlay.classList.remove('visible');
+        const fin = () => {
+          document.body.style.overflow = originalOverflow;
+          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        };
+        overlay.addEventListener('transitionend', fin, { once: true });
+        setTimeout(fin, 220);
+        resolve(result);
+      }
+
+      const elegida = () => {
+        const marcado = overlay.querySelector(`input[name="${grupo}"]:checked`);
+        return marcado ? marcado.value : null;
+      };
+      const btnAceptar = overlay.querySelector('[data-accion="confirmar"]');
+      const btnCancelar = overlay.querySelector('[data-accion="cancelar"]');
+      btnAceptar.addEventListener('click', () => cleanup(elegida()));
+      btnCancelar.addEventListener('click', () => cleanup(null));
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) cleanup(null);
+      });
+      overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') cleanup(null);
+        // Enter sobre una opción equivale a Aceptar
+        if (e.key === 'Enter' && e.target.type === 'radio') {
+          e.preventDefault();
+          cleanup(elegida());
+        }
+        if (e.key === 'Tab') {
+          const focusables = [overlay.querySelector(`input[name="${grupo}"]:checked`) || overlay.querySelector('input[type="radio"]'), btnAceptar, btnCancelar].filter(Boolean);
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      });
+
+      setTimeout(() => (overlay.querySelector(`input[name="${grupo}"]:checked`) || btnAceptar).focus(), 120);
+    });
+  }
+
+  /**
+   * Muestra un modal de mensaje con un botón Aceptar (✅ éxito / ⚠️ error).
+   * @param {string} mensaje - Texto plano; los saltos de línea se respetan
+   * @param {boolean} [esError=false]
+   * @returns {Promise<void>} Se resuelve al cerrar el modal
+   */
+  function showMessage(mensaje, esError = false) {
+    return new Promise((resolve) => {
+      // Crear overlay si no existe
+      let overlay = document.querySelector('.message-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'message-overlay';
+        overlay.innerHTML = `
+          <div class="message-dialog" role="dialog" aria-modal="true">
+            <div class="message-icon" data-rol="icono"></div>
+            <div class="message-body"></div>
+            <div class="message-actions">
+              <button type="button" class="btn-message-ok">Aceptar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+      }
+
+      const dialog = overlay.querySelector('.message-dialog');
+      const iconEl = overlay.querySelector('[data-rol="icono"]');
+      const bodyEl = overlay.querySelector('.message-body');
+      const btnOk = overlay.querySelector('.btn-message-ok');
+
+      dialog.className = 'message-dialog ' + (esError ? 'message-error' : 'message-success');
+      // El aviso usa el mismo icono que los diálogos de confirmación
+      iconEl.className = esError ? 'confirm-icon' : 'message-icon';
+      iconEl.textContent = esError ? '⚠️' : '✅';
+      bodyEl.innerHTML = mensajeHtml(mensaje);
+
+      overlay.classList.add('visible');
+      btnOk.focus();
+
+      const cerrar = () => {
+        overlay.classList.remove('visible');
+        btnOk.removeEventListener('click', cerrar);
+        overlay.removeEventListener('click', cerrarOverlay);
+        document.removeEventListener('keydown', cerrarEsc);
+        resolve();
+      };
+      const cerrarOverlay = (e) => {
+        if (e.target === overlay) cerrar();
+      };
+      const cerrarEsc = (e) => {
+        if (e.key === 'Escape') cerrar();
+      };
+
+      btnOk.addEventListener('click', cerrar);
+      overlay.addEventListener('click', cerrarOverlay);
+      document.addEventListener('keydown', cerrarEsc);
+    });
+  }
+
   // =========================================================================
   // EXPORTACIÓN
   // =========================================================================
 
   const confirmDialog = {
     showConfirm,
-    showPrompt
+    showPrompt,
+    showChoice,
+    showMessage
   };
 
   global.confirmDialog = confirmDialog;
@@ -290,5 +453,7 @@
   // Alias de conveniencia
   global.showConfirm = showConfirm;
   global.showPrompt = showPrompt;
+  global.showChoice = showChoice;
+  global.showMessage = showMessage;
 
 })(typeof window !== 'undefined' ? window : this);

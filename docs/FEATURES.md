@@ -183,9 +183,15 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
 **Archivos.** `js/serializacionDatos.js` (`exportarArchivo`, `importarArchivo`, `restaurarTodo`, `abrirDialogoImportar`, `mensajeFalloCarga`).
 
 **Flujo de carga.**
-1. Se comprueba la versión con `confirm`.
+1. Si la versión de esquema es distinta, se carga igualmente (solo un aviso en la consola).
 2. Se normaliza el modo.
-3. Si ya hay un formulario abierto con otro modo, la carga es **parcial**: solo beneficiario y proyecto. Si el archivo o el formulario son AECC, solo se carga el beneficiario.
+3. **Tipo distinto al del formulario abierto.** Desde el menú inicial no hay conflicto. Un formulario GNRAL abierto admite cualquier archivo salvo AECC: lo carga completo y sigue siendo GNRAL. En los demás casos aparece un diálogo (`confirmDialog.showChoice`):
+   - Icono ⚠️ y texto centrado: *"El archivo corresponde a una liquidación de «Honorarios», / pero la liquidación actual es de «Desplazamientos»."* Debajo, la pregunta *"¿Cómo quiere que se carguen los datos?"* con el estilo `desplazamiento-titulo`.
+   - Dos opciones de radio en recuadros (borde verde, *hover* `--color-primary-hover`), alineadas a la izquierda:
+     - **"Seguir en la liquidación actual y cargar solamente los datos de beneficiario y proyecto."**: primera y marcada por defecto. Carga parcial: también copia la forma de pago, aunque el texto no lo diga. Si interviene AECC, dice "…de beneficiario." y no carga el proyecto. El resto del formulario no se toca, y los valores del archivo sustituyen a los actuales aunque estén vacíos.
+     - **"Abrir como liquidación de «X» y cargar todos los datos (se sustituirán los datos actuales)."**: cambia de tipo y hace una carga completa.
+   - Botones **Aceptar** (verde, `btn-message-ok`) y **Cancelar** (gris, `btn-confirm-no`), alineados a la derecha. Cancelar, Escape o clic fuera: no se carga nada. Enter sobre una opción equivale a Aceptar.
+   - Nombres de tipo en los diálogos: Desplazamientos, Congresos, Honorarios, AECC, General (`obtenerNombreTipoLiquidacion`).
 4. Comprobaciones de compatibilidad:
    - CONGR/HONOR con más de 1 ficha;
    - AECC con fichas normales;
@@ -195,12 +201,12 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
    1. `aplicarModoDesdeArchivo`, luego limpiar el formulario y restaurar sección a sección, en orden y sin esperas. "Justificar pernocta" se marca después de calcular su ficha.
    2. Mostrar y restaurar el vehículo, y después `logicaDesp.recalcularTodas()`.
    3. Restaurar la imputación.
-   4. `restaurarTodo` responde solo cuando todo ha terminado. Entonces aparece "Datos cargados correctamente".
+   4. `restaurarTodo` responde solo cuando todo ha terminado. Entonces aparece el modal (`showMessage`, el mismo de "Comprobar datos") con "Datos cargados correctamente." o el resumen de la carga parcial.
 
 **Casos límite.**
 - Las fichas que superan el límite se descartan sin avisar.
 - Si el archivo trae un valor de select que no existe, se pierde sin avisar.
-- Si la carga falla (JSON inválido, archivo vacío o incompatible), se muestra "Falló la carga de datos guardados." con el motivo. Si el usuario cancela la pregunta de versión, no se muestra nada (`{ok:false, cancelado:true}`).
+- Si la carga falla (JSON inválido, archivo vacío o incompatible), se muestra el modal de error "Falló la carga de datos guardados." con el motivo. Si el usuario cancela, no se muestra nada. En la carga ya no queda ningún `alert()` ni `confirm()` nativo.
 - Una ficha especial **sin líneas** (solo título o IRPF) no se restaura (`uiDesplazamientoEspecial.restaurarDatos`).
 - Pendiente de revisar (ver STATUS §3): mapeo de `evento-asociado` y pérdidas silenciosas.
 
@@ -242,7 +248,7 @@ El título depende del modo (:81-122).
 - **Acordeón de secciones accesible** (`main.js:44-130`).
 - **"Comprobar datos"** (`#btn-comprobar-datos`, `formLogic.validarDatos`): marca los campos obligatorios y abre las secciones afectadas.
 - **Borrar sección** (`.btn-clear-section`, `formLogic.js:2018-2029`) y **borrar todo** (`limpiarFormularioCompleto`).
-- **Modales** `showConfirm` y `showPrompt` (`confirmDialog.js`), que sustituyen a `confirm()` y `prompt()` salvo en la carga de archivos. `showPrompt` admite `confirmClass` y `cancelClass`; el diálogo de Guardar usa `btn-message-ok`.
+- **Modales de `confirmDialog.js`:** `showConfirm`, `showPrompt` (admite `confirmClass` y `cancelClass`), `showChoice` (icono, mensaje centrado, `pregunta` opcional, opciones de radio y Aceptar/Cancelar) y `showMessage` (mensaje con Aceptar, ✅ o ⚠️; lo usan "Comprobar datos" y la carga de `.dta`). Todos escapan el texto y convierten `\n` en `<br>`.
 - **Fecha de firma:** con o sin fecha fija, mediante radios (`formLogic.js:240-263`).
 
 ## 14. Dudas / no verificado
