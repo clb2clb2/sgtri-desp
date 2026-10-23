@@ -298,6 +298,13 @@ body {
   gap: 0.75rem;
 }
 
+/* Separa "Cargar datos guardados" de los tipos de liquidación (mismo borde que el cuadro) */
+.tipo-liquidacion-separador {
+  border: none;
+  border-top: 1px solid #999;
+  margin: 0.25rem 0;
+}
+
 .tipo-liquidacion-btn {
   width: 100%;
   text-align: center;
