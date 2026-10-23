@@ -43,6 +43,22 @@
     }
   }
 
+  /** Longitud máxima de una orgánica (campo del proyecto y líneas de imputación). */
+  const MAX_LONGITUD_ORGANICA = 30;
+
+  /**
+   * Sanea una orgánica: solo letras, números, puntos y espacios, en mayúsculas,
+   * hasta MAX_LONGITUD_ORGANICA caracteres.
+   * @param {string} valor
+   * @returns {string}
+   */
+  function sanitizeOrganica(valor) {
+    return String(valor || '')
+      .replace(/[^A-Za-z0-9. ]/g, '')
+      .toUpperCase()
+      .slice(0, MAX_LONGITUD_ORGANICA);
+  }
+
   /**
    * Sanea referencias de proyecto: permite letras, números, barras y puntuación básica.
    * @param {string} value - Valor a sanear
@@ -84,21 +100,6 @@
       return String(value || '').replace(/[^A-Za-z0-9.-]/g, '').slice(0, maxLen || 20).toUpperCase();
     } catch (err) {
       return String(value || '').slice(0, maxLen || 20).toUpperCase();
-    }
-  }
-
-  /**
-   * Formatea código de orgánica: pares de caracteres separados por puntos.
-   * @param {string} value - Valor a formatear
-   * @returns {string} Orgánica formateada (ej: "AB.CD.EF")
-   */
-  function formatOrganica(value) {
-    try {
-      const only = String(value || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 14).toUpperCase();
-      const parts = only.match(/.{1,2}/g) || [];
-      return parts.join('.');
-    } catch (err) {
-      return String(value || '').slice(0, 20).toUpperCase();
     }
   }
 
@@ -335,9 +336,10 @@
     sanitizeGeneralText,
     sanitizeExtendedText,
     sanitizeReferencia,
+    sanitizeOrganica,
+    MAX_LONGITUD_ORGANICA,
     sanitizeIBAN,
     sanitizeDNI,
-    formatOrganica,
 
     // Formateo agrupado
     formatGroupedRaw,

@@ -41,6 +41,7 @@ Es una SPA estática, sin backend, para el SGTRI de la Universidad de Extremadur
 
 ## Trampas / no tocar
 - **`js/pdfmake.min.js`** es de terceros y **`js/pdfFonts.js`** es un archivo generado ("NO EDITAR MANUALMENTE"). No se editan a mano.
+- **Producción:** https://dietas.sgtri-unex.es/ (Cloudflare Pages, `sgtri-dietas.pages.dev`), que se despliega automáticamente con cada push a `main` de `sgtri-desp-prod`. Ver @docs/INTEGRATIONS_AND_CONFIG.md §6.
 - **Sincronía con producción:** el repositorio gemelo `sgtri-desp-prod` contiene una copia idéntica de `index.html`, `js/`, `css/`, `assets/data`, `assets/img`, `favicon.ico` y `robots.txt`; a fecha del análisis solo difiere `.gitignore`. Cualquier cambio en esos archivos hay que copiarlo allí. **La documentación, `tools/` y los ejemplos no se copian a prod.**
 - `datos_ejemplo.js` y `Prueba salida PDF *.docx` contienen **datos personales**: están en `.gitignore` y no se versionan (aunque siguen en el historial). No los vuelvas a añadir ni copies sus datos.
 - `.dta` es JSON en claro: contiene DNI, IBAN y tarjeta.

@@ -569,12 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Orgánica
     if (el.classList.contains('organica') || el.id === 'organica' || /^organica-/.test(el.id || '')) {
-      applyWithCaret(el, (valOrg) => {
-        return String(valOrg || '')
-          .replace(/[^A-Za-z0-9. ]/g, '')
-          .toUpperCase()
-          .slice(0, 20);
-      });
+      applyWithCaret(el, (valOrg) => ld.sanitizeOrganica(valOrg));
       return;
     }
 

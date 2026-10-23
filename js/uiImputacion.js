@@ -76,10 +76,7 @@
    * Solo admite letras, números, puntos y espacios; transforma a mayúsculas.
    */
   function sanitizeOrganica(valor) {
-    return String(valor || '')
-      .toUpperCase()
-      .replace(/[^A-Z0-9. ]/g, '')
-      .slice(0, 20);
+    return global.limpiaDatos.sanitizeOrganica(valor);
   }
 
   /**
@@ -219,7 +216,7 @@
                class="imputacion-organica organica${fieldErrorClass}" 
                value="${escapeHtml(linea.organica)}"
                pattern="^18\\.[A-Za-z0-9. ]*$"
-               maxlength="20"
+               maxlength="${global.limpiaDatos.MAX_LONGITUD_ORGANICA}"
                ${readonlyAttr}${tabindexAttr}
                aria-label="Orgánica" />
       </div>

@@ -119,4 +119,3 @@
 ## 7. Dudas / no verificado
 
 - Las pruebas automáticas se hicieron en Chrome. No se ha probado en Firefox ni Safari.
-- Hosting real de prod: ver INTEGRATIONS §7.

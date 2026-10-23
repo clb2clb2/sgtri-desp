@@ -55,7 +55,13 @@ No hay APIs remotas, analítica, autenticación, backend ni llamadas a servicios
 
 ## 6. Despliegue
 
-- **No hay pipeline:** no hay CI, ni `.github/`, ni Dockerfile, ni scripts de despliegue en el repo.
+- **Hosting: Cloudflare Pages.**
+  - URL pública: **https://dietas.sgtri-unex.es/** (dominio propio).
+  - URL de Cloudflare: https://sgtri-dietas.pages.dev/.
+  - Ambas sirven exactamente el último commit de `sgtri-desp-prod`; se comprobó el 2026-10-23 comparando los hashes de `index.html`, `css/styles.css` y los `js/`. Cloudflare Pages redirige `/index.html` → `/` (308).
+- **Cloudflare despliega desde `sgtri-desp-prod`.** La configuración (proyecto conectado al repositorio de GitHub, rama, dominio) está en el panel de Cloudflare, no en el repo: no hay `wrangler.toml`, `_headers` ni `_redirects`. El despliegue se lanza solo con cada push a `main` de `sgtri-desp-prod` (deducido de que lo publicado coincide con cada commit).
+- **GitHub Pages está desactivado** en `sgtri-desp-prod` desde el 2026-10-23; la única publicación es la de Cloudflare.
+- **No hay pipeline propio:** no hay CI, ni `.github/`, ni Dockerfile, ni scripts de despliegue en el repo.
 - **Cómo se despliega.** El repositorio gemelo `sgtri-desp-prod` (remoto `github.com/clb2clb2/sgtri-desp-prod`) contiene solo los archivos de runtime, copiados a mano. Sus commits se titulan "Sync … from production" / "Sync production app …".
   - A fecha del análisis, todos sus archivos versionados son **idénticos** a los de este repo excepto `.gitignore`. Comprobado con `cmp`.
   - El `.gitignore` de prod excluye explícitamente `docs/`, `tools/`, `Normativas/`, `datos_ejemplo.js`, `Ejemplos PDFMake.pdf` y `*.docx` de prueba.
@@ -63,9 +69,9 @@ No hay APIs remotas, analítica, autenticación, backend ni llamadas a servicios
   - Incluido: `index.html`, `favicon.ico`, `robots.txt`, `css/`, `js/`, `assets/data/datos.json` y `assets/img/*`.
   - Excluido: `assets/fonts/`, que no hace falta porque las fuentes van en `pdfFonts.js`.
 - **`robots.txt`:** `Disallow: /`. No se quiere que la app aparezca en buscadores.
-- **Al publicar un cambio:** copia los archivos de runtime modificados a `sgtri-desp-prod` y haz el commit allí. **No copies** este `CLAUDE.md` ni `docs/*.md`.
+- **Al publicar un cambio:** copia los archivos de runtime modificados a `sgtri-desp-prod`, haz el commit allí y `git push`. Cloudflare Pages lo publica en `dietas.sgtri-unex.es` en uno o dos minutos. **No copies** este `CLAUDE.md` ni `docs/*.md`.
 
 ## 7. Dudas / no verificado
 
-- **Hosting real de prod.** No hay `CNAME` ni configuración visible. ¿GitHub Pages? ¿Servidor de la UEx? No se ha determinado.
+- No se ha visto la configuración del proyecto en el panel de Cloudflare (rama de producción, comando de build, si hay *preview deployments*). Lo descrito en §6 se ha deducido del contenido publicado.
 - No se ha comprobado si el sincronizado con prod sigue un procedimiento o script fuera del repo.
