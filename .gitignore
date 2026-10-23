@@ -20,3 +20,7 @@ Thumbs.db
 # Archivos con datos personales (no versionar)
 datos_ejemplo.js
 Prueba salida PDF *.docx
+
+# Temporales y bloqueos de Microsoft Word
+~$*
+~WRL*.tmp
