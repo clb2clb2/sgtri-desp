@@ -44,7 +44,7 @@ Es una SPA estática, sin backend, para el SGTRI de la Universidad de Extremadur
 - **Sincronía con producción:** el repositorio gemelo `sgtri-desp-prod` contiene una copia idéntica de `index.html`, `js/`, `css/`, `assets/data`, `assets/img`, `favicon.ico` y `robots.txt`; a fecha del análisis solo difiere `.gitignore`. Cualquier cambio en esos archivos hay que copiarlo allí. **La documentación, `tools/` y los ejemplos no se copian a prod.**
 - `datos_ejemplo.js` y `Prueba salida PDF *.docx` contienen **datos personales**: están en `.gitignore` y no se versionan (aunque siguen en el historial). No los vuelvas a añadir ni copies sus datos.
 - `.dta` es JSON en claro: contiene DNI, IBAN y tarjeta.
-- La carga de un `.dta` depende de `setTimeout` encadenados (`js/serializacionDatos.js:998-1157`). Si cambias la creación de fichas, revisa esos tiempos.
+- La carga de un `.dta` (`serializacionDatos.restaurarTodo`) es **síncrona y ordenada**: cada paso depende de que el anterior haya creado su DOM, y la creación de fichas, campos de pago y ficha de vehículo es inmediata. No introduzcas `setTimeout` ni esperas en la creación de esos elementos, o la carga dejará de funcionar.
 - Los diálogos (`showConfirm`/`showPrompt`) escapan el texto: no les pases HTML.
 - El índice del `<select>` de país es la posición en los arrays de `dietasPorPais` (99 entradas). **Reordenar `paises` en `datos.json` sin reordenar también las tarifas rompe el cálculo.**
 - Los modos (DESPL/CONGR/HONOR/AECC/GNRAL) están en `CONFIG` (`js/tipoLiquidacion.js:29-35`). Al modo GNRAL solo se llega con Shift+clic en "Liquidación de desplazamientos".

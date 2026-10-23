@@ -192,15 +192,17 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
    - AECC en modos que no lo admiten;
    - ficha especial fuera de GNRAL.
 5. Carga completa:
-   1. `aplicarModoDesdeArchivo`, luego limpiar el formulario y restaurar sección a sección con `setTimeout` encadenados (50–300 ms).
-   2. `logicaDesp.scheduleFullRecalc(0)`.
+   1. `aplicarModoDesdeArchivo`, luego limpiar el formulario y restaurar sección a sección, en orden y sin esperas. "Justificar pernocta" se marca después de calcular su ficha.
+   2. Mostrar y restaurar el vehículo, y después `logicaDesp.recalcularTodas()`.
    3. Restaurar la imputación.
+   4. `restaurarTodo` responde solo cuando todo ha terminado. Entonces aparece "Datos cargados correctamente".
 
 **Casos límite.**
 - Las fichas que superan el límite se descartan sin avisar.
 - Si el archivo trae un valor de select que no existe, se pierde sin avisar.
 - Si la carga falla (JSON inválido, archivo vacío o incompatible), se muestra "Falló la carga de datos guardados." con el motivo. Si el usuario cancela la pregunta de versión, no se muestra nada (`{ok:false, cancelado:true}`).
-- Pendiente de revisar (ver STATUS §3): mapeo de `evento-asociado`, pérdidas silenciosas y dependencia de `setTimeout`.
+- Una ficha especial **sin líneas** (solo título o IRPF) no se restaura (`uiDesplazamientoEspecial.restaurarDatos`).
+- Pendiente de revisar (ver STATUS §3): mapeo de `evento-asociado` y pérdidas silenciosas.
 
 ## 12. Generar el PDF
 

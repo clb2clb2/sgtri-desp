@@ -40,6 +40,9 @@
 | `confirmDialog` escapa todo lo que inserta en HTML, y `\n` → `<br>` | `confirmDialog.escapeHtml`, `mensajeHtml` |
 | Residencia eventual a final de mes: los meses se cuentan de fecha a fecha (art. 5 del Código Civil). Antes, una salida el día 29, 30 o 31 se reconocía hasta 3 días tarde | `calculoDesp.sumarMesesNaturales`, `isResidenciaEventual` (sustituye a `monthsBetween`) |
 | Acordeón: el primer clic en una sección podía abrirla en vez de cerrarla, porque `maxHeight` se calculaba con el formulario oculto. `toggle()` usa ahora solo la clase `.collapsed` | `main.js`, `toggle` |
+| IRPF del tramo "España (ida)" en viajes internacionales: los días antes del cruce usaban el exento bajo (26,67) porque el corte técnico de las 00:00 se tomaba como un regreso de madrugada. Ahora se considera que hay pernocta. Ejemplo: Decreto, cruce un día después de salir → 26,67 € menos de IRPF sujeto (10,73 € con RD) | `calculoDesp.calcIRPF` (`isSpainOutboundSegment`) |
+| Carga de `.dta` sin `setTimeout`. Antes había pausas fijas (50/100/120×10/150/300 ms) y el aviso de "cargado" aparecía ~400 ms antes de terminar. Ahora es síncrona y ordenada, y `restaurarTodo` responde al acabar | `serializacionDatos.restaurarTodo`, `restaurarPago`, `restaurarDesplazamientos`, `restaurarJustificaPernoctaDesplazamiento`, `restaurarVehiculo` |
+| Cada clic en "Añadir línea" de la ficha especial lanzaba un error en consola: comparte la clase `btn-otros-gastos` con las fichas normales | `uiDesplazamientos` (delegación de clics) |
 
 **Lógica duplicada unificada:**
 - `utils.getNormativa`, que antes estaba en 5 sitios.
@@ -77,14 +80,11 @@
 
 ## 3. Pendiente de revisar (decisión del usuario: revisar más a fondo más adelante)
 
-1. **IRPF del tramo "España (ida)".** El último día en España usa el exento bajo (26,67 en vez de 53,34), porque el tramo termina a las 00:00 y se interpreta como "sin pernocta" (`calculoDesp.calcIRPF`).
-2. **Mapeo de `evento-asociado` al cargar.** Si se borraron fichas antes de guardar, el congreso puede quedar asociado a otra ficha (`serializacionDatos.restaurarDesplazamientos`, clave `desp${id original}`).
-3. **Pérdidas silenciosas al cargar un `.dta`:**
+1. **Mapeo de `evento-asociado` al cargar.** Si se borraron fichas antes de guardar, el congreso puede quedar asociado a otra ficha (`serializacionDatos.restaurarDesplazamientos`, clave `desp${id original}`).
+2. **Pérdidas silenciosas al cargar un `.dta`:**
    - las fichas que superan el límite;
    - los valores de select que no existen;
    - los códigos de pago antiguos (`CuentaEsp`…).
-4. **Restauración con `setTimeout` encadenados** (50/100/120×10/150/300 ms) en lugar de eventos (`serializacionDatos.restaurarTodo` y funciones auxiliares). Es la parte más frágil de la app.
-5. **DNI, IBAN y tarjeta se guardan en claro** en el `.dta`.
 
 ## 4. Decidido / sin acción
 
@@ -92,6 +92,7 @@
   - el día del cruce de vuelta se paga a tarifa española;
   - la residencia eventual en viajes internacionales se mide sobre todo el viaje;
   - el alojamiento por encima del máximo entra entero en el total, solo con un aviso.
+- **DNI, IBAN y tarjeta en claro en el `.dta`: se mantiene así (decisión del 2026-10-23).** Usan el formulario los beneficiarios y sus gestores, que ya tienen acceso a los datos de los investigadores, y volver a teclearlos o usar contraseñas no compensa.
 - **Ignorados por decisión del usuario:**
   - el listener de cambio de país que usa el contador global (`uiDesplazamientos.js`, `manejarCambioPais(desplazamientoCounter)`);
   - el tooltip de las fechas del congreso;
@@ -112,6 +113,7 @@
 - **`MutationObserver` sobre el atributo `value`** de un input oculto como canal de comunicación (`resultadoLiquidacion.js`, `#descuento-manut-congreso`).
 - **Diálogos mezclados.** La carga de archivos sigue usando `confirm()` y `alert()` nativos.
 - **Criterios distintos de validación de fechas:** el motor permite regreso = ida, pero `logicaDesp` y `validaciones` lo rechazan.
+- **Una ficha especial sin líneas** (solo título o IRPF) no se guarda al recargar: `uiDesplazamientoEspecial.restaurarDatos` la ignora. Ya era así antes; está sin decidir.
 - **Sincronía manual con `sgtri-desp-prod`.**
 
 ## 7. Dudas / no verificado

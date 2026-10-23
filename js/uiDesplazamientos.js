@@ -906,8 +906,10 @@
       const targetAdd = e.target.closest && e.target.closest('.btn-otros-gastos');
       if (targetAdd) {
         const grupo = targetAdd.closest('.desplazamiento-grupo');
-        if (!grupo) return;
+        // El botón "Añadir línea" de la ficha especial comparte clase; lo gestiona su módulo
+        if (!grupo || grupo.classList.contains('desplazamiento-especial')) return;
         const cont = grupo.querySelector('.otros-gastos-container');
+        if (!cont) return;
         if (cont.style.display === 'none' || cont.style.display === '') {
           cont.style.display = 'block';
         }

@@ -530,25 +530,22 @@
     if (!datos) return;
     establecerValorCampo('tipo-pago', datos.tipo);
     
-    // Disparar evento change para que se actualice la UI
+    // El change crea en el acto los campos IBAN/SWIFT/tarjeta (uiPagos.renderPagoFields)
     const tipoPagoEl = document.getElementById('tipo-pago');
     if (tipoPagoEl) {
       tipoPagoEl.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // Esperar a que la UI se actualice antes de establecer IBAN/SWIFT
-    setTimeout(() => {
-      if (datos.tipo === 'CE' && datos.iban) {
-        establecerValorCampo('iban', datos.iban);
-      }
-      if (datos.tipo === 'CI') {
-        if (datos.iban) establecerValorCampo('iban-ext', datos.iban);
-        if (datos.swift) establecerValorCampo('swift', datos.swift);
-      }
-      if (datos.tipo === 'TJ' && datos.tarjeta) {
-        establecerValorCampo('numero-tarjeta', datos.tarjeta);
-      }
-    }, 50);
+    if (datos.tipo === 'CE' && datos.iban) {
+      establecerValorCampo('iban', datos.iban);
+    }
+    if (datos.tipo === 'CI') {
+      if (datos.iban) establecerValorCampo('iban-ext', datos.iban);
+      if (datos.swift) establecerValorCampo('swift', datos.swift);
+    }
+    if (datos.tipo === 'TJ' && datos.tarjeta) {
+      establecerValorCampo('numero-tarjeta', datos.tarjeta);
+    }
   }
 
   /**
@@ -646,128 +643,107 @@
 
   /**
    * Restaura el checkbox dinámico de justificar última pernocta.
-   * Se reintenta porque el control puede renderizarse tras el recálculo.
+   * Calcula la ficha para que exista el control antes de marcarlo.
    * @param {number|string} id
    * @param {boolean} valor
-   * @param {number} [intentos=10]
    */
-  function restaurarJustificaPernoctaDesplazamiento(id, valor, intentos = 10) {
+  function restaurarJustificaPernoctaDesplazamiento(id, valor) {
     if (!valor) return;
 
-    const trySet = (restantes) => {
-      const chk = document.getElementById(`justificar-pernocta-${id}`);
-      if (chk) {
-        chk.checked = true;
-        chk.dispatchEvent(new Event('change', { bubbles: true }));
-        return;
-      }
-      if (restantes <= 0) return;
-      setTimeout(() => trySet(restantes - 1), 120);
-    };
+    // La casilla la pinta salidaDesp al calcular la ficha (solo si la última noche es ambigua)
+    const grupo = document.querySelector(`.desplazamiento-grupo[data-desplazamiento-id="${id}"]`);
+    if (grupo) global.calculoDesp?.calculaDesplazamientoFicha?.(grupo);
 
-    trySet(intentos);
+    const chk = document.getElementById(`justificar-pernocta-${id}`);
+    if (chk && !chk.checked) {
+      chk.checked = true;
+      chk.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
 
   /**
-   * Restaura todos los desplazamientos
+   * Restaura todos los desplazamientos (síncrono) y deja en
+   * global.__tempMapeoDesplazamientos el mapeo de IDs para evento-asociado.
    * @param {Array} desplazamientos
-   * @returns {Promise} Promesa que se resuelve cuando todos los desplazamientos están restaurados
    */
   function restaurarDesplazamientos(desplazamientos) {
-    return new Promise((resolve) => {
-      if (!desplazamientos || desplazamientos.length === 0) {
-        resolve();
-        return;
+    if (!desplazamientos || desplazamientos.length === 0) return;
+
+    const uiDesp = global.uiDesplazamientos;
+    const contenedor = document.getElementById('desplazamientos-container');
+    if (!contenedor) return;
+
+    // Eliminar todos los desplazamientos existentes antes de crear los nuevos
+    const gruposExistentes = contenedor.querySelectorAll('.desplazamiento-grupo');
+    gruposExistentes.forEach(grupo => {
+      const id = grupo.dataset.desplazamientoId;
+      // Eliminar del registro de totales
+      if (id && global.resultadoLiquidacion?.eliminarDesplazamiento) {
+        global.resultadoLiquidacion.eliminarDesplazamiento(id);
       }
-
-      const uiDesp = global.uiDesplazamientos;
-      const contenedor = document.getElementById('desplazamientos-container');
-      if (!contenedor) {
-        resolve();
-        return;
-      }
-
-      // Eliminar todos los desplazamientos existentes antes de crear los nuevos
-      const gruposExistentes = contenedor.querySelectorAll('.desplazamiento-grupo');
-      gruposExistentes.forEach(grupo => {
-        const id = grupo.dataset.desplazamientoId;
-        // Eliminar del registro de totales
-        if (id && global.resultadoLiquidacion?.eliminarDesplazamiento) {
-          global.resultadoLiquidacion.eliminarDesplazamiento(id);
-        }
-        // Eliminar del DOM sin animación
-        grupo.remove();
-      });
-
-      // Resetear el contador para que los nuevos IDs empiecen desde 1
-      if (uiDesp && uiDesp.resetCounter) {
-        uiDesp.resetCounter();
-      }
-
-      // Crear todos los desplazamientos necesarios
-      for (let i = 0; i < desplazamientos.length; i++) {
-        if (uiDesp && uiDesp.crearNuevoDesplazamiento) {
-          uiDesp.crearNuevoDesplazamiento();
-        }
-      }
-
-      // Esperar a que se creen los elementos en el DOM
-      setTimeout(() => {
-        // Obtener los grupos de desplazamiento reales del DOM
-        const grupos = contenedor.querySelectorAll('.desplazamiento-grupo');
-        
-        // Mapa de IDs originales a índices reales (para evento-asociado)
-        const mapeoIds = {};
-        
-        desplazamientos.forEach((desp, idx) => {
-          const grupo = grupos[idx];
-          if (grupo) {
-            // Quitar clase entry para asegurar visibilidad
-            grupo.classList.remove('entry');
-            
-            const idReal = parseInt(grupo.dataset.desplazamientoId, 10);
-            
-            // Guardar mapeo: "despX" original → "despY" real
-            mapeoIds[`desp${desp.id}`] = `desp${idx + 1}`;
-            
-            // Crear copia del objeto con el ID correcto
-            const despConIdReal = { ...desp, id: idReal };
-            restaurarDesplazamiento(despConIdReal, idx);
-          }
-        });
-
-        // Actualizar números
-        if (uiDesp && uiDesp.actualizarNumerosDesplazamientos) {
-          uiDesp.actualizarNumerosDesplazamientos();
-        }
-        
-        // Devolver el mapeo para uso posterior
-        global.__tempMapeoDesplazamientos = mapeoIds;
-        
-        resolve();
-      }, 150);
+      // Eliminar del DOM sin animación
+      grupo.remove();
     });
+
+    // Resetear el contador para que los nuevos IDs empiecen desde 1
+    if (uiDesp && uiDesp.resetCounter) {
+      uiDesp.resetCounter();
+    }
+
+    // Crear todos los desplazamientos necesarios (se insertan en el DOM en el acto)
+    for (let i = 0; i < desplazamientos.length; i++) {
+      if (uiDesp && uiDesp.crearNuevoDesplazamiento) {
+        uiDesp.crearNuevoDesplazamiento();
+      }
+    }
+
+    const grupos = contenedor.querySelectorAll('.desplazamiento-grupo');
+    
+    // Mapa de IDs originales a índices reales (para evento-asociado)
+    const mapeoIds = {};
+    
+    desplazamientos.forEach((desp, idx) => {
+      const grupo = grupos[idx];
+      if (grupo) {
+        // Quitar clase entry para asegurar visibilidad
+        grupo.classList.remove('entry');
+        
+        const idReal = parseInt(grupo.dataset.desplazamientoId, 10);
+        
+        // Guardar mapeo: "despX" original → "despY" real
+        mapeoIds[`desp${desp.id}`] = `desp${idx + 1}`;
+        
+        // Crear copia del objeto con el ID correcto
+        const despConIdReal = { ...desp, id: idReal };
+        restaurarDesplazamiento(despConIdReal, idx);
+      }
+    });
+
+    // Actualizar números
+    if (uiDesp && uiDesp.actualizarNumerosDesplazamientos) {
+      uiDesp.actualizarNumerosDesplazamientos();
+    }
+    
+    // Devolver el mapeo para uso posterior
+    global.__tempMapeoDesplazamientos = mapeoIds;
   }
 
   /**
    * Restaura los datos del vehículo
    * @param {Object} datos
-   * @param {number} delay - Tiempo de espera antes de restaurar
    */
-  function restaurarVehiculo(datos, delay = 150) {
+  function restaurarVehiculo(datos) {
     if (!datos) return;
 
-    // El contenedor de vehículo se genera dinámicamente por evaluarKmParaMostrarFicha
-    setTimeout(() => {
-      const radio = document.querySelector(`input[name="vehiculo-tipo"][value="${datos.tipo}"]`);
-      if (radio) {
-        radio.checked = true;
-        radio.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      establecerValorCampo('veh-marca', datos.marca);
-      establecerValorCampo('veh-modelo', datos.modelo);
-      establecerValorCampo('veh-matricula', datos.matricula);
-    }, delay);
+    // La ficha de vehículo debe existir ya (evaluarKmParaMostrarFicha se llama antes)
+    const radio = document.querySelector(`input[name="vehiculo-tipo"][value="${datos.tipo}"]`);
+    if (radio) {
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    establecerValorCampo('veh-marca', datos.marca);
+    establecerValorCampo('veh-modelo', datos.modelo);
+    establecerValorCampo('veh-matricula', datos.matricula);
   }
 
   /**
@@ -1062,16 +1038,13 @@
     restaurarPago(datos.pago);
     restaurarProyecto(datos.proyecto);
     
-    // Restaurar desplazamientos (asíncrono)
-    await restaurarDesplazamientos(datos.desplazamientos);
+    // Restaurar desplazamientos
+    restaurarDesplazamientos(datos.desplazamientos);
 
     // Restaurar desplazamiento AECC
     if (tieneAECC && global.uiDesplazamientoAecc?.restaurarDatos) {
       global.uiDesplazamientoAecc.restaurarDatos(datos.desplazamientoAECC[0]);
     }
-    
-    // Esperar un poco más para que el DOM se actualice completamente
-    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Restaurar evento (después de desplazamientos para tener el mapeo)
     restaurarEvento(datos.evento);
@@ -1088,50 +1061,45 @@
     // Restaurar fecha de firma
     restaurarFechaFirma(datos.fechaFirma);
 
-    // Tareas post-restauración
-    setTimeout(() => {
-      // 1. Mostrar ficha de vehículo si hay km (o si hay desplazamiento especial)
-      if (global.uiDesplazamientos?.evaluarKmParaMostrarFicha) {
-        global.uiDesplazamientos.evaluarKmParaMostrarFicha();
+    // Tareas post-restauración (todo síncrono: el DOM que necesitan ya existe)
+    // 1. Mostrar ficha de vehículo si hay km (o si hay desplazamiento especial)
+    if (global.uiDesplazamientos?.evaluarKmParaMostrarFicha) {
+      global.uiDesplazamientos.evaluarKmParaMostrarFicha();
+    }
+    
+    // 2. Restaurar vehículo, con la ficha ya visible
+    restaurarVehiculo(datos.vehiculo);
+    
+    // 3. Desplegar secciones con contenido
+    desplegarSeccionesConContenido(datos);
+    
+    // 4. Calcular descuento por comidas de congreso
+    if (typeof global.computeDescuentoManutencion === 'function') {
+      global.computeDescuentoManutencion();
+    }
+    
+    // 5. Actualizar registro de honorarios y gastos de inscripción
+    if (global.resultadoLiquidacion) {
+      if (typeof global.resultadoLiquidacion.actualizarHonorarios === 'function') {
+        global.resultadoLiquidacion.actualizarHonorarios();
       }
-      
-      // 2. Restaurar vehículo DESPUÉS de que la ficha esté visible
-      restaurarVehiculo(datos.vehiculo, 100);
-      
-      // 3. Desplegar secciones con contenido
-      desplegarSeccionesConContenido(datos);
-      
-      // 4. Calcular descuento por comidas de congreso
-      if (typeof global.computeDescuentoManutencion === 'function') {
-        global.computeDescuentoManutencion();
+      if (typeof global.resultadoLiquidacion.actualizarGastosInscripcion === 'function') {
+        global.resultadoLiquidacion.actualizarGastosInscripcion();
       }
-      
-      // 5. Actualizar registro de honorarios y gastos de inscripción
-      if (global.resultadoLiquidacion) {
-        if (typeof global.resultadoLiquidacion.actualizarHonorarios === 'function') {
-          global.resultadoLiquidacion.actualizarHonorarios();
-        }
-        if (typeof global.resultadoLiquidacion.actualizarGastosInscripcion === 'function') {
-          global.resultadoLiquidacion.actualizarGastosInscripcion();
-        }
-      }
-      
-      // 6. Recalcular todo
-      if (global.logicaDesp?.scheduleFullRecalc) {
-        global.logicaDesp.scheduleFullRecalc(0);
-      }
-      
-      // 7. Restaurar imputación (después de recalcular para tener el total correcto)
-      setTimeout(() => {
-        if (global.uiImputacion && typeof global.uiImputacion.restaurarLineas === 'function') {
-          global.uiImputacion.restaurarLineas(datos.imputacion);
-        }
-      }, 100);
-      
-      // 8. Limpiar mapeo temporal
-      delete global.__tempMapeoDesplazamientos;
-      
-    }, 300);
+    }
+    
+    // 6. Recalcular todo
+    if (global.logicaDesp?.recalcularTodas) {
+      global.logicaDesp.recalcularTodas();
+    }
+    
+    // 7. Restaurar imputación (después de recalcular para tener el total correcto)
+    if (global.uiImputacion && typeof global.uiImputacion.restaurarLineas === 'function') {
+      global.uiImputacion.restaurarLineas(datos.imputacion);
+    }
+    
+    // 8. Limpiar mapeo temporal
+    delete global.__tempMapeoDesplazamientos;
 
     return { ok: true, cargaParcial: false };
   }

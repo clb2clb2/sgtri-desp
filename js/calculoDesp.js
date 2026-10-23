@@ -599,6 +599,10 @@ function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCen
     return parsedRef ? toMinutes(parsedRef) : null;
   })();
 
+  // Tramo "España (ida)": único tramo en España que no es el último del viaje
+  const isLastSegment = !!(input?._isLastIntlSegment || input?.flags?._isLastIntlSegment);
+  const isSpainOutboundSegment = isSegmentMode && !isIntlSegment && !isLastSegment;
+
   let noPernoctaUltimaNoche = false;
   if (perDayUnits.length >= 2) {
     if (isIntlSegment) {
@@ -606,6 +610,10 @@ function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCen
         const { counts } = evalLastNightByHour(lastNightRefTime, justificaPernocta);
         noPernoctaUltimaNoche = !counts;
       }
+    } else if (isSpainOutboundSegment) {
+      // Termina a las 00:00 del día del cruce porque el viaje sigue en el extranjero:
+      // esa hora no es un regreso de madrugada, la última noche sí se pernocta fuera
+      noPernoctaUltimaNoche = false;
     } else {
       noPernoctaUltimaNoche = (
         tRet !== null &&

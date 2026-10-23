@@ -106,6 +106,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: 1rem;
 }
 
 .Encabezado .logo {
@@ -116,6 +117,7 @@ body {
 
 .Encabezado.portada-mode .encabezado-top-row {
   justify-content: center;
+  margin-bottom: 1rem;
 }
 
 .Encabezado.portada-mode .logo {
