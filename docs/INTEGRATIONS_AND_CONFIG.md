@@ -43,7 +43,7 @@ No hay APIs remotas, analítica, autenticación, backend ni llamadas a servicios
 |---|---|---|
 | `convert_fonts_to_base64.py` | Genera `js/pdfFonts.js` (VFS de pdfmake) | `assets/fonts/*` (mapa `FONTS_TO_CONVERT`, :21-31) → `js/pdfFonts.js` |
 | `generate_manual_calculo.py` | Manual de usuario "Cálculos de desplazamientos" | → `docs/Calculo_de_desplazamientos.docx` (:637) |
-| `generate_technical_doc.py` | "Lógica interna del cálculo de desplazamientos" | → `docs/Logica_interna_calculo_desplazamientos.docx` (:827) |
+| `generate_technical_doc.py` | "Lógica interna del cálculo de desplazamientos" | → `docs/Logica_interna_calculo_desplazamientos.docx` (:827). Ese documento se eliminó del repositorio el 2026-10-23; el script puede regenerarlo, pero su contenido puede estar desfasado respecto al código |
 | `generate_docx.py` | Guía de liquidación paso a paso | → `docs/Liquidacion_Desplazamientos.docx`, según su docstring. El archivo existente está en la raíz |
 | `generate_formLogic_docx.py` | Descripción y propuestas de refactorización de `formLogic.js` | → `docs/formLogic.docx` (no existe en el repo) |
 | `generate_input_schema_docx.py` | Esquema de la entrada del motor | → `docs/Estructura_Input_Desplazamiento.docx` (no existe) |

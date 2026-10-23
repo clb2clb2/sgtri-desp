@@ -26,7 +26,7 @@ Es una SPA estática, sin backend, para el SGTRI de la Universidad de Extremadur
 - `assets/img/`: logos que usa el PDF (SVG/PNG).
 - `assets/fonts/`: OTF/TTF de origen para `pdfFonts.js`. **No se usan en tiempo de ejecución.**
 - `tools/`: scripts Python auxiliares (fuentes base64, generación de .docx). No van a producción.
-- `docs/`: esta documentación y dos .docx (manual de cálculo y lógica interna).
+- `docs/`: esta documentación y `Calculo_de_desplazamientos.docx` (manual de cálculo).
 - `Normativas/` (PDF del RD 462/2002 y del Decreto 42/2025), `Liquidacion_Desplazamientos.docx`, `Ejemplos PDFMake.pdf`: material de referencia versionado. No los usa la app.
 
 ## Convenciones al modificar
