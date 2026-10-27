@@ -18,11 +18,6 @@
   const soportado = typeof HTMLInputElement !== 'undefined' &&
     typeof HTMLInputElement.prototype.showPicker === 'function';
 
-  const ICONO = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-      <rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-      <path d="M3 10h18M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>`;
-
   function pad2(n) {
     return String(n).padStart(2, '0');
   }
@@ -103,7 +98,7 @@
     boton.tabIndex = -1;
     boton.title = 'Elegir en el calendario';
     boton.setAttribute('aria-label', 'Elegir fecha en el calendario');
-    boton.innerHTML = ICONO;
+    boton.innerHTML = global.utils.iconoSvg('calendar');
     // mousedown sin foco: el campo no pierde ni gana el foco al pulsar el botón
     boton.addEventListener('mousedown', (e) => e.preventDefault());
     const selector = crearSelector(campo);

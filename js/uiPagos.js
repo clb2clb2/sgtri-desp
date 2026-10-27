@@ -49,7 +49,7 @@
         <label for="iban">IBAN:
           <span class="warn-wrapper iban-warn" tabindex="0" aria-label="Aviso de IBAN"
             style="display: none;">
-            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-icon" aria-hidden="true">${global.utils.iconoSvg('triangle-alert')}</span>
             <span class="warn-tooltip">Atención, ese número de cuenta no parece correcto.</span>
           </span>
         </label>
@@ -74,7 +74,7 @@
         <label for="iban-ext">IBAN:
           <span class="warn-wrapper iban-ext-warn" tabindex="0" aria-label="Aviso de IBAN"
             style="display: none;">
-            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-icon" aria-hidden="true">${global.utils.iconoSvg('triangle-alert')}</span>
             <span class="warn-tooltip">Atención, ese IBAN no parece correcto.</span>
           </span>
         </label>
@@ -93,7 +93,7 @@
         <label for="swift">SWIFT/BIC:
           <span class="warn-wrapper swift-warn" tabindex="0" aria-label="Aviso de SWIFT"
             style="display: none;">
-            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-icon" aria-hidden="true">${global.utils.iconoSvg('triangle-alert')}</span>
             <span class="warn-tooltip">Atención, ese SWIFT/BIC no parece correcto.</span>
           </span>
         </label>
@@ -109,7 +109,7 @@
         <label for="numero-tarjeta">Número de tarjeta:
           <span class="warn-wrapper tarjeta-warn" tabindex="0" aria-label="Aviso de tarjeta"
             style="display: none;">
-            <span class="warn-icon" aria-hidden="true">⚠️</span>
+            <span class="warn-icon" aria-hidden="true">${global.utils.iconoSvg('triangle-alert')}</span>
             <span class="warn-tooltip">Atención, ese número de tarjeta no parece correcto.</span>
           </span>
         </label>
@@ -124,7 +124,7 @@
       <label for="iban">IBAN:
         <span class="warn-wrapper iban-warn" tabindex="0" aria-label="Aviso de IBAN"
           style="display: none;">
-          <span class="warn-icon" aria-hidden="true">⚠️</span>
+          <span class="warn-icon" aria-hidden="true">${global.utils.iconoSvg('triangle-alert')}</span>
           <span class="warn-tooltip">Atención, ese número de cuenta no parece correcto.</span>
         </span>
       </label>

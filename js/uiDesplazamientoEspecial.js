@@ -208,7 +208,7 @@
     btnUp.className = 'btn-order-esp-linea btn-order-esp-up';
     btnUp.setAttribute('aria-label', 'Subir linea');
     btnUp.title = 'Subir linea';
-    btnUp.textContent = '▲';
+    btnUp.innerHTML = global.utils.iconoSvg('chevron-up');
     btnUp.addEventListener('click', () => {
       moverLinea(linea, 'up');
     });
@@ -218,7 +218,7 @@
     btnDown.className = 'btn-order-esp-linea btn-order-esp-down';
     btnDown.setAttribute('aria-label', 'Bajar linea');
     btnDown.title = 'Bajar linea';
-    btnDown.textContent = '▼';
+    btnDown.innerHTML = global.utils.iconoSvg('chevron-down');
     btnDown.addEventListener('click', () => {
       moverLinea(linea, 'down');
     });

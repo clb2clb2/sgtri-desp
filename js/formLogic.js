@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnBorrarTodo.addEventListener('click', async () => {
           const confirmed = await window.showConfirm(
             '¿Está seguro de que desea borrar todos los datos del formulario actual?',
-            { confirmText: 'Borrar todo', icon: '⚠️' }
+            { confirmText: 'Borrar todo', icon: 'aviso' }
           );
           if (confirmed) {
             limpiarFormularioCompleto();
@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const ejecutarReinicio = async () => {
         const confirmed = await window.showConfirm(
           '¿Está seguro de que desea borrar todos los datos y volver al menú inicial?',
-          { confirmText: 'Reiniciar', icon: '⚠️' }
+          { confirmText: 'Reiniciar', icon: 'aviso' }
         );
         if (confirmed) {
           limpiarFormularioCompleto();
@@ -1505,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmed = await showConfirm('¿Estás seguro de que quieres borrar el contenido de esta sección?', {
       confirmText: 'Borrar',
       cancelText: 'Cancelar',
-      icon: '⚠️'
+      icon: 'aviso'
     });
     
     if (!confirmed) return;

@@ -185,7 +185,7 @@ body {
 .menu-item {
   background: none;
   border: none;
-  color: var(--color-text-primary);
+  color: var(--color-primary-text);
   font-size: 0.92rem;
   cursor: pointer;
   font-family: var(--font-family-title);
@@ -210,7 +210,7 @@ body {
 }
 
 .menu-item.menu-danger {
-  color: var(--color-text-primary);
+  color: var(--color-primary-text);
 }
 
 .menu-item.menu-danger:hover {
@@ -415,7 +415,7 @@ body {
 .btn-clear-section .icon-eraser {
   width: 18px;
   height: 18px;
-  fill: var(--color-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 span.txt-eraser {
@@ -553,6 +553,36 @@ textarea,
 select {
   background-color: #fff;
   color: var(--color-text-primary);
+}
+
+/* Iconos Lucide (sprite en index.html; desde JS, utils.iconoSvg) */
+.icono {
+  width: 1.15em;
+  height: 1.15em;
+  flex-shrink: 0;
+  vertical-align: -0.2em;
+}
+
+.confirm-icon .icono,
+.message-icon .icono {
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+}
+
+.warn-icon .icono {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+.btn-order-esp-linea .icono {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-calendario .icono {
+  width: 16px;
+  height: 16px;
 }
 
 /* Calendario de los campos de fecha (js/calendarioFechas.js) */

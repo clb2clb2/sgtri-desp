@@ -48,6 +48,18 @@
     return escapeHtml(mensaje).replace(/\r?\n/g, '<br>');
   }
 
+  /**
+   * HTML del icono de un diálogo: 'aviso' (triángulo) o 'exito' (círculo con ✓), de Lucide.
+   * Se aceptan también los emojis antiguos ⚠️ y ✅; cualquier otro texto se muestra tal cual.
+   * @param {string} icon
+   * @returns {string}
+   */
+  function iconoDialogoHtml(icon) {
+    if (icon === 'aviso' || icon === '⚠️') return global.utils.iconoSvg('triangle-alert');
+    if (icon === 'exito' || icon === '✅') return global.utils.iconoSvg('circle-check');
+    return escapeHtml(icon);
+  }
+
   function showConfirm(message, options = {}) {
     return new Promise(resolve => {
       const {
@@ -62,7 +74,7 @@
       const overlay = document.createElement('div');
       overlay.className = 'confirm-overlay';
       overlay.tabIndex = -1;
-      const iconHtml = icon ? `<div class="confirm-icon">${escapeHtml(icon)}</div>` : '';
+      const iconHtml = icon ? `<div class="confirm-icon">${iconoDialogoHtml(icon)}</div>` : '';
       overlay.innerHTML = `
         <div class="confirm-dialog" role="dialog" aria-modal="true">
           ${iconHtml}
@@ -284,7 +296,7 @@
    * @param {string} [options.pregunta] - Pregunta destacada bajo el mensaje (estilo .desplazamiento-titulo)
    * @param {Array<{id: string, texto: string}>} options.opciones - Opciones en orden
    * @param {string} [options.seleccion] - id de la opción marcada al abrir (por defecto, la primera)
-   * @param {string} [options.icon='⚠️']
+   * @param {string} [options.icon='aviso'] - 'aviso', 'exito' o texto (ver iconoDialogoHtml)
    * @param {string} [options.confirmText='Aceptar']
    * @param {string} [options.cancelText='Cancelar']
    * @returns {Promise<string|null>} id de la opción elegida, o null si se cancela
@@ -295,7 +307,7 @@
         opciones = [],
         pregunta = '',
         seleccion = opciones[0] && opciones[0].id,
-        icon = '⚠️',
+        icon = 'aviso',
         confirmText = 'Aceptar',
         cancelText = 'Cancelar'
       } = options;
@@ -311,7 +323,7 @@
             </label>`).join('');
       overlay.innerHTML = `
         <div class="confirm-dialog choice-dialog" role="dialog" aria-modal="true">
-          ${icon ? `<div class="confirm-icon">${escapeHtml(icon)}</div>` : ''}
+          ${icon ? `<div class="confirm-icon">${iconoDialogoHtml(icon)}</div>` : ''}
           <div class="confirm-body choice-body">${mensajeHtml(message)}</div>
           ${pregunta ? `<div class="desplazamiento-titulo choice-pregunta">${escapeHtml(pregunta)}</div>` : ''}
           <div class="choice-opciones" role="radiogroup">${radios}
@@ -379,7 +391,7 @@
   }
 
   /**
-   * Muestra un modal de mensaje con un botón Aceptar (✅ éxito / ⚠️ error).
+   * Muestra un modal de mensaje con un botón Aceptar (icono de éxito o de aviso).
    * @param {string} mensaje - Texto plano; los saltos de línea se respetan
    * @param {boolean} [esError=false]
    * @returns {Promise<void>} Se resuelve al cerrar el modal
@@ -411,7 +423,7 @@
       dialog.className = 'message-dialog ' + (esError ? 'message-error' : 'message-success');
       // El aviso usa el mismo icono que los diálogos de confirmación
       iconEl.className = esError ? 'confirm-icon' : 'message-icon';
-      iconEl.textContent = esError ? '⚠️' : '✅';
+      iconEl.innerHTML = iconoDialogoHtml(esError ? 'aviso' : 'exito');
       bodyEl.innerHTML = mensajeHtml(mensaje);
 
       overlay.classList.add('visible');

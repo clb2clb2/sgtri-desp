@@ -146,6 +146,20 @@
   }
 
   // =========================================================================
+  // ICONOS
+  // =========================================================================
+
+  /**
+   * Marcado de un icono de Lucide del sprite de index.html (<symbol id="lucide-…">).
+   * El color sale de currentColor y el tamaño de la clase .icono (styles.css).
+   * @param {string} nombre - Nombre del icono en Lucide (p. ej. 'triangle-alert')
+   * @returns {string} HTML del <svg>
+   */
+  function iconoSvg(nombre) {
+    return `<svg class="icono" aria-hidden="true" focusable="false"><use href="#lucide-${nombre}"></use></svg>`;
+  }
+
+  // =========================================================================
   // REGLAS COMPARTIDAS
   // =========================================================================
 
@@ -206,6 +220,9 @@
 
     // Datos globales
     getSgtriDatos,
+
+    // Iconos
+    iconoSvg,
 
     // Reglas compartidas
     getNormativa,

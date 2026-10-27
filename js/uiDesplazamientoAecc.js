@@ -439,7 +439,7 @@
 
   function warningAlojamientoExcedido() {
     return `<span class="warn-wrapper" tabindex="0" aria-live="polite">
-      <span class="warn-icon" aria-hidden="true">⚠️</span>
+      <span class="warn-icon" aria-hidden="true">${global.utils.iconoSvg('triangle-alert')}</span>
       <span class="warn-tooltip" role="tooltip">¡Atención! El importe del alojamiento supera el máximo permitido.</span>
     </span>`;
   }

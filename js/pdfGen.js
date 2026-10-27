@@ -2338,7 +2338,7 @@
             {
               confirmText: 'Revisar el formulario',
               cancelText: 'Generar PDF',
-              icon: '⚠️'
+              icon: 'aviso'
             }
           );
           if (revisarFormulario) {
@@ -2354,7 +2354,7 @@
               {
                 confirmText: 'Aceptar',
                 cancelText: 'Cancelar',
-                icon: '⚠️'
+                icon: 'aviso'
               }
             );
           } else {

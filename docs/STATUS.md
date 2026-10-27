@@ -1,7 +1,7 @@
 # Estado del código
 
 - **Fecha del análisis:** 2026-10-23 (actualizado el 2026-10-27).
-- **Commit de referencia:** `03f772c` (`git rev-parse --short HEAD`), rama `main`. Todos los cambios descritos aquí están confirmados y publicados.
+- **Commit de referencia:** el último de `main` (los cambios descritos aquí están confirmados y publicados; el calendario de fechas entró en `ee4cf19` y los iconos Lucide en el commit siguiente).
 - **Método:** lectura del código, más pruebas automáticas en Chrome headless que se ejecutan fuera del repositorio (§1).
 
 ## 1. Tests y calidad
@@ -43,6 +43,7 @@
 | Carga de `.dta` de otro tipo: diálogo con tres opciones (abrir como el tipo del archivo / copiar solo datos comunes / cancelar); sin pregunta de versión de esquema; mensajes de éxito y error en modal, sin `alert()`/`confirm()` | `serializacionDatos.restaurarTodo`, `abrirDialogoImportar`, `confirmDialog.showChoice`, `showMessage` |
 | "Borrar todo" vaciaba la ficha de vehículo sin avisar a `uiDesplazamientos`, así que no se volvía a crear: se perdía el vehículo al cargar un `.dta` sobre un formulario que lo mostraba, y no reaparecía al volver a poner km | `uiDesplazamientos.resetFichaVehiculo`, `formLogic.limpiarSeccionDesplazamientos` |
 | Calendario nativo opcional en todos los campos de fecha (añadido el 2026-10-27), sin cambios en la escritura con teclado; los campos de hora no lo llevan, a propósito | `calendarioFechas.js`, `styles.css` (`.fecha-con-calendario`, `.btn-calendario`) |
+| Iconos: los emojis (barra de acciones, "Generar PDF", diálogos, avisos de campo, flechas de la ficha especial) y la goma de "Borrar" se sustituyeron por iconos de Lucide v1.62.0 en un sprite SVG; un solo ayudante, `utils.iconoSvg` | `index.html` (sprite), `utils.iconoSvg`, `confirmDialog.iconoDialogoHtml`, `styles.css` (`.icono`) |
 
 **Lógica duplicada unificada:**
 - `utils.getNormativa`, que antes estaba en 5 sitios.

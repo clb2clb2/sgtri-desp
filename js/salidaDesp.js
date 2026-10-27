@@ -118,7 +118,7 @@
      */
     warning(mensaje) {
       return `<span class="warn-wrapper" tabindex="0" aria-live="polite">
-        <span class="warn-icon" aria-hidden="true">⚠️</span>
+        <span class="warn-icon" aria-hidden="true">${window.utils.iconoSvg('triangle-alert')}</span>
         <span class="warn-tooltip" role="tooltip">${mensaje}</span>
       </span>`;
     },

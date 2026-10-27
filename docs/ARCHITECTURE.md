@@ -44,7 +44,7 @@ pdfGen (+ pdfmake, pdfFonts)                                ← salida PDF
 
 | Archivo | `window.*` | Responsabilidad | Llamado desde |
 |---|---|---|---|
-| `js/utils.js` | `utils` | `fmt` (`de-DE`), `fmtPrecio`, `parseNumber`, `round2`, `debounce`, `getSgtriDatos` y reglas compartidas: `getNormativa`, `esPaisInternacional`, `ordenCrucesValido`. Es la única implementación; el resto de módulos delega aquí | salidaDesp, resultadoLiquidacion, uiImputacion, uiDesplazamientoEspecial… |
+| `js/utils.js` | `utils` | `fmt` (`de-DE`), `fmtPrecio`, `parseNumber`, `round2`, `debounce`, `getSgtriDatos`, `iconoSvg` (iconos Lucide del sprite de `index.html`) y reglas compartidas: `getNormativa`, `esPaisInternacional`, `ordenCrucesValido`. Es la única implementación; el resto de módulos delega aquí | salidaDesp, resultadoLiquidacion, uiImputacion, uiDesplazamientoEspecial… |
 | `js/limpiaDatos.js` | `limpiaDatos` | Saneado de texto, IBAN, DNI y orgánica; `ibanMod97Valido`; `parseDateStrict` y `parseTimeStrict` (únicos parsers de fecha y hora); formateo de fecha | formLogic, uiPagos, AECC, validaciones, cogeDatosDesp |
 | `js/confirmDialog.js` | `confirmDialog`, `showConfirm`, `showPrompt`, `showChoice`, `showMessage` | Modales basados en promesas; escapan todo el texto (`escapeHtml`) y convierten `
 ` en `<br>` | pdfGen, formLogic, uiDesplazamientos, serializacionDatos |
