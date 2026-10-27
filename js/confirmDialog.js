@@ -394,9 +394,12 @@
    * Muestra un modal de mensaje con un botón Aceptar (icono de éxito o de aviso).
    * @param {string} mensaje - Texto plano; los saltos de línea se respetan
    * @param {boolean} [esError=false]
+   * @param {Object} [options]
+   * @param {boolean} [options.html=false] - El mensaje es HTML fijo del programa (<b>, <i>…) y no se escapa.
+   *   Nunca con texto que venga del usuario o de un archivo.
    * @returns {Promise<void>} Se resuelve al cerrar el modal
    */
-  function showMessage(mensaje, esError = false) {
+  function showMessage(mensaje, esError = false, options = {}) {
     return new Promise((resolve) => {
       // Crear overlay si no existe
       let overlay = document.querySelector('.message-overlay');
@@ -424,7 +427,9 @@
       // El aviso usa el mismo icono que los diálogos de confirmación
       iconEl.className = esError ? 'confirm-icon' : 'message-icon';
       iconEl.innerHTML = iconoDialogoHtml(esError ? 'aviso' : 'exito');
-      bodyEl.innerHTML = mensajeHtml(mensaje);
+      bodyEl.innerHTML = options.html
+        ? String(mensaje).replace(/\r?\n/g, '<br>')
+        : mensajeHtml(mensaje);
 
       overlay.classList.add('visible');
       btnOk.focus();

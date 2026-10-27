@@ -255,6 +255,58 @@
   }
 
   // =========================================================================
+  // PLAZO DE PRESENTACIÓN (art. 32.8 de las Normas de Ejecución Presupuestaria de la UEx)
+  // =========================================================================
+
+  const PLAZO_PRESENTACION_DIAS = 45;
+  const ID_FECHA_REGRESO = /^(aecc-fecha-regreso|fecha-regreso-\d+)$/;
+
+  /**
+   * Último día del plazo para presentar la liquidación: 45 días naturales
+   * contados desde el día siguiente al regreso, sin computar el mes de agosto.
+   * @param {Date} fechaRegreso
+   * @returns {Date}
+   */
+  function finPlazoPresentacion(fechaRegreso) {
+    const d = new Date(fechaRegreso.getFullYear(), fechaRegreso.getMonth(), fechaRegreso.getDate());
+    let contados = 0;
+    while (contados < PLAZO_PRESENTACION_DIAS) {
+      d.setDate(d.getDate() + 1);
+      if (d.getMonth() !== 7) contados++;
+    }
+    return d;
+  }
+
+  /**
+   * Avisa en un modal si la fecha de regreso introducida ya está fuera de plazo.
+   * Solo avisa una vez por valor, para no repetir el aviso en cada blur.
+   * @param {HTMLInputElement} el - Campo de fecha de regreso ya formateado
+   */
+  function avisarPlazoPresentacion(el) {
+    if (!ID_FECHA_REGRESO.test(el.id || '')) return;
+    const valor = el.value;
+    if (el.dataset.avisoPlazo === valor) return;
+    el.dataset.avisoPlazo = valor;
+
+    const parseDateStrict = ld.parseDateStrict || global.parseDateStrict || (() => null);
+    const regreso = valor ? parseDateStrict(valor) : null;
+    if (!regreso || typeof global.showMessage !== 'function') return;
+
+    const fin = finPlazoPresentacion(regreso);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (hoy <= fin) return;
+
+    global.showMessage(
+      '¡Atención! No olvide que la liquidación debe presentarse,\n' +
+      '<b>como máximo, 45 días naturales tras el desplazamiento</b>.\n\n' +
+      '<i>(Art. 32.8 Normas de Ejecución Presupuestaria UEx)</i>',
+      true,
+      { html: true }
+    );
+  }
+
+  // =========================================================================
   // HANDLERS DE BLUR PARA CAMPOS DE FECHA/HORA
   // =========================================================================
 
@@ -298,6 +350,7 @@
     }
 
     el.value = final;
+    avisarPlazoPresentacion(el);
 
     // Validar el par fecha/hora
     const match = (el.id || '').match(/(fecha|hora)-(ida|regreso)-(\d+)/);
@@ -433,7 +486,8 @@
     handleHoraKeydown,
 
     // Helpers
-    sumNonManutencionAmounts
+    sumNonManutencionAmounts,
+    finPlazoPresentacion
   };
 
   global.validaciones = validaciones;

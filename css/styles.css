@@ -1863,8 +1863,9 @@ input.num-spinner::-webkit-inner-spin-button {
   background: #fff;
   padding: 1.4rem 1.6rem;
   border-radius: var(--border-radius-lg);
+  box-sizing: border-box;
   min-width: 340px;
-  max-width: 90%;
+  max-width: min(740px, 90%);
   box-shadow: var(--shadow-modal);
   transform: translateY(8px) scale(0.995);
   transition: transform 0.18s ease-out;

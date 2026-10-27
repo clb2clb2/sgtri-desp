@@ -1,7 +1,7 @@
 # Estado del código
 
 - **Fecha del análisis:** 2026-10-23 (actualizado el 2026-10-27).
-- **Commit de referencia:** el último de `main` (los cambios descritos aquí están confirmados y publicados; el calendario de fechas entró en `ee4cf19` y los iconos Lucide en el commit siguiente).
+- **Commit de referencia:** el último de `main` (los cambios descritos aquí están confirmados y publicados; el calendario de fechas entró en `ee4cf19` los iconos Lucide en `9281709` y el aviso de plazo de presentación en el commit siguiente).
 - **Método:** lectura del código, más pruebas automáticas en Chrome headless que se ejecutan fuera del repositorio (§1).
 
 ## 1. Tests y calidad
@@ -44,6 +44,7 @@
 | "Borrar todo" vaciaba la ficha de vehículo sin avisar a `uiDesplazamientos`, así que no se volvía a crear: se perdía el vehículo al cargar un `.dta` sobre un formulario que lo mostraba, y no reaparecía al volver a poner km | `uiDesplazamientos.resetFichaVehiculo`, `formLogic.limpiarSeccionDesplazamientos` |
 | Calendario nativo opcional en todos los campos de fecha (añadido el 2026-10-27), sin cambios en la escritura con teclado; los campos de hora no lo llevan, a propósito | `calendarioFechas.js`, `styles.css` (`.fecha-con-calendario`, `.btn-calendario`) |
 | Iconos: los emojis (barra de acciones, "Generar PDF", diálogos, avisos de campo, flechas de la ficha especial) y la goma de "Borrar" se sustituyeron por iconos de Lucide v1.62.0 en un sprite SVG; un solo ayudante, `utils.iconoSvg` | `index.html` (sprite), `utils.iconoSvg`, `confirmDialog.iconoDialogoHtml`, `styles.css` (`.icono`) |
+| Aviso modal al introducir una fecha de regreso fuera del plazo de presentación (45 días naturales sin agosto, art. 32.8 de las Normas de Ejecución Presupuestaria de la UEx); solo informativo | `validaciones.js` (`finPlazoPresentacion`, `avisarPlazoPresentacion`) |
 
 **Lógica duplicada unificada:**
 - `utils.getNormativa`, que antes estaba en 5 sitios.
