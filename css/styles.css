@@ -555,6 +555,50 @@ select {
   color: var(--color-text-primary);
 }
 
+/* Calendario de los campos de fecha (js/calendarioFechas.js) */
+.fecha-con-calendario {
+  position: relative;
+  display: block;
+}
+
+.fecha-con-calendario .input-fecha {
+  padding-right: 2rem;
+}
+
+.btn-calendario {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  padding: 0.2rem;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-primary);
+  opacity: 0.7;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.btn-calendario:hover {
+  opacity: 1;
+  background-color: var(--color-primary-light);
+}
+
+/* Selector nativo oculto (uno por campo): solo sirve para abrir el calendario del navegador */
+input.calendario-selector {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 select::-ms-expand {
   display: none;
 }

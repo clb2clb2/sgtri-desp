@@ -250,6 +250,7 @@ El título depende del modo (:81-122).
 - **Borrar sección** (`.btn-clear-section`, `formLogic.js:2018-2029`) y **borrar todo** (`limpiarFormularioCompleto`).
 - **Modales de `confirmDialog.js`:** `showConfirm`, `showPrompt` (admite `confirmClass` y `cancelClass`), `showChoice` (icono, mensaje centrado, `pregunta` opcional, opciones de radio y Aceptar/Cancelar) y `showMessage` (mensaje con Aceptar, ✅ o ⚠️; lo usan "Comprobar datos" y la carga de `.dta`). Todos escapan el texto y convierten `\n` en `<br>`.
 - **Fecha de firma:** con o sin fecha fija, mediante radios (`formLogic.js:240-263`).
+- **Calendario en los campos de fecha** (`js/calendarioFechas.js`): un icono dentro de cada `.input-fecha` abre el calendario nativo del navegador (`showPicker()` sobre un `<input type="date">` oculto, uno por campo). El campo sigue siendo de texto, sin listeners nuevos, y el botón está fuera del tabulador (`tabindex="-1"`), así que **la escritura con teclado no cambia**. Abre en la fecha del campo o, si está vacío, en la primera fecha de la misma ficha. Al elegir, escribe `dd/mm/aa` y da y quita el foco al campo, con lo que valida y recalcula igual que al teclear. Se añade también a los campos creados después (`MutationObserver`). En navegadores sin `showPicker()` no aparece. Los campos de hora no llevan selector, a propósito.
 
 ## 14. Dudas / no verificado
 

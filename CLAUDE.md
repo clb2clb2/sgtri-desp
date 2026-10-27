@@ -47,6 +47,7 @@ Es una SPA estática, sin backend, para el SGTRI de la Universidad de Extremadur
 - `.dta` es JSON en claro: contiene DNI, IBAN y tarjeta.
 - La carga de un `.dta` (`serializacionDatos.restaurarTodo`) es **síncrona y ordenada**: cada paso depende de que el anterior haya creado su DOM, y la creación de fichas, campos de pago y ficha de vehículo es inmediata. No introduzcas `setTimeout` ni esperas en la creación de esos elementos, o la carga dejará de funcionar.
 - Los diálogos (`showConfirm`/`showPrompt`) escapan el texto: no les pases HTML.
+- Los campos de fecha van envueltos en `.fecha-con-calendario`, con un icono y un `<input type="date">` oculto (`js/calendarioFechas.js`). **No conviertas los campos a `type="date"` ni les añadas listeners de teclado**: la escritura rápida (`020326`, `0203`…) es el método principal de los usuarios.
 - El índice del `<select>` de país es la posición en los arrays de `dietasPorPais` (99 entradas). **Reordenar `paises` en `datos.json` sin reordenar también las tarifas rompe el cálculo.**
 - Los modos (DESPL/CONGR/HONOR/AECC/GNRAL) están en `CONFIG` (`js/tipoLiquidacion.js:29-35`). Al modo GNRAL solo se llega con Shift+clic en "Liquidación de desplazamientos".
 

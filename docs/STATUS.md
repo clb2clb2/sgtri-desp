@@ -1,11 +1,7 @@
 # Estado del código
 
-- **Fecha del análisis:** 2026-10-23
-- **Commit base:** `c4dd894` (`git rev-parse --short HEAD`), rama `main`.
-- **Cambios del 2026-10-23 sin commit sobre ese commit:**
-  - Se recuperó el trabajo de "portada" de `stash@{0}`.
-  - Se corrigieron bugs, lógica duplicada y código muerto (§2).
-  - `datos_ejemplo.js` y `Prueba salida PDF *.docx` se sacaron del repositorio (§5).
+- **Fecha del análisis:** 2026-10-23 (actualizado el 2026-10-27).
+- **Commit de referencia:** `03f772c` (`git rev-parse --short HEAD`), rama `main`. Todos los cambios descritos aquí están confirmados y publicados.
 - **Método:** lectura del código, más pruebas automáticas en Chrome headless que se ejecutan fuera del repositorio (§1).
 
 ## 1. Tests y calidad
@@ -46,6 +42,7 @@
 | Carga de `.dta` de otro tipo: la carga parcial incluye ahora la forma de pago; un formulario GNRAL abierto carga completo cualquier archivo salvo AECC; erratas del aviso ("liquidación") | `serializacionDatos.restaurarTodo`, `obtenerNombreTipoLiquidacion` |
 | Carga de `.dta` de otro tipo: diálogo con tres opciones (abrir como el tipo del archivo / copiar solo datos comunes / cancelar); sin pregunta de versión de esquema; mensajes de éxito y error en modal, sin `alert()`/`confirm()` | `serializacionDatos.restaurarTodo`, `abrirDialogoImportar`, `confirmDialog.showChoice`, `showMessage` |
 | "Borrar todo" vaciaba la ficha de vehículo sin avisar a `uiDesplazamientos`, así que no se volvía a crear: se perdía el vehículo al cargar un `.dta` sobre un formulario que lo mostraba, y no reaparecía al volver a poner km | `uiDesplazamientos.resetFichaVehiculo`, `formLogic.limpiarSeccionDesplazamientos` |
+| Calendario nativo opcional en todos los campos de fecha (añadido el 2026-10-27), sin cambios en la escritura con teclado; los campos de hora no lo llevan, a propósito | `calendarioFechas.js`, `styles.css` (`.fecha-con-calendario`, `.btn-calendario`) |
 
 **Lógica duplicada unificada:**
 - `utils.getNormativa`, que antes estaba en 5 sitios.
@@ -106,8 +103,9 @@
 
 ## 5. Datos personales
 
-- `datos_ejemplo.js` y `Prueba salida PDF 0/1/2.docx` se han sacado del índice de git (`git rm --cached`). Las copias locales siguen en disco y se han añadido a `.gitignore`.
-- **Siguen en el historial de git y en el remoto** (`github.com/clb2clb2/sgtri-desp`), y también en `stash@{0}`. Para borrarlos de verdad haría falta reescribir el historial (p. ej. `git filter-repo`) y hacer *force push*. No se ha hecho.
+- `datos_ejemplo.js` y `Prueba salida PDF 0/1/2.docx` están fuera del repositorio y en `.gitignore`. Las copias locales siguen en disco.
+- **El historial se reescribió el 2026-10-23** con `git filter-repo` en `sgtri-desp` y `sgtri-desp-prod`, y se subió con *force push*. Se eliminaron esos archivos, los temporales de Word (`~$…`, `~WRL*.tmp`, también en `.gitignore`) y un nombre y un DNI de ejemplo que había en una versión antigua de `pdfGen.js`.
+- GitHub puede conservar un tiempo los commits antiguos, accesibles por su SHA directo. Para eliminarlos del todo hay que pedirlo a su soporte.
 
 ## 6. Partes frágiles y deuda técnica restante
 

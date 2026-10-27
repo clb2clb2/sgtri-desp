@@ -21,7 +21,7 @@ pdfGen (+ pdfmake, pdfFonts)                                ← salida PDF
 ## 2. Orden de carga (`index.html:24-54`)
 
 1. **Síncronos en `<head>`**, que se ejecutan antes que todos los `defer`: `pdfmake.min.js` y `pdfFonts.js`. Este último fusiona sus fuentes en `pdfMake.vfs` y `pdfMake.fonts`.
-2. **`defer`, en orden de documento:** utils → limpiaDatos → confirmDialog → validaciones → uiPagos → uiDesplazamientos → uiDesplazamientoEspecial → uiDesplazamientoAecc → uiAjustes → uiImputacion → serializacionDatos → tipoLiquidacion → cogeDatosDesp → calculoDesp → logicaDesp → salidaDesp → resultadoLiquidacion → main → formLogic → pdfGen.
+2. **`defer`, en orden de documento:** utils → limpiaDatos → confirmDialog → validaciones → calendarioFechas → uiPagos → uiDesplazamientos → uiDesplazamientoEspecial → uiDesplazamientoAecc → uiAjustes → uiImputacion → serializacionDatos → tipoLiquidacion → cogeDatosDesp → calculoDesp → logicaDesp → salidaDesp → resultadoLiquidacion → main → formLogic → pdfGen.
 3. **Auto-inicialización.** `tipoLiquidacion.js:306-310`, `uiDesplazamientoAecc.js:1243-1247` y `pdfGen.js:2479-2483` usan el patrón `readyState==='loading' ? DOMContentLoaded : init()`. Como los scripts `defer` se ejecutan con `readyState` ya en `interactive`, en la práctica se inician en el momento.
 4. **Dos listeners de `DOMContentLoaded`**, que se ejecutan en este orden:
    - `main.js:6`
@@ -49,6 +49,7 @@ pdfGen (+ pdfmake, pdfFonts)                                ← salida PDF
 | `js/confirmDialog.js` | `confirmDialog`, `showConfirm`, `showPrompt`, `showChoice`, `showMessage` | Modales basados en promesas; escapan todo el texto (`escapeHtml`) y convierten `
 ` en `<br>` | pdfGen, formLogic, uiDesplazamientos, serializacionDatos |
 | `js/validaciones.js` | `validaciones` | Validación de fecha y hora (blur, teclado) y de cruces de frontera, con marcado `.field-error` | formLogic (:799, :809, :1222), uiDesplazamientos |
+| `js/calendarioFechas.js` | `calendarioFechas` (`init`) | Icono de calendario nativo en cada `.input-fecha`, también en campos creados después; no toca la escritura con teclado | se inicia solo |
 | `js/uiPagos.js` | `uiPagos` | Pinta los campos IBAN, IBAN+SWIFT o tarjeta según `#tipo-pago`. **La validación está en formLogic** | formLogic:158 |
 | `js/uiDesplazamientos.js` | `uiDesplazamientos` | Crea, elimina y renumera fichas, otros gastos, ficha de vehículo, select de países, ticket de cena y límites | formLogic, serializacionDatos, tipoLiquidacion |
 | `js/uiDesplazamientoEspecial.js` | `uiDesplazamientoEspecial` | Ficha libre de líneas (importe × cantidad), solo en modo GNRAL | resultadoLiquidacion:401, serializacionDatos, tipoLiquidacion |
