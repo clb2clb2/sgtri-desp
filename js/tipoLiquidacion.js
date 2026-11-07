@@ -306,6 +306,15 @@
     return normalizarTipo(tipoActual || global.__sgtriTipoLiquidacion || TIPOS.GNRAL);
   }
 
+  /**
+   * Configuración de secciones del tipo indicado (o del actual).
+   * @param {string} [tipo]
+   * @returns {Object} Copia de la entrada de CONFIG
+   */
+  function getConfig(tipo) {
+    return { ...CONFIG[normalizarTipo(tipo || getTipoActual())] };
+  }
+
   function volverAlMenuInicial() {
     tipoActual = null;
     delete global.__sgtriTipoLiquidacion;
@@ -368,6 +377,7 @@
     aplicarModoUI,
     aplicarModoDesdeArchivo,
     getTipoActual,
+    getConfig,
     volverAlMenuInicial
   };
 

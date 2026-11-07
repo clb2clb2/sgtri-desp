@@ -386,9 +386,14 @@
     const { id, ui } = salidaData;
     const existingField = despEl.querySelector('.justificar-pernocta-field');
 
-    // Sin noches ambiguas → eliminar campo si existe
+    // Sin noches ambiguas → eliminar campo si existe, desmarcándolo antes
     if (!ui.nochesAmbiguas || !ui.nochesAmbiguasRango) {
       existingField?.remove();
+      if (despEl.dataset?.justificarPernocta === '1') {
+        delete despEl.dataset.justificarPernocta;
+        // El cálculo que ha llegado aquí aún contaba con la pernocta justificada
+        window.calculoDesp?.calculaDesplazamientoFicha?.(despEl);
+      }
       return;
     }
 

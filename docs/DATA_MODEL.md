@@ -17,13 +17,13 @@ Las listas son pares `[etiqueta, código]`. Al rellenar un select, el código es
 
 | Clave | Contenido | Uso |
 |---|---|---|
-| `versionEsquema` | `"26.10.2"` | `serializacionDatos.inicializar`. Se escribe en el `.dta` y se compara al cargarlo |
+| `versionEsquema` | `"26.11.1"` | `serializacionDatos.inicializar`. Se escribe en el `.dta` y se compara al cargarlo |
 | `limites` | `maxDesplazamientos` (8), `maxOtrosGastosPorDesplazamiento` (10), `maxOtrosDescuentos` (5), `maxLineasImputacion` (4) | uiDesplazamientos, uiAjustes, uiImputacion, AECC. Valores por defecto en código si falta el objeto: 6/10/5/4 |
 | `categorias` | 13 categorías del beneficiario (IP, ME, DC…) | Select `#categoria`. **El motor no lo usa**; solo se guarda y se imprime |
 | `pagos` | CE (cuenta española), CI (extranjera), TJ (tarjeta UEx) | `#tipo-pago` → uiPagos |
 | `tiposProyecto` | UEX, G24, I24, PEI, PCO, NAL, JEX | `#tipoProyecto` → normativa |
 | `otrosGastos` | AVN, PJE, TAX, PRK, TRF, INS, ALQ, SAC, SME, TTR, TAG, OTR | Select de otros gastos. AECC añade `ICG` "Inscripción Congreso" (`uiDesplazamientoAecc.js:450-462`) |
-| `otrosDescuentos` | TOT, MNT, ALJ, KLM, OTR | Descuentos de ajustes por categoría |
+| `otrosDescuentos` | MNT, ALJ, KLM, HON, INS, OTR (en este orden) | Opciones de "Descontar de" en los ajustes. HON e INS solo se ofrecen si la liquidación tiene honorarios o congresos (`uiAjustes.tipoDescuentoDisponible`) |
 | `kmTarifas` | `coche` 0.26, `motocicleta` 0.106 €/km | `calculoDesp.getKmTarifa` (:954-959), según el radio global `vehiculo-tipo` |
 | `dietasPorPais.paises` | 99 países; índice 0 = España, último = "Resto del mundo" | Select de país (sin placeholder). **El índice del select es el índice en las tablas** |
 | `dietasPorPais.decreto42_2025` / `.rd462_2002` | `alojamiento[99]`, `manutencion[99]` (€/día y €/noche) | `calculoDesp.getPrecios`. Si no hay tabla o tarifa, el respaldo es 0, así que no hay importe |
@@ -47,10 +47,10 @@ Es JSON en claro (`JSON.stringify(datos, null, 2)`, :1168), sin cifrar. Claves d
 - `desplazamientoAECC[]`: 0 o 1 elementos (`uiDesplazamientoAecc.obtenerDatos`, :1100-1145), con fechas, destino, `destinoAltaOcupacion`, `manutPrimerDia`, `manutUltimoDia`, `km`, `alojamiento`, `otrosGastos[]` y `datosCalculados`.
 - `desplazamientoEspecial`: `null` o `{titulo, lineas[], irpf, total}`. Cada línea es `{tipo:'seccion', descripcion}` o `{tipo:'normal', descripcion, importe, cantidad, total}`.
 - `vehiculo`: `null` o `{tipo, marca, modelo, matricula}`. Los `.dta` antiguos pueden traer `justificarPernocta`, que se ignora.
-- `evento`: `{nombre, lugar, fechaDesde, fechaHasta, gastosInscripcion, comidasIncluidas, desplazamientoAsociado ("despN"|""), descuentoComidas}`.
+- `evento`: `{nombre, lugar, fechaDesde, fechaHasta, gastosInscripcion, comidasIncluidas, comidasDiasRetencion, desplazamientoAsociado ("despN"|""), descuentoComidas}`. `comidasDiasRetencion` (desde 26.11.1) son las comidas incluidas que caen en días con retención; vale 0 si no hay ninguno dentro del congreso.
 - `honorarios`: `{importe, beneficiario, situacion, concepto, domicilio}`.
 - `imputacion[]`: `{organica, responsable, importe, readonly}`.
-- `ajustes`: `{financiacionMaxima, importeAnticipado (vacío salvo en GNRAL), comentarios, descuentos[] {tipo, motivo, importe}}`. Los comentarios de la sección "Comentarios" se guardan aquí.
+- `ajustes`: `{financiacionMaxima, importeAnticipado (vacío salvo en GNRAL), comentarios, descuentos[] {tipo, motivo, importe}, manutencionDiasRetencion}`. Los comentarios de la sección "Comentarios" se guardan aquí. `manutencionDiasRetencion` (desde 26.11.1) es la parte de los descuentos MNT que corresponde a días con retención; vacío si no hay descuentos MNT o días con retención.
 - `resultadoLiquidacion`: `{totalLiquidacion, totalAntesFinanciacion, importeAnticipado, importeImputar, irpfTotal}`.
 - `fechaFirma`: `{fechado, ciudad, fecha}`.
 
@@ -73,7 +73,7 @@ Hay campos que se guardan pero **nunca se restauran**: `categoriaNombre`, `tipoN
 - `manutenciones`, `manutencionesAmount`, `precioManutencion`
 - `noches`, `nochesAmount`, `precioNoche`, `nochesAmbiguous`
 - `kmAmount`, `alojamientoMaxAmount`, `residenciaEventual`, `factorResidencia`
-- `irpf{sujeto, breakdown[], limitesUsed, source}`
+- `irpf{sujeto, breakdown[], limitesUsed, source}`. Cada día de `breakdown` lleva `{dayIndex, fecha (yyyy-mm-dd), units, precio, brutoOriginal, bruto, exento, sujeto, isLast}`.
 
 **`salidaData`.** Es lo que se pinta y se registra (`buildSalidaData`, :1309-1372):
 - `totales{manutencion, alojamientoMax, alojamientoUser, km, otrosGastos, total, irpfSujeto, noches}`
@@ -85,10 +85,17 @@ Hay campos que se guardan pero **nunca se restauran**: `categoriaNombre`, `tipoN
 ## 4. `window.__sgtriTotales` (`resultadoLiquidacion.js:42-55`)
 
 ```
-{ desplazamientos: { [id|'aecc']: { manutencion, alojamiento, km, otrosGastos, irpfSujeto, detalles } },
-  honorarios, gastosInscripcion, descuentoCongreso, financiacionMaxima, importeAnticipado,
-  descuentosAjustes: [{tipo, tipoLabel, motivo, importe}] }
+{ desplazamientos: { [id|'aecc']: { manutencion, alojamiento, km, otrosGastos, irpfSujeto,
+                                    diasIrpf: [{fecha, units, precio, bruto, exento, sujeto}], detalles } },
+  honorarios, gastosInscripcion, descuentoCongreso,
+  congreso: { despId, desde, hasta, numComidas, comidasDiasRetencion },
+  financiacionMaxima, importeAnticipado,
+  descuentosAjustes: [{tipo, tipoLabel, motivo, importe}],
+  manutencionDiasRetencion }
 ```
+
+- `diasIrpf` es el desglose diario del IRPF de la ficha (de todos sus tramos si es internacional; vacío si las fechas no son válidas). La ficha AECC no lo tiene.
+- `congreso` lo escribe `registrarCongreso` desde `formLogic.computeDescuentoManutencion`. `desde`/`hasta` van en `yyyy-mm-dd`, o vacíos si las fechas no son válidas.
 
 **Quién escribe:**
 - `registrarDesplazamiento`: `calculoDesp.js:1515` con id numérico y `uiDesplazamientoAecc.js:718` con la clave `'aecc'`.
@@ -107,10 +114,11 @@ Es un JSON con extensión `.js` que no carga ningún archivo. Su esquema es anti
 - La comprobación es una igualdad estricta: `datos.versionEsquema !== VERSION_ESQUEMA`. Si no coinciden, se pregunta con `confirm()` nativo si se carga de todos modos (`serializacionDatos.js:1004-1014`). **No hay migraciones.**
 - Solo hay compatibilidad hacia atrás en estos casos:
   - AECC: la clave `justificarPernoctaMadrugada` (`uiDesplazamientoAecc.js:1180-1181`) y `gasto.descripcion` como alias de `concepto` (:1214).
+  - Ajustes: las líneas de descuento de tipo `TOT` (eliminado en 26.11.1) se ignoran al cargar (`restaurarAjustes`).
   - `formLogic.validarDatos` acepta los códigos de pago antiguos (`CuentaEsp`, `TarjetaUEx`…, `formLogic.js:1435-1443`), pero la restauración solo entiende CE/CI/TJ.
 - Al importar, se acepta la extensión `.json` además de `.dta` ("compatibilidad con Android", :1225-1230). No se valida la forma del objeto más allá de `JSON.parse`.
 
 ## 7. Dudas / no verificado
 
 - No se ha comprobado si hay `.dta` reales en circulación con versiones anteriores ni qué cambió entre versiones de esquema. No existe changelog.
-- El motivo de la versión `"26.10.2"` (¿fecha AA.MM.n?) se ha deducido del valor; no está documentado en el código.
+- El motivo de la versión `"26.11.1"` (¿fecha AA.MM.n?) se ha deducido del valor; no está documentado en el código.

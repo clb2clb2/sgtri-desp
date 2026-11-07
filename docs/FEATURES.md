@@ -104,7 +104,7 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
 **Flujo.** `calcularResultado` la lee con `getDatosParaLiquidacion()` (:813-865) y no pasa por `__sgtriTotales`.
 
 **Casos límite.**
-- Le afectan el descuento TOT y el tope de financiación, pero no los descuentos MNT/ALJ/KLM/OTR (`resultadoLiquidacion.js:417-453`).
+- Le afecta el tope de financiación, pero no los descuentos de ajustes (`resultadoLiquidacion.calcularResultado`).
 - Si se sale de GNRAL se elimina (`tipoLiquidacion.js:210-214`).
 
 ## 6. Desplazamiento AECC
@@ -130,24 +130,35 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
 - **Honorarios:** importe, tipo de beneficiario, situación, concepto y domicilio. En el PDF añaden una autodeclaración.
 
 **Archivos.**
-- `formLogic.computeDescuentoManutencion` (:313-412, expuesta en `window`): calcula el descuento por las comidas incluidas, que se escribe en el input oculto `#descuento-manut-congreso`.
-- `resultadoLiquidacion` (MutationObserver en :747-754) y `pdfGen` (:831-965, :1647-1737).
+- `formLogic.computeDescuentoManutencion` (expuesta en `window`): calcula el descuento por las comidas incluidas (media manutención del país por comida), que se escribe en el input oculto `#descuento-manut-congreso`, y registra el congreso con `resultadoLiquidacion.registrarCongreso` (ficha asociada, fechas y comidas).
+- `resultadoLiquidacion` (MutationObserver sobre el input oculto) y `pdfGen` (:831-965, :1647-1737).
+
+**Comidas e IRPF.** El descuento de las comidas reduce la manutención, pero **no** el importe sujeto, salvo las comidas que caen en días con retención:
+- `resultadoLiquidacion.getDiasRetencionCongreso` busca, en el desglose diario de la ficha asociada (`diasIrpf`), los días con sujeto > 0 dentro de las fechas del congreso.
+- Si hay alguno, `formLogic.actualizarPreguntaComidasRetencion` muestra `#comidas-retencion-row`: "De estas comidas incluidas en el congreso, ¿cuántas corresponden al día dd/mm/aa?" (o "a los días …, … o …"). Si no hay, la oculta y la pone a 0.
+- Cada comida de esos días descuenta media manutención de su día (como mucho, las medias que tenga) y el sujeto del día se recalcula (`calcularReduccionIrpfCongreso`). Con varios días, las comidas se reparten de una en una por orden de fecha y, tras el último día, se vuelve a empezar por el primero.
+- Al cargar un `.dta`, el valor se restaura después de recalcular las fichas (`restaurarTodo`, paso 6.1), porque antes la pregunta está oculta.
 
 **Casos límite.**
-- Con varias fichas, el usuario elige la ficha asociada en `#evento-asociado` (valores `despN` por posición, `uiDesplazamientos.js:627-647`).
+- Con varias fichas, el usuario elige la ficha asociada en `#evento-asociado` (valores `despN` por posición entre las fichas normales, `uiDesplazamientos.js:627-647`). `formLogic.getDesplazamientoAsociadoEvento` resuelve la ficha y no cuenta la ficha especial.
 - Las fechas del evento admiten ±4 días respecto al desplazamiento (`formLogic.js:751-760`), aunque el tooltip de `index.html:483` dice otra cosa.
 - El precio de manutención se busca con el `selectedIndex` del país. Si no se encuentra, vale 0 y no hay descuento.
 
 ## 8. Ajustes (descuentos, financiación máxima y anticipo)
 
 **Qué.**
-- Hasta 5 líneas de descuento de tipo TOT/MNT/ALJ/KLM/OTR.
+- Hasta 5 líneas de descuento. "Descontar de": Manutención (MNT), Alojamiento (ALJ), Kilometraje (KLM), Honorarios (HON), Inscripción en Congreso (INS) y Otros gastos (OTR).
 - Un tope de "financiación máxima".
 - Un "importe anticipado", solo en GNRAL.
 
-**Archivos.** `js/uiAjustes.js`, `resultadoLiquidacion.js` (`calcularResultado`, :390-480).
+**Archivos.** `js/uiAjustes.js`, `resultadoLiquidacion.js` (`calcularResultado`).
 
-**Casos límite.** Fuera de GNRAL, el campo del anticipo se oculta **y se vacía** (`uiAjustes.actualizarVisibilidadImporteAnticipado`). Tampoco se guarda en el `.dta` (`recopilarAjustes`).
+**Casos límite.**
+- HON solo se ofrece si hay sección de honorarios (HONOR y GNRAL) e INS si la hay de congresos (CONGR y GNRAL): `uiAjustes.tipoDescuentoDisponible`, según `tipoLiquidacion.getConfig()`.
+- HON resta de los honorarios y también del importe sujeto (los honorarios están siempre sujetos). INS resta de la inscripción y no afecta al IRPF.
+- MNT resta de la manutención, pero del importe sujeto solo resta la parte que el usuario asigna a los días con retención. Si hay descuentos MNT y días con retención (de cualquier ficha normal), aparece `#manut-retencion-row`: "Del descuento en manutención, ¿qué importe corresponde al día dd/mm/aa?" (o "a los días f1, f2 o f3?"). El importe se limita al total MNT, se divide a partes iguales entre las fechas y cada parte se resta del sujeto de su día (sin bajar de 0), después de las comidas del congreso (`resultadoLiquidacion.calcularReduccionIrpfManutencion`). Al ocultarse, el campo se vacía (`uiAjustes.actualizarPreguntaManutencionRetencion`).
+- Ya no hay descuento del total (TOT). Las líneas TOT de un `.dta` antiguo se ignoran al cargarlo.
+- Fuera de GNRAL, el campo del anticipo se oculta **y se vacía** (`uiAjustes.actualizarVisibilidadImporteAnticipado`). Tampoco se guarda en el `.dta` (`recopilarAjustes`).
 
 ## 9. Resultado de la liquidación
 
@@ -156,10 +167,10 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
 **Archivos.** `js/resultadoLiquidacion.js`.
 
 **Cálculo** (`calcularResultado`):
-1. Neto de cada categoría = max(0, total − sus descuentos). A la manutención se le resta también el descuento del congreso.
-2. `totalAntesFinanciacion` = max(0, suma de netos + inscripción + honorarios + ficha especial − TOT).
+1. Neto de cada categoría = max(0, total − sus descuentos), incluidos honorarios (HON) e inscripción (INS). A la manutención se le resta también el descuento del congreso.
+2. `totalAntesFinanciacion` = suma de netos + ficha especial.
 3. Si la financiación máxima es menor, `totalLiquidacion` pasa a ser ese tope.
-4. `irpfTotal` incluye los **honorarios completos**.
+4. `irpfTotal` = max(0, sujeto de desplazamientos − reducción por comidas del congreso en días con retención − reducción por la parte de los descuentos MNT asignada a días con retención + honorarios netos + IRPF de la ficha especial − recorte por financiación máxima).
 5. `importeImputar` = total − anticipo.
 
 **Casos límite.** Si no hay contenido, `renderResultado` sale antes de tiempo (:645-648) y no actualiza la imputación.
@@ -180,7 +191,9 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
 
 **Qué.** Exporta e importa el estado completo; ver DATA_MODEL §2.
 
-**Archivos.** `js/serializacionDatos.js` (`exportarArchivo`, `importarArchivo`, `restaurarTodo`, `abrirDialogoImportar`, `mensajeFalloCarga`).
+**Archivos.** `js/serializacionDatos.js` (`exportarArchivo`, `importarArchivo`, `restaurarTodo`, `abrirDialogoImportar`, `mensajeFalloCarga`, `extraerDatosDePdf`).
+
+**Cargar desde un PDF.** "Cargar" admite también un `.pdf` generado por la app: `extraerDatosDePdf` lee la clave `SgtriDta` de sus metadatos (ver §12) y el objeto resultante sigue el mismo flujo que un `.dta`. Si el PDF no la tiene: "Este PDF no contiene datos del formulario…".
 
 **Flujo de carga.**
 1. Si la versión de esquema es distinta, se carga igualmente (solo un aviso en la consola).
@@ -204,11 +217,10 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
    4. `restaurarTodo` responde solo cuando todo ha terminado. Entonces aparece el modal (`showMessage`, el mismo de "Comprobar datos") con "Datos cargados correctamente." o el resumen de la carga parcial.
 
 **Casos límite.**
-- Las fichas que superan el límite se descartan sin avisar.
-- Si el archivo trae un valor de select que no existe, se pierde sin avisar.
 - Si la carga falla (JSON inválido, archivo vacío o incompatible), se muestra el modal de error "Falló la carga de datos guardados." con el motivo. Si el usuario cancela, no se muestra nada. En la carga ya no queda ningún `alert()` ni `confirm()` nativo.
 - Una ficha especial **sin líneas** (solo título o IRPF) no se restaura (`uiDesplazamientoEspecial.restaurarDatos`).
-- Pendiente de revisar (ver STATUS §3): mapeo de `evento-asociado` y pérdidas silenciosas.
+- `evento-asociado` (`despN`, posición de la ficha) se restaura tal cual, porque las fichas se recrean en el mismo orden.
+- Las fichas que superan el límite y los valores de select inexistentes se pierden sin aviso; decidido no tratarlos (ver STATUS §4).
 
 ## 12. Generar el PDF
 
@@ -237,6 +249,21 @@ Calcula la manutención, las noches, el máximo de alojamiento, el kilometraje y
 - pie con firmas (una o dos, según `beneficiarioCoincideResponsable`) y logos GR24 en proyectos G24/I24.
 
 El título depende del modo (:81-122).
+
+**Datos ocultos.** La última página termina con un bloque marcado que no dibuja nada, `/SgtriDta <</D (base64)>> BDC EMC`, con el mismo objeto que el `.dta` (`recopilarTodo()` → JSON → UTF-8 → base64, `serializacionDatos.codificarDatosParaPdf`). Lo escribe `pdfGen.incrustarDatosEnContenido`, que envuelve `_flushDoc` de pdfmake para usar `addContent` de pdfkit antes de cerrar. No se ve, no se imprime y no sale al buscar o copiar texto.
+
+Como copia de reserva, los metadatos (`info`) llevan la clave `SgtriDta` con la misma cadena. pdfmake la escribe como objeto aparte (`/SgtriDta N 0 R`). Se ve en "Propiedades del documento → Personalizado" de algunos lectores.
+
+Al cargar, `extraerDatosDePdf` (asíncrona) busca el bloque en claro; si no está, descomprime los streams Flate con `DecompressionStream`; y si tampoco, recurre a los metadatos (Info, o la copia en claro del XMP `<pdfx:SgtriDta>` que dejan Acrobat y Adobe PDF al comprimir el Info).
+
+Probado el 2026-11-07 con PDF reales:
+
+| Proceso | Bloque | Metadatos |
+|---|---|---|
+| Firma con Acrobat | se conserva | se conserva (en el XMP) |
+| Informe de firma de la UEx (`vfirma`, iText): copia las páginas byte a byte | se conserva | se pierde |
+| Imprimir con "Adobe PDF" (Distiller): rehace las páginas | se pierde | se conserva (en el XMP) |
+| "Microsoft Print to PDF" | se pierde | se pierde |
 
 **Casos límite.**
 - Nunca se descarga el PDF directamente: siempre se abre en una pestaña nueva.

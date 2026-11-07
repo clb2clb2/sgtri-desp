@@ -78,7 +78,6 @@ pdfGen (+ pdfmake, pdfFonts)                                ← salida PDF
   - `__sgtriDatos`: catálogo de `datos.json`.
   - `__sgtriTipoLiquidacion`: modo actual.
   - `__sgtriTotales`: importes consolidados (ver DATA_MODEL §4).
-  - `__tempMapeoDesplazamientos`: estado temporal mientras se carga un `.dta`.
 - **Un `MutationObserver`** vigila el atributo `value` del input oculto `#descuento-manut-congreso` (`resultadoLiquidacion.js:747-754`), que escribe `formLogic.computeDescuentoManutencion`.
 
 ## 5. Flujo típico de extremo a extremo

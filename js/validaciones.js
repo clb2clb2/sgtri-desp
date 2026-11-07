@@ -297,13 +297,21 @@
     hoy.setHours(0, 0, 0, 0);
     if (hoy <= fin) return;
 
-    global.showMessage(
-      '¡Atención! No olvide que la liquidación debe presentarse,\n' +
-      '<b>como máximo, 45 días naturales tras el desplazamiento</b>.\n\n' +
-      '<i>(Art. 32.8 Normas de Ejecución Presupuestaria UEx)</i>',
-      true,
-      { html: true }
-    );
+    // Se difiere para que el foco llegue antes al campo de destino del blur,
+    // y se le devuelve al cerrar el aviso
+    setTimeout(() => {
+      const activo = document.activeElement;
+      const destino = activo && activo !== document.body ? activo : el;
+      Promise.resolve(global.showMessage(
+        '¡Atención! No olvide que la liquidación debe presentarse,\n' +
+        '<b>como máximo, 45 días naturales tras el desplazamiento</b>.\n\n' +
+        '<i>(Art. 32.8 Normas de Ejecución Presupuestaria UEx)</i>',
+        true,
+        { html: true }
+      )).then(() => {
+        if (destino.isConnected) destino.focus();
+      });
+    }, 0);
   }
 
   // =========================================================================

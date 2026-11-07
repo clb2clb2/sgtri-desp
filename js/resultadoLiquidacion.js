@@ -23,6 +23,7 @@
    *   desplazamientos: {
    *     '1': {
    *       manutencion, alojamiento, km, otrosGastos, irpfSujeto,
+   *       diasIrpf: [{ fecha (yyyy-mm-dd), units, precio, bruto, exento, sujeto }, ...],
    *       detalles: {
    *         numManutenciones, precioManutencion, importeManutencion,
    *         numNoches, importeMaxAlojamiento, importeAlojamientoUsuario, excedeMaxAlojamiento,
@@ -34,24 +35,44 @@
    *   honorarios: number,
    *   gastosInscripcion: number,
    *   descuentoCongreso: number,
+   *   congreso: { despId, desde, hasta, numComidas, comidasDiasRetencion },
    *   financiacionMaxima: number,
    *   importeAnticipado: number,
-   *   descuentosAjustes: [{ tipo, motivo, importe }, ...]
+   *   descuentosAjustes: [{ tipo, motivo, importe }, ...],
+   *   manutencionDiasRetencion: number  // parte de los descuentos MNT de días con retención
    * }
    */
   function getRegistro() {
     if (!global.__sgtriTotales) {
-      global.__sgtriTotales = {
-        desplazamientos: {},
-        honorarios: 0,
-        gastosInscripcion: 0,
-        descuentoCongreso: 0,
-        financiacionMaxima: 0,
-        importeAnticipado: 0,
-        descuentosAjustes: []
-      };
+      global.__sgtriTotales = registroVacio();
     }
     return global.__sgtriTotales;
+  }
+
+  /**
+   * Registro de totales en su estado inicial.
+   * @returns {Object}
+   */
+  function registroVacio() {
+    return {
+      desplazamientos: {},
+      honorarios: 0,
+      gastosInscripcion: 0,
+      descuentoCongreso: 0,
+      congreso: congresoVacio(),
+      financiacionMaxima: 0,
+      importeAnticipado: 0,
+      descuentosAjustes: [],
+      manutencionDiasRetencion: 0
+    };
+  }
+
+  /**
+   * Datos del congreso que afectan al IRPF, sin congreso.
+   * @returns {Object}
+   */
+  function congresoVacio() {
+    return { despId: null, desde: '', hasta: '', numComidas: 0, comidasDiasRetencion: 0 };
   }
 
   /**
@@ -68,6 +89,14 @@
       km: round2(totales.km || 0),
       otrosGastos: round2(totales.otrosGastos || 0),
       irpfSujeto: round2(totales.irpfSujeto || 0),
+      diasIrpf: (totales.diasIrpf || []).map(d => ({
+        fecha: d.fecha,
+        units: Number(d.units) || 0,
+        precio: Number(d.precio) || 0,
+        bruto: Number(d.bruto) || 0,
+        exento: Number(d.exento) || 0,
+        sujeto: Number(d.sujeto) || 0
+      })),
       // Detalles adicionales para serialización
       detalles: detalles || null
     };
@@ -107,6 +136,26 @@
   }
 
   /**
+   * Registra los datos del congreso que deciden qué comidas reducen el IRPF.
+   * @param {Object} datos
+   * @param {string|null} datos.despId - ID del desplazamiento asociado al congreso
+   * @param {string} datos.desde - Inicio del congreso (yyyy-mm-dd) o ''
+   * @param {string} datos.hasta - Fin del congreso (yyyy-mm-dd) o ''
+   * @param {number} datos.numComidas - Comidas incluidas en la inscripción
+   * @param {number} datos.comidasDiasRetencion - De ellas, las de días con retención
+   */
+  function registrarCongreso(datos) {
+    const numComidas = Math.max(0, Math.floor(Number(datos?.numComidas) || 0));
+    getRegistro().congreso = {
+      despId: datos?.despId != null ? String(datos.despId) : null,
+      desde: datos?.desde || '',
+      hasta: datos?.hasta || '',
+      numComidas,
+      comidasDiasRetencion: Math.min(numComidas, Math.max(0, Math.floor(Number(datos?.comidasDiasRetencion) || 0)))
+    };
+  }
+
+  /**
    * Registra la financiación máxima.
    * @param {number} importe
    */
@@ -133,6 +182,14 @@
       motivo: d.motivo || '',
       importe: round2(d.importe || 0)
     }));
+  }
+
+  /**
+   * Registra qué parte de los descuentos de manutención (MNT) corresponde a días con retención.
+   * @param {number} importe
+   */
+  function registrarManutencionDiasRetencion(importe) {
+    getRegistro().manutencionDiasRetencion = round2(Math.max(0, importe || 0));
   }
 
   // =========================================================================
@@ -210,6 +267,100 @@
    */
   function getDescuentoCongreso() {
     return getRegistro().descuentoCongreso || 0;
+  }
+
+  /**
+   * Días con importe sujeto a retención del desplazamiento asociado al congreso
+   * que caen entre las fechas de celebración del congreso.
+   * Solo hay días si el congreso incluye comidas.
+   * @returns {Array<{fecha, units, precio, bruto, exento, sujeto}>} Ordenados por fecha
+   */
+  function getDiasRetencionCongreso() {
+    const reg = getRegistro();
+    const congreso = reg.congreso || congresoVacio();
+    if (congreso.numComidas <= 0 || !congreso.despId || !congreso.desde || !congreso.hasta) return [];
+
+    const desp = reg.desplazamientos[congreso.despId];
+    if (!desp || !Array.isArray(desp.diasIrpf)) return [];
+
+    return desp.diasIrpf
+      .filter(d => d.sujeto > 0 && d.fecha >= congreso.desde && d.fecha <= congreso.hasta)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  }
+
+  /**
+   * Días con importe sujeto a retención de todos los desplazamientos normales.
+   * Son los mismos objetos del registro que devuelve getDiasRetencionCongreso().
+   * @returns {Array<{fecha, units, precio, bruto, exento, sujeto}>} Ordenados por fecha
+   */
+  function getDiasRetencion() {
+    const dias = [];
+    Object.values(getRegistro().desplazamientos).forEach(desp => {
+      (desp.diasIrpf || []).forEach(d => {
+        if (d.sujeto > 0) dias.push(d);
+      });
+    });
+    return dias.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  }
+
+  /**
+   * Importe sujeto de cada día tras descontar las comidas del congreso que caen en días con retención.
+   * Las comidas se reparten de una en una por orden de fecha y, al llegar al último día, se
+   * vuelve a empezar por el primero. Cada día admite como mucho las medias manutenciones que tiene.
+   * Cada comida descuenta media manutención de su día, y el sujeto de ese día se recalcula.
+   * @param {Array} dias - Resultado de getDiasRetencionCongreso()
+   * @param {number} comidas - Comidas del congreso que corresponden a esos días
+   * @returns {Map<Object, number>} Día del registro → importe sujeto
+   */
+  function calcularSujetosTrasCongreso(dias, comidas) {
+    const capacidad = dias.map(d => Math.round(d.units * 2));
+    const comidasDia = dias.map(() => 0);
+    let pendientes = comidas;
+
+    while (pendientes > 0 && comidasDia.some((n, i) => n < capacidad[i])) {
+      for (let i = 0; i < dias.length && pendientes > 0; i++) {
+        if (comidasDia[i] < capacidad[i]) {
+          comidasDia[i]++;
+          pendientes--;
+        }
+      }
+    }
+
+    const sujetos = new Map();
+    dias.forEach((d, i) => {
+      const brutoDia = Math.max(0, d.bruto - comidasDia[i] * 0.5 * d.precio);
+      sujetos.set(d, round2(Math.max(0, brutoDia - d.exento)));
+    });
+    return sujetos;
+  }
+
+  /**
+   * Reducción del importe sujeto por la parte de los descuentos de manutención que el
+   * usuario asigna a los días con retención. El importe se divide a partes iguales entre
+   * esos días (fechas distintas) y cada parte se resta del sujeto de su día, sin bajar de 0.
+   * Se aplica después de las comidas del congreso.
+   * @param {Array} dias - Resultado de getDiasRetencion()
+   * @param {Map<Object, number>} sujetosCongreso - Resultado de calcularSujetosTrasCongreso()
+   * @param {number} importe - Parte de los descuentos MNT de días con retención
+   * @returns {number}
+   */
+  function calcularReduccionIrpfManutencion(dias, sujetosCongreso, importe) {
+    const fechas = [...new Set(dias.map(d => d.fecha))];
+    if (fechas.length === 0 || importe <= 0) return 0;
+
+    const cuota = importe / fechas.length;
+    let reduccion = 0;
+    fechas.forEach(fecha => {
+      // Una fecha puede estar en dos desplazamientos (regreso de uno y salida del otro)
+      let restante = cuota;
+      dias.filter(d => d.fecha === fecha).forEach(d => {
+        const sujeto = sujetosCongreso.has(d) ? sujetosCongreso.get(d) : d.sujeto;
+        const resta = Math.min(restante, sujeto);
+        reduccion += resta;
+        restante -= resta;
+      });
+    });
+    return round2(reduccion);
   }
 
   /**
@@ -330,6 +481,14 @@
     registrarDescuentosAjustes(descuentos);
   }
 
+  /**
+   * Lee y actualiza desde el DOM la parte de los descuentos de manutención de días con retención.
+   */
+  function actualizarManutencionDiasRetencion() {
+    const input = document.getElementById('descuento-manut-retencion');
+    registrarManutencionDiasRetencion(input ? parseNumber(input.value) : 0);
+  }
+
   // =========================================================================
   // CÁLCULO DEL RESULTADO
   // =========================================================================
@@ -337,10 +496,10 @@
   /**
    * Agrupa los descuentos por tipo y suma los importes.
    * @param {Array} descuentos - Array de descuentos de ajustes
-   * @returns {Object} { TOT: number, MNT: number, ALJ: number, KLM: number, OTR: number }
+   * @returns {Object} { MNT, ALJ, KLM, HON, INS, OTR } (number)
    */
   function agruparDescuentosPorTipo(descuentos) {
-    const agrupados = { TOT: 0, MNT: 0, ALJ: 0, KLM: 0, OTR: 0 };
+    const agrupados = { MNT: 0, ALJ: 0, KLM: 0, HON: 0, INS: 0, OTR: 0 };
     
     descuentos.forEach(d => {
       if (agrupados.hasOwnProperty(d.tipo)) {
@@ -370,7 +529,7 @@
     const totalEspecial = datosEspecial?.total || 0;
     const irpfEspecial = datosEspecial?.irpf || 0;
 
-    // Descuentos por tipo específico (SIN el TOT que se aplica al final)
+    // Descuentos por tipo
     const descuentosManutencion = descuentoCongreso + descuentosAgrupados.MNT;
     const descuentosAlojamiento = descuentosAgrupados.ALJ;
     const descuentosKilometraje = descuentosAgrupados.KLM;
@@ -381,15 +540,15 @@
     const netoAlojamiento = Math.max(0, totales.alojamiento - descuentosAlojamiento);
     const netoKilometraje = Math.max(0, totales.kilometraje - descuentosKilometraje);
     const netoOtrosGastos = Math.max(0, totales.otrosGastos - descuentosOtrosGastos);
+    const netoHonorarios = Math.max(0, honorarios - descuentosAgrupados.HON);
+    const netoInscripcion = Math.max(0, gastosInscripcion - descuentosAgrupados.INS);
 
     // Total de la liquidación (incluye gastos inscripción, honorarios y desplazamiento especial)
-    // El descuento de tipo TOT se aplica al total final, incluyendo honorarios
-    // El desplazamiento especial NO se ve afectado por descuentos específicos (MNT, ALJ, KLM, OTR)
-    let totalAntesFinanciacion = round2(
+    // El desplazamiento especial NO se ve afectado por los descuentos de ajustes
+    const totalAntesFinanciacion = round2(
       netoManutencion + netoAlojamiento + netoKilometraje + netoOtrosGastos +
-      gastosInscripcion + honorarios + totalEspecial - descuentosAgrupados.TOT
+      netoInscripcion + netoHonorarios + totalEspecial
     );
-    totalAntesFinanciacion = Math.max(0, totalAntesFinanciacion);
 
     // Calcular descuento por financiación máxima
     let descuentoFinanciacionMaxima = 0;
@@ -400,25 +559,34 @@
     }
 
     // === CÁLCULO DEL IRPF ===
-    // Descuentos que afectan SOLO al IRPF de desplazamientos (manutención):
-    // - Descuento por comidas de congreso
-    // - Descuentos de manutención del usuario (tipo MNT)
-    const descuentosManut = descuentoCongreso + descuentosAgrupados.MNT;
-    
-    // Descuentos que afectan al IRPF TOTAL (desplazamientos + honorarios + especial):
-    // - Descuentos del total (tipo TOT)
-    // - Descuento por financiación máxima
-    const descuentosTotales = descuentosAgrupados.TOT + descuentoFinanciacionMaxima;
-    
-    // IRPF de desplazamientos normales (restando descuentos de manutención)
-    const irpfDesplazamientos = Math.max(0, totales.irpfSujeto - descuentosManut);
-    
-    // IRPF total antes de descuentos TOT (desplazamientos + honorarios + especial)
+    // Comidas del congreso: solo reducen el sujeto las que caen en días con retención
+    const diasRetencionCongreso = getDiasRetencionCongreso();
+    const sujetosCongreso = calcularSujetosTrasCongreso(
+      diasRetencionCongreso,
+      getRegistro().congreso?.comidasDiasRetencion || 0
+    );
+    const reduccionIrpfCongreso = round2(diasRetencionCongreso.reduce(
+      (suma, d) => suma + d.sujeto - sujetosCongreso.get(d), 0));
+
+    // Descuentos de manutención (MNT): solo reduce el sujeto la parte que el usuario
+    // asigna a los días con retención, que no puede superar lo descontado
+    const diasRetencionManutencion = descuentosAgrupados.MNT > 0 ? getDiasRetencion() : [];
+    const manutencionDiasRetencion = Math.min(
+      getRegistro().manutencionDiasRetencion || 0,
+      descuentosAgrupados.MNT
+    );
+    const reduccionIrpfManutencion = calcularReduccionIrpfManutencion(
+      diasRetencionManutencion, sujetosCongreso, manutencionDiasRetencion);
+
+    // IRPF de desplazamientos normales
+    const irpfDesplazamientos = Math.max(0, totales.irpfSujeto - reduccionIrpfCongreso - reduccionIrpfManutencion);
+
+    // Los honorarios están siempre sujetos: entra su importe neto (tras el descuento HON).
     // El IRPF del especial NO se ve afectado por descuentos específicos
-    const irpfAntesDescTot = irpfDesplazamientos + honorarios + irpfEspecial;
-    
-    // IRPF final (restando descuentos TOT y financiación máxima)
-    const irpfTotal = round2(Math.max(0, irpfAntesDescTot - descuentosTotales));
+    const irpfAntesFinanciacion = irpfDesplazamientos + netoHonorarios + irpfEspecial;
+
+    // IRPF final (restando la financiación máxima)
+    const irpfTotal = round2(Math.max(0, irpfAntesFinanciacion - descuentoFinanciacionMaxima));
 
     // Importe final a imputar tras descontar, si procede, un anticipo.
     const importeImputar = round2(Math.max(0, totalLiquidacion - importeAnticipado));
@@ -438,8 +606,14 @@
         manutencion: netoManutencion,
         alojamiento: netoAlojamiento,
         kilometraje: netoKilometraje,
-        otrosGastos: netoOtrosGastos
+        otrosGastos: netoOtrosGastos,
+        honorarios: netoHonorarios,
+        inscripcion: netoInscripcion
       },
+      diasRetencionCongreso,
+      reduccionIrpfCongreso,
+      diasRetencionManutencion,
+      reduccionIrpfManutencion,
       totalAntesFinanciacion: round2(totalAntesFinanciacion),
       totalLiquidacion: round2(totalLiquidacion),
       importeImputar,
@@ -536,6 +710,11 @@
 
     const datos = calcularResultado();
     const lines = [];
+
+    // La pregunta de comidas en días con retención depende del cálculo de los desplazamientos
+    global.formLogic?.actualizarPreguntaComidasRetencion?.(datos.diasRetencionCongreso);
+    global.uiAjustes?.actualizarPreguntaManutencionRetencion?.(
+      datos.diasRetencionManutencion, datos.descuentosAgrupados.MNT);
 
     // --- Líneas del desplazamiento especial (al principio, sin total) ---
     if (datos.datosEspecial && datos.datosEspecial.lineasHtml.length > 0) {
@@ -644,10 +823,11 @@
    */
   function getTipoNombre(tipo) {
     const nombres = {
-      TOT: 'total',
       MNT: 'manutención',
       ALJ: 'alojamiento',
       KLM: 'kilometraje',
+      HON: 'honorarios',
+      INS: 'inscripción en congreso',
       OTR: 'otros gastos'
     };
     return nombres[tipo] || tipo;
@@ -746,6 +926,7 @@
     actualizarImporteAnticipado();
     actualizarDescuentoCongreso();
     actualizarDescuentosAjustes();
+    actualizarManutencionDiasRetencion();
 
     // Render inicial
     renderResultado();
@@ -756,15 +937,7 @@
    * Pensado para ser llamado desde limpiarFormularioCompleto().
    */
   function resetTotales() {
-    global.__sgtriTotales = {
-      desplazamientos: {},
-      honorarios: 0,
-      gastosInscripcion: 0,
-      descuentoCongreso: 0,
-      financiacionMaxima: 0,
-      importeAnticipado: 0,
-      descuentosAjustes: []
-    };
+    global.__sgtriTotales = registroVacio();
   }
 
   // =========================================================================
@@ -781,15 +954,18 @@
     registrarHonorarios,
     registrarGastosInscripcion,
     registrarDescuentoCongreso,
+    registrarCongreso,
     registrarFinanciacionMaxima,
     registrarImporteAnticipado,
     registrarDescuentosAjustes,
-    
+    registrarManutencionDiasRetencion,
+
     // Actualización desde DOM (para usar tras restaurar datos)
     actualizarHonorarios,
     actualizarGastosInscripcion,
     actualizarDescuentoCongreso,
     actualizarDescuentosAjustes,
+    actualizarManutencionDiasRetencion,
     actualizarFinanciacionMaxima,
     actualizarImporteAnticipado,
     

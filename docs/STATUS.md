@@ -1,7 +1,7 @@
 # Estado del código
 
-- **Fecha del análisis:** 2026-10-23 (actualizado el 2026-10-27).
-- **Commit de referencia:** el último de `main` (los cambios descritos aquí están confirmados y publicados; el calendario de fechas entró en `ee4cf19` los iconos Lucide en `9281709` y el aviso de plazo de presentación en el commit siguiente).
+- **Fecha del análisis:** 2026-10-23 (actualizado el 2026-11-07).
+- **Commit de referencia:** `9cb44aa` (el calendario de fechas entró en `ee4cf19`, los iconos Lucide en `9281709` y el aviso de plazo de presentación en `9cb44aa`). Los cambios marcados "2026-11-07" en §2 se confirmaron en el commit siguiente ("IRPF per-day discounts…").
 - **Método:** lectura del código, más pruebas automáticas en Chrome headless que se ejecutan fuera del repositorio (§1).
 
 ## 1. Tests y calidad
@@ -45,6 +45,14 @@
 | Calendario nativo opcional en todos los campos de fecha (añadido el 2026-10-27), sin cambios en la escritura con teclado; los campos de hora no lo llevan, a propósito | `calendarioFechas.js`, `styles.css` (`.fecha-con-calendario`, `.btn-calendario`) |
 | Iconos: los emojis (barra de acciones, "Generar PDF", diálogos, avisos de campo, flechas de la ficha especial) y la goma de "Borrar" se sustituyeron por iconos de Lucide v1.62.0 en un sprite SVG; un solo ayudante, `utils.iconoSvg` | `index.html` (sprite), `utils.iconoSvg`, `confirmDialog.iconoDialogoHtml`, `styles.css` (`.icono`) |
 | Aviso modal al introducir una fecha de regreso fuera del plazo de presentación (45 días naturales sin agosto, art. 32.8 de las Normas de Ejecución Presupuestaria de la UEx); solo informativo | `validaciones.js` (`finPlazoPresentacion`, `avisarPlazoPresentacion`) |
+| (2026-11-07) Al cerrar el aviso del plazo de presentación, el foco vuelve al campo al que iba el usuario (o a la fecha de regreso) | `validaciones.avisarPlazoPresentacion` |
+| (2026-11-07) "Justifica pernoctación" se desmarca al desaparecer (regreso fuera de 01:01–06:59). Antes quedaba marcada en la ficha y el IRPF seguía contando la pernocta | `salidaDesp.setupJustificarPernocta` |
+| (2026-11-07) Comidas del congreso e IRPF: el descuento por comidas ya no se resta del importe sujeto. Solo lo reducen las comidas que el usuario asigna a los días con retención dentro del congreso (pregunta nueva `#comidas-retencion-row`), recalculando el sujeto de esos días | `calculoDesp.calcIRPF` (fecha y precio por día), `resultadoLiquidacion` (`registrarCongreso`, `getDiasRetencionCongreso`, `calcularReduccionIrpfCongreso`), `formLogic` (`actualizarPreguntaComidasRetencion`) |
+| (2026-11-07) Ajustes: se quita el descuento del total (TOT; las líneas TOT de `.dta` antiguos se ignoran) y se añaden Honorarios (HON, resta también del sujeto) e Inscripción en Congreso (INS, no afecta al IRPF), solo en los modos con esa sección. La financiación máxima sigue restando del sujeto. `versionEsquema` 26.11.1 | `datos.json`, `uiAjustes.tipoDescuentoDisponible`, `tipoLiquidacion.getConfig`, `resultadoLiquidacion.calcularResultado`, `serializacionDatos`, `pdfGen` |
+| (2026-11-07) Descuentos de manutención (MNT) e IRPF: ya no se restan enteros del importe sujeto. Solo lo reduce la parte que el usuario asigna a los días con retención (pregunta nueva `#manut-retencion-row` en "Ajustes"), repartida a partes iguales entre esos días y aplicada después de las comidas del congreso | `resultadoLiquidacion` (`getDiasRetencion`, `calcularSujetosTrasCongreso`, `calcularReduccionIrpfManutencion`), `uiAjustes.actualizarPreguntaManutencionRetencion`, `serializacionDatos` (`ajustes.manutencionDiasRetencion`), `formLogic.limpiarSeccionAjustes` |
+| (2026-11-07) Descuento por comidas con ficha especial: la ficha asociada se buscaba contando la especial, así que con una ficha normal y la especial el descuento salía 0. Estaba en "ignorados"; se corrigió al unificar la búsqueda de la ficha asociada | `formLogic.getDesplazamientoAsociadoEvento` |
+| (2026-11-07) El PDF lleva oculto el contenido del `.dta` (bloque marcado `SgtriDta` al final de la última página, que no dibuja nada), y "Cargar" admite ese PDF para recuperar los datos. Probado con PDF reales: se conserva firmado con Acrobat y en el informe de firma de la UEx. Los metadatos (clave `SgtriDta` en `info`) llevan una copia de reserva, que se usa si el bloque falta: el informe de la UEx descarta los metadatos, pero "Adobe PDF" rehace las páginas y los conserva. "Microsoft Print to PDF" pierde ambos | `pdfGen.incrustarDatosEnContenido`, `pdfGen.buildDocDefinition` (`info`), `serializacionDatos.codificarDatosParaPdf`, `extraerDatosDePdf`, `importarArchivo` |
+| (2026-11-07) Mapeo de `evento-asociado` al cargar: el valor guardado (`despN`, posición de la ficha) se traducía como si fuera el id de la ficha, así que si se habían borrado fichas antes de guardar el congreso podía quedar asociado a otra. Ahora se restaura tal cual | `serializacionDatos.restaurarDesplazamientos`, `restaurarEvento` (se elimina `__tempMapeoDesplazamientos`) |
 
 **Lógica duplicada unificada:**
 - `utils.getNormativa`, que antes estaba en 5 sitios.
@@ -80,13 +88,9 @@
 - El alias `'congresos'`.
 - Variables y parámetros sin uso.
 
-## 3. Pendiente de revisar (decisión del usuario: revisar más a fondo más adelante)
+## 3. Pendiente de revisar
 
-1. **Mapeo de `evento-asociado` al cargar.** Si se borraron fichas antes de guardar, el congreso puede quedar asociado a otra ficha (`serializacionDatos.restaurarDesplazamientos`, clave `desp${id original}`).
-2. **Pérdidas silenciosas al cargar un `.dta`:**
-   - las fichas que superan el límite;
-   - los valores de select que no existen;
-   - los códigos de pago antiguos (`CuentaEsp`…).
+Nada pendiente. El mapeo de `evento-asociado` se corrigió el 2026-11-07 (§2) y las pérdidas silenciosas al cargar se descartaron (§4).
 
 ## 4. Decidido / sin acción
 
@@ -99,9 +103,9 @@
   - el listener de cambio de país que usa el contador global (`uiDesplazamientos.js`, `manejarCambioPais(desplazamientoCounter)`);
   - el tooltip de las fechas del congreso;
   - el viaje internacional de un solo día;
-  - el descuento de congreso en GNRAL con la ficha especial;
   - el fallo de `fetch(datos.json)` (por ejemplo, con `file://`);
-  - la ausencia de tests.
+  - la ausencia de tests;
+  - las pérdidas silenciosas al cargar un `.dta` (fichas por encima del límite, valores de select que no existen, códigos de pago antiguos como `CuentaEsp`): no hay archivos guardados en esas condiciones (decisión del 2026-11-07).
 
 ## 5. Datos personales
 

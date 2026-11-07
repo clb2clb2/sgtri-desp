@@ -311,9 +311,112 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
 
   /**
-   * Calcula el descuento por comidas incluidas en inscripción de congreso.
+   * Ficha del desplazamiento (normal, no especial) en el que se celebra el congreso:
+   * la única si solo hay una, o la elegida en "Evento asociado al desplazamiento".
+   * @returns {HTMLElement|null}
+   */
+  function getDesplazamientoAsociadoEvento() {
+    const normales = Array.from(document.querySelectorAll('.desplazamiento-grupo:not(.desplazamiento-especial)'));
+    if (normales.length === 0) return null;
+    if (normales.length === 1) return normales[0];
+
+    const valSel = document.getElementById('evento-asociado')?.value || '';
+    const m = valSel.match(/^desp(\d+)$/);
+    return m ? (normales[parseInt(m[1], 10) - 1] || null) : null;
+  }
+
+  /**
+   * Convierte una fecha dd/mm/aa del formulario a yyyy-mm-dd (o '' si no es válida).
+   * @param {string} valor
+   * @returns {string}
+   */
+  function fechaFormularioAIso(valor) {
+    const d = ld.parseDateStrict ? ld.parseDateStrict((valor || '').trim()) : null;
+    if (!d) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /**
+   * Calcula el descuento por comidas incluidas en inscripción de congreso y registra
+   * los datos del congreso que deciden qué comidas reducen el importe sujeto a IRPF.
    */
   function computeDescuentoManutencion() {
+    try {
+      calcularImporteDescuentoCongreso();
+      registrarCongresoParaIrpf();
+    } catch (e) {
+      console.warn('[computeDescuentoManutencion] Error:', e);
+    }
+  }
+
+  /**
+   * Registra el congreso (desplazamiento, fechas y comidas) y recalcula el resultado.
+   */
+  function registrarCongresoParaIrpf() {
+    const rl = window.resultadoLiquidacion;
+    if (!rl?.registrarCongreso) return;
+
+    const desde = fechaFormularioAIso(document.getElementById('evento-del')?.value);
+    const hasta = fechaFormularioAIso(document.getElementById('evento-al')?.value);
+    const fechasValidas = desde && hasta && desde <= hasta;
+
+    rl.registrarCongreso({
+      despId: getDesplazamientoAsociadoEvento()?.dataset?.desplazamientoId || null,
+      desde: fechasValidas ? desde : '',
+      hasta: fechasValidas ? hasta : '',
+      numComidas: Number(document.getElementById('evento-num-comidas')?.value) || 0,
+      comidasDiasRetencion: Number(document.getElementById('evento-comidas-retencion')?.value) || 0
+    });
+    rl.actualizarDescuentoCongreso?.();
+    rl.renderResultado?.();
+  }
+
+  /**
+   * Muestra la pregunta "¿cuántas comidas corresponden al día...?" solo si alguno de los
+   * días con retención cae dentro del congreso. Al ocultarla, la pone a 0.
+   * La llama resultadoLiquidacion.renderResultado con los días calculados.
+   * @param {Array<{fecha: string}>} dias - Días con retención dentro del congreso (yyyy-mm-dd)
+   */
+  function actualizarPreguntaComidasRetencion(dias) {
+    const row = document.getElementById('comidas-retencion-row');
+    const input = document.getElementById('evento-comidas-retencion');
+    const label = document.getElementById('evento-comidas-retencion-label');
+    if (!row || !input || !label) return;
+
+    const lista = Array.isArray(dias) ? dias : [];
+    if (lista.length === 0) {
+      row.style.display = 'none';
+      if (input.value !== '0') {
+        input.value = '0';
+        const congreso = window.__sgtriTotales?.congreso;
+        if (congreso) congreso.comidasDiasRetencion = 0;
+      }
+      return;
+    }
+
+    const fechas = lista.map(d => {
+      const [y, m, dd] = d.fecha.split('-');
+      return `${dd}/${m}/${y.slice(-2)}`;
+    });
+    const textoDias = fechas.length === 1
+      ? `al día ${fechas[0]}`
+      : `a los días ${fechas.slice(0, -1).join(', ')} o ${fechas[fechas.length - 1]}`;
+    label.textContent = `De estas comidas incluidas en el congreso, ¿cuántas corresponden ${textoDias}?`;
+
+    const numComidas = Number(document.getElementById('evento-num-comidas')?.value) || 0;
+    input.max = String(numComidas);
+    if ((Number(input.value) || 0) > numComidas) {
+      input.value = String(numComidas);
+      const congreso = window.__sgtriTotales?.congreso;
+      if (congreso) congreso.comidasDiasRetencion = numComidas;
+    }
+    row.style.display = '';
+  }
+
+  /**
+   * Calcula el importe del descuento por comidas del congreso y actualiza el mensaje.
+   */
+  function calcularImporteDescuentoCongreso() {
     try {
       const numEl = document.getElementById('evento-num-comidas');
       const hidden = document.getElementById('descuento-manut-congreso');
@@ -330,8 +433,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const desplazamientos = Array.from(document.querySelectorAll('.desplazamiento-grupo'));
-      if (desplazamientos.length === 0) {
+      const target = getDesplazamientoAsociadoEvento();
+      if (!target) {
         hidden.value = '0.00';
         if (msg) msg.style.display = '';
         if (msgAmount) msgAmount.textContent = '0,00 €';
@@ -339,36 +442,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       let paisIndex = 0;
-      if (desplazamientos.length === 1) {
-        const paisSelect = desplazamientos[0].querySelector('select[id^="pais-destino"]');
-        if (paisSelect) paisIndex = paisSelect.selectedIndex >= 0 ? paisSelect.selectedIndex : 0;
-      } else {
-        const eventoSelect = document.getElementById('evento-asociado');
-        if (!eventoSelect) { 
-          hidden.value = '0.00'; 
-          if (msg) msg.style.display = '';
-          if (msgAmount) msgAmount.textContent = '0,00 €';
-          return; 
-        }
-        const valSel = eventoSelect.value || '';
-        const m = valSel.match(/^desp(\d+)$/);
-        if (!m) { 
-          hidden.value = '0.00'; 
-          if (msg) msg.style.display = '';
-          if (msgAmount) msgAmount.textContent = '0,00 €';
-          return; 
-        }
-        const idx = parseInt(m[1], 10) - 1;
-        const target = desplazamientos[idx];
-        if (!target) { 
-          hidden.value = '0.00'; 
-          if (msg) msg.style.display = '';
-          if (msgAmount) msgAmount.textContent = '0,00 €';
-          return; 
-        }
-        const paisSelect = target.querySelector('select[id^="pais-destino"]');
-        if (paisSelect) paisIndex = paisSelect.selectedIndex >= 0 ? paisSelect.selectedIndex : 0;
-      }
+      const paisSelect = target.querySelector('select[id^="pais-destino"]');
+      if (paisSelect) paisIndex = paisSelect.selectedIndex >= 0 ? paisSelect.selectedIndex : 0;
 
       // Obtener precio de manutención según normativa y país
       const tipoProj = (document.getElementById('tipoProyecto') || {}).value || '';
@@ -404,8 +479,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const txt = descuento.toFixed(2).replace('.', ',') + ' €';
       if (msgAmount) msgAmount.textContent = txt;
       if (msg) msg.style.display = '';
-    } catch (e) { 
-      console.warn('[computeDescuentoManutencion] Error:', e);
+    } catch (e) {
+      console.warn('[calcularImporteDescuentoCongreso] Error:', e);
     }
   }
 
@@ -437,6 +512,12 @@ document.addEventListener('DOMContentLoaded', () => {
       computeDescuentoManutencion();
       recalcularTodosDesplazamientos();
     });
+  }
+
+  const comidasRetencionEl = document.getElementById('evento-comidas-retencion');
+  if (comidasRetencionEl) {
+    comidasRetencionEl.addEventListener('input', computeDescuentoManutencion);
+    comidasRetencionEl.addEventListener('change', computeDescuentoManutencion);
   }
 
   const eventoSel = document.getElementById('evento-asociado');
@@ -794,8 +875,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.classList && el.classList.contains('input-fecha')) {
       if (val.handleFechaBlur) val.handleFechaBlur(e);
       // Después del formateo, validar fechas del evento si corresponde
+      // y revisar si el congreso coincide con días con retención
       if (el.id === 'evento-del' || el.id === 'evento-al') {
         validarFechasEvento();
+        computeDescuentoManutencion();
       }
       return;
     }
@@ -1732,6 +1815,18 @@ document.addEventListener('DOMContentLoaded', () => {
       descuentoHidden.value = '0.00';
     }
 
+    // Pregunta de comidas en días con retención (a 0 y oculta)
+    const comidasRetencion = document.getElementById('evento-comidas-retencion');
+    if (comidasRetencion) {
+      comidasRetencion.value = '0';
+    }
+    const comidasRetencionRow = document.getElementById('comidas-retencion-row');
+    if (comidasRetencionRow) {
+      comidasRetencionRow.style.display = 'none';
+    }
+    window.resultadoLiquidacion?.registrarCongreso?.(null);
+    window.resultadoLiquidacion?.actualizarDescuentoCongreso?.();
+
     // Ocultar aviso de fechas
     document.querySelectorAll('.evento-fechas-warn').forEach(w => {
       w.style.display = 'none';
@@ -1801,6 +1896,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (descuentosContainer) {
       descuentosContainer.innerHTML = '';
     }
+
+    // Parte de la manutención descontada en días con retención
+    const manutRetencion = document.getElementById('descuento-manut-retencion');
+    if (manutRetencion) manutRetencion.value = '';
+    const manutRetencionRow = document.getElementById('manut-retencion-row');
+    if (manutRetencionRow) manutRetencionRow.style.display = 'none';
+    window.resultadoLiquidacion?.registrarManutencionDiasRetencion?.(0);
 
     // Resetear módulo de ajustes si existe
     if (window.uiAjustes?.reset) {
@@ -1881,10 +1983,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.uiImputacion.reset();
     }
 
-    // 4. Limpiar residuos de mapeo temporal
-    delete window.__tempMapeoDesplazamientos;
-
-    // 5. Renderizar resultado vacío
+    // 4. Renderizar resultado vacío
     if (window.resultadoLiquidacion?.renderResultado) {
       window.resultadoLiquidacion.renderResultado();
     }
@@ -1924,6 +2023,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.formLogic = window.formLogic || {};
   window.formLogic.validarDatos = validarDatos;
   window.formLogic.limpiarFormularioCompleto = limpiarFormularioCompleto;
+  window.formLogic.actualizarPreguntaComidasRetencion = actualizarPreguntaComidasRetencion;
 
   // ---- Listener delegado para botones de borrar sección ----
   document.addEventListener('click', (e) => {

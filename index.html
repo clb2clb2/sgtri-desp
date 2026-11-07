@@ -537,6 +537,12 @@
               <label>Se descontarán <span id="descuento-manut-amount">0,00 €</span> al importe final de
                 manutención.</label>
             </div>
+            <!-- Comidas del congreso en días con retención (se muestra sólo si las fechas del congreso los incluyen) -->
+            <div id="comidas-retencion-row" class="conditional-row comidas-retencion-row" style="display:none;">
+              <label for="evento-comidas-retencion" id="evento-comidas-retencion-label"></label>
+              <input type="number" id="evento-comidas-retencion" name="evento-comidas-retencion"
+                class="num-spinner limit-2digits" min="0" max="99" step="1" value="0" />
+            </div>
             <input type="hidden" id="descuento-manut-congreso" name="descuento-manut-congreso" value="0.00" />
           </form>
         </div>
@@ -655,6 +661,13 @@
 
             <!-- Contenedor de líneas de descuentos -->
             <div class="otros-descuentos-container" id="otros-descuentos-container"></div>
+
+            <!-- Parte del descuento de manutención en días con retención (se muestra sólo si hay ambos) -->
+            <div id="manut-retencion-row" class="conditional-row comidas-retencion-row manut-retencion-row" style="display:none;">
+              <label for="descuento-manut-retencion" id="descuento-manut-retencion-label"></label>
+              <input type="text" id="descuento-manut-retencion" name="descuento-manut-retencion"
+                class="format-alojamiento" maxlength="12" placeholder="0,00 €" />
+            </div>
           </form>
         </div>
       </div>

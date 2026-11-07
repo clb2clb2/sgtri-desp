@@ -323,7 +323,10 @@
         title: tituloLiquidacion,
         author: 'SGTRI - Universidad de Extremadura',
         subject: `Liquidación ${datos.tipoLiquidacion || 'GNRAL'} ${datos.proyecto?.referencia || ''}`,
-        creator: versionVisiblePdf ? `SGTRI ${versionVisiblePdf}` : 'SGTRI'
+        creator: versionVisiblePdf ? `SGTRI ${versionVisiblePdf}` : 'SGTRI',
+        // Copia de reserva de los datos ocultos (ver incrustarDatosEnContenido): sobrevive
+        // a programas que rehacen las páginas pero conservan los metadatos (Adobe PDF)
+        [window.serializacionDatos?.CLAVE_PDF_DTA || 'SgtriDta']: window.serializacionDatos?.codificarDatosParaPdf?.(datos)
       },
 
       // ─────────────────────────────────────────────────────────────────────
@@ -1752,10 +1755,11 @@
 
     // Mapa de tipos de descuento
     const tiposDescuento = {
-      'TOT': 'Total',
       'MNT': 'Manutención',
       'ALJ': 'Alojamiento',
       'KLM': 'Kilometraje',
+      'HON': 'Honorarios',
+      'INS': 'Inscripción en congreso',
       'OTR': 'Otros gastos'
     };
 
@@ -2275,6 +2279,29 @@
   }
 
   /**
+   * Incrusta el contenido del .dta al final de la última página, como un bloque
+   * marcado que no dibuja nada: el gestor puede recuperarlo cargando el PDF en la
+   * app (serializacionDatos.extraerDatosDePdf). Es el método principal: los
+   * metadatos (copia de reserva en buildDocDefinition) se pierden cuando un sistema
+   * de firma regenera el PDF (p. ej. el informe de firma de la UEx), mientras que
+   * el contenido de las páginas se copia tal cual.
+   * pdfmake llama a _flushDoc justo antes de cerrar el documento de pdfkit, con la
+   * última página aún abierta.
+   * @param {Object} pdf - Documento devuelto por pdfMake.createPdf
+   * @param {Object} datos - Datos de la liquidación
+   */
+  function incrustarDatosEnContenido(pdf, datos) {
+    const base64 = window.serializacionDatos?.codificarDatosParaPdf?.(datos);
+    if (!base64 || typeof pdf._flushDoc !== 'function') return;
+    const clave = window.serializacionDatos.CLAVE_PDF_DTA;
+    const flushOriginal = pdf._flushDoc;
+    pdf._flushDoc = function (pdfKitDoc, ...resto) {
+      pdfKitDoc.addContent(`/${clave} <</D (${base64})>> BDC EMC`);
+      return flushOriginal.call(this, pdfKitDoc, ...resto);
+    };
+  }
+
+  /**
    * Abre el PDF en una nueva pestaña.
    * @param {Object} [datos] - Datos de la liquidación (si no se proporciona, se obtienen del formulario)
    */
@@ -2311,7 +2338,9 @@
       }
 
       const docDefinition = buildDocDefinition(d, logoData, isSVG, logosGr24Base64);
-      pdfMake.createPdf(docDefinition).open();
+      const pdf = pdfMake.createPdf(docDefinition);
+      incrustarDatosEnContenido(pdf, d);
+      pdf.open();
 
     } catch (error) {
       console.error('[pdfGen] Error:', error);

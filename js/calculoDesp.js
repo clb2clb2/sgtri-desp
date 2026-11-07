@@ -633,8 +633,12 @@ function calcIRPF(parsed, manutenciones, precioManutencion, normativa, ticketCen
     const exento = Number((isLast || isPenultimateWithoutPernocta) ? limites[0] : limites[1]);
     const sujeto = round2(Math.max(0, bruto - exento));
 
+    // Fecha del día (yyyy-mm-dd), para cruzarla con las fechas del congreso
+    const dia = new Date(parsed.fechaIda.getFullYear(), parsed.fechaIda.getMonth(), parsed.fechaIda.getDate() + i);
+    const fecha = `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
+
     sujetoTotal += sujeto;
-    return { dayIndex: i + 1, units, brutoOriginal, bruto, exento, sujeto, isLast };
+    return { dayIndex: i + 1, fecha, units, precio: precioManutencion, brutoOriginal, bruto, exento, sujeto, isLast };
   });
 
   return {
@@ -1405,7 +1409,17 @@ window.calculoDesp._daysBetween = daysBetween;
           importeMaxAlojamiento: seg.nochesAmount || 0
         })) : null
       };
-      window.resultadoLiquidacion.registrarDesplazamiento(data.id, salidaData.totales, detallesSerializacion);
+      // Desglose diario del IRPF (de los tramos si es internacional), para los descuentos por día
+      const desgloseIrpf = fechasInvalidas
+        ? []
+        : (Array.isArray(segmentos) && segmentos.length > 0
+          ? segmentos.flatMap(seg => seg.irpf?.breakdown || [])
+          : (canonical.irpf?.breakdown || []));
+      window.resultadoLiquidacion.registrarDesplazamiento(
+        data.id,
+        { ...salidaData.totales, diasIrpf: desgloseIrpf },
+        detallesSerializacion
+      );
     }
 
     // 10. Actualizar resultado de la liquidación

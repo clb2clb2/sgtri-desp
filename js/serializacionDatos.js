@@ -316,6 +316,7 @@
       fechaHasta: obtenerValorCampo('evento-al'),
       gastosInscripcion: obtenerValorCampo('evento-gastos'),
       comidasIncluidas: obtenerValorCampo('evento-num-comidas', 'number'),
+      comidasDiasRetencion: obtenerValorCampo('evento-comidas-retencion', 'number'),
       desplazamientoAsociado: obtenerValorCampo('evento-asociado'),
       descuentoComidas: obtenerValorCampo('descuento-manut-congreso', 'number')
     };
@@ -347,7 +348,9 @@
         ? obtenerValorCampo('importe-anticipado')
         : '',
       comentarios: normalizarComentarios(obtenerValorCampo('comentarios-liquidacion')),
-      descuentos: []
+      descuentos: [],
+      // Parte de los descuentos de manutención que corresponde a días con retención
+      manutencionDiasRetencion: obtenerValorCampo('descuento-manut-retencion')
     };
 
     // Recopilar líneas de descuentos
@@ -662,8 +665,7 @@
   }
 
   /**
-   * Restaura todos los desplazamientos (síncrono) y deja en
-   * global.__tempMapeoDesplazamientos el mapeo de IDs para evento-asociado.
+   * Restaura todos los desplazamientos (síncrono), en el mismo orden en que se guardaron.
    * @param {Array} desplazamientos
    */
   function restaurarDesplazamientos(desplazamientos) {
@@ -698,21 +700,15 @@
     }
 
     const grupos = contenedor.querySelectorAll('.desplazamiento-grupo');
-    
-    // Mapa de IDs originales a índices reales (para evento-asociado)
-    const mapeoIds = {};
-    
+
     desplazamientos.forEach((desp, idx) => {
       const grupo = grupos[idx];
       if (grupo) {
         // Quitar clase entry para asegurar visibilidad
         grupo.classList.remove('entry');
-        
+
         const idReal = parseInt(grupo.dataset.desplazamientoId, 10);
-        
-        // Guardar mapeo: "despX" original → "despY" real
-        mapeoIds[`desp${desp.id}`] = `desp${idx + 1}`;
-        
+
         // Crear copia del objeto con el ID correcto
         const despConIdReal = { ...desp, id: idReal };
         restaurarDesplazamiento(despConIdReal, idx);
@@ -723,9 +719,6 @@
     if (uiDesp && uiDesp.actualizarNumerosDesplazamientos) {
       uiDesp.actualizarNumerosDesplazamientos();
     }
-    
-    // Devolver el mapeo para uso posterior
-    global.__tempMapeoDesplazamientos = mapeoIds;
   }
 
   /**
@@ -759,16 +752,10 @@
     establecerValorCampo('evento-gastos', datos.gastosInscripcion);
     establecerValorCampo('evento-num-comidas', datos.comidasIncluidas);
     establecerValorCampo('descuento-manut-congreso', datos.descuentoComidas);
-    
-    // Usar el mapeo de IDs si existe
-    let desplazamientoAsociado = datos.desplazamientoAsociado;
-    if (global.__tempMapeoDesplazamientos && datos.desplazamientoAsociado) {
-      const mapeado = global.__tempMapeoDesplazamientos[datos.desplazamientoAsociado];
-      if (mapeado) {
-        desplazamientoAsociado = mapeado;
-      }
-    }
-    establecerValorCampo('evento-asociado', desplazamientoAsociado);
+
+    // "despN" es la posición de la ficha (no su id) y las fichas se recrean en el
+    // mismo orden en que se guardaron, así que el valor sirve tal cual
+    establecerValorCampo('evento-asociado', datos.desplazamientoAsociado);
   }
 
   /**
@@ -803,7 +790,8 @@
         // Limpiar líneas existentes
         container.innerHTML = '';
 
-        datos.descuentos.forEach(descuento => {
+        // El descuento del total (TOT) ya no existe: se ignora
+        datos.descuentos.filter(descuento => descuento?.tipo !== 'TOT').forEach(descuento => {
           const linea = global.uiAjustes.crearLineaDescuento();
           container.appendChild(linea);
 
@@ -1061,7 +1049,7 @@
       global.uiDesplazamientoAecc.restaurarDatos(datos.desplazamientoAECC[0]);
     }
     
-    // Restaurar evento (después de desplazamientos para tener el mapeo)
+    // Restaurar evento (después de desplazamientos, para que existan las opciones de evento-asociado)
     restaurarEvento(datos.evento);
     restaurarHonorarios(datos.honorarios);
     restaurarAjustes(datos.ajustes);
@@ -1107,16 +1095,166 @@
     if (global.logicaDesp?.recalcularTodas) {
       global.logicaDesp.recalcularTodas();
     }
-    
+
+    // 6.1 Comidas del congreso en días con retención: solo ahora se sabe qué días tienen
+    // retención (antes, la pregunta oculta se habría puesto a 0)
+    establecerValorCampo('evento-comidas-retencion', datos.evento?.comidasDiasRetencion || 0);
+    // Lo mismo con la parte de los descuentos de manutención de días con retención
+    establecerValorCampo('descuento-manut-retencion', datos.ajustes?.manutencionDiasRetencion || '');
+    global.resultadoLiquidacion?.actualizarManutencionDiasRetencion?.();
+    if (typeof global.computeDescuentoManutencion === 'function') {
+      global.computeDescuentoManutencion();
+    }
+
     // 7. Restaurar imputación (después de recalcular para tener el total correcto)
     if (global.uiImputacion && typeof global.uiImputacion.restaurarLineas === 'function') {
       global.uiImputacion.restaurarLineas(datos.imputacion);
     }
-    
-    // 8. Limpiar mapeo temporal
-    delete global.__tempMapeoDesplazamientos;
 
     return { ok: true, cargaParcial: false };
+  }
+
+  // =========================================================================
+  // DATOS INCRUSTADOS EN EL PDF
+  // =========================================================================
+  // La última página del PDF termina con un bloque marcado que no dibuja nada
+  // ("/SgtriDta <</D (base64)>> BDC EMC", lo escribe pdfGen) con el mismo objeto que
+  // el .dta, en JSON → UTF-8 → base64. Sirve para que un gestor recupere los datos
+  // cargando el PDF en la app, incluso después de firmarlo. Los metadatos (Info) llevan
+  // una copia de reserva con la misma clave, por si un programa rehace las páginas.
+
+  const CLAVE_PDF_DTA = 'SgtriDta';
+
+  /**
+   * Codifica los datos del formulario para el bloque SgtriDta del PDF.
+   * @param {Object} datos - Objeto de recopilarTodo()
+   * @returns {string} base64
+   */
+  function codificarDatosParaPdf(datos) {
+    const bytes = new TextEncoder().encode(JSON.stringify(datos));
+    let binario = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binario += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(binario);
+  }
+
+  /**
+   * Última coincidencia de un patrón global en un texto (o null).
+   * Las actualizaciones incrementales de un PDF (p. ej., una firma) añaden al final
+   * las versiones nuevas de sus objetos, así que la última es la vigente.
+   * @param {RegExp} patron - Con flag g
+   * @param {string} texto
+   * @returns {RegExpExecArray|null}
+   */
+  function ultimaCoincidencia(patron, texto) {
+    let ultimo = null;
+    let m;
+    while ((m = patron.exec(texto)) !== null) ultimo = m;
+    return ultimo;
+  }
+
+  const CADENA_PDF = '(?:\\(([A-Za-z0-9+/=\\s]*)\\)|<([0-9A-Fa-f\\s]*)>)';
+
+  /** Bloque marcado que pdfGen añade al contenido de la última página (no dibuja nada) */
+  function patronMarcaContenido() {
+    return new RegExp(`/${CLAVE_PDF_DTA}\\s*<<\\s*/D\\s*${CADENA_PDF}\\s*>>\\s*BDC`, 'g');
+  }
+
+  async function descomprimirFlate(bytes) {
+    const flujo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+    return new Uint8Array(await new Response(flujo).arrayBuffer());
+  }
+
+  /**
+   * Busca el bloque marcado dentro de los streams comprimidos (FlateDecode) del PDF.
+   * Es lo que queda cuando un sistema de firma regenera el PDF copiando las páginas
+   * pero descartando los metadatos (p. ej. el informe de firma de la UEx).
+   * @param {Uint8Array} bytes
+   * @param {string} texto - Los mismos bytes decodificados como latin1
+   * @returns {Promise<RegExpExecArray|null>}
+   */
+  async function buscarCadenaEnStreams(bytes, texto) {
+    if (typeof DecompressionStream === 'undefined') return null;
+    const inicio = /(?<![A-Za-z])stream\r?\n/g;
+    let m;
+    while ((m = inicio.exec(texto)) !== null) {
+      const desde = m.index + m[0].length;
+      const hasta = texto.indexOf('endstream', desde);
+      if (hasta < 0) break;
+      inicio.lastIndex = hasta + 'endstream'.length;
+
+      // Los datos van seguidos de un fin de línea opcional antes de "endstream"
+      const datos = bytes.subarray(desde, hasta);
+      let sinEol = datos.length;
+      if (datos[sinEol - 1] === 0x0A) sinEol--;
+      if (datos[sinEol - 1] === 0x0D) sinEol--;
+      for (const candidato of [datos.subarray(0, sinEol), datos]) {
+        try {
+          const contenido = new TextDecoder('latin1').decode(await descomprimirFlate(candidato));
+          const cadena = ultimaCoincidencia(patronMarcaContenido(), contenido);
+          if (cadena) return cadena;
+          break;
+        } catch {
+          // No es Flate o sobra el fin de línea: probar el siguiente candidato
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Busca la copia de reserva en los metadatos. En el diccionario Info la clave puede
+   * apuntar a un objeto aparte ("/SgtriDta 38 0 R", así lo escribe pdfmake) o llevar
+   * la cadena directamente. Acrobat y Adobe PDF comprimen el Info al guardar, pero
+   * dejan una copia en claro en el XMP.
+   * @param {string} texto - PDF decodificado como latin1
+   * @returns {RegExpExecArray|null}
+   */
+  function buscarCadenaEnMetadatos(texto) {
+    let cadena = null;
+    const ref = ultimaCoincidencia(new RegExp(`/${CLAVE_PDF_DTA}\\s+(\\d+)\\s+(\\d+)\\s+R`, 'g'), texto);
+    if (ref) {
+      cadena = ultimaCoincidencia(new RegExp(`(?:^|[^0-9])${ref[1]}\\s+${ref[2]}\\s+obj\\s*${CADENA_PDF}`, 'g'), texto);
+    } else {
+      cadena = ultimaCoincidencia(new RegExp(`/${CLAVE_PDF_DTA}\\s*${CADENA_PDF}`, 'g'), texto);
+    }
+    if (!cadena) {
+      cadena = ultimaCoincidencia(new RegExp(`<[\\w-]+:${CLAVE_PDF_DTA}>([A-Za-z0-9+/=\\s]*)</[\\w-]+:${CLAVE_PDF_DTA}>`, 'g'), texto);
+    }
+    return cadena;
+  }
+
+  /**
+   * Extrae los datos incrustados en un PDF generado por la app.
+   * Busca el bloque marcado primero en claro (por si algún programa ha descomprimido
+   * las páginas) y luego en los streams comprimidos; si no está, recurre a la copia
+   * de los metadatos. La cadena puede ser literal o hexadecimal (por si otro
+   * programa reescribe el PDF).
+   * @param {ArrayBuffer} buffer - Contenido del PDF
+   * @returns {Promise<Object|null>} Objeto del .dta, o null si el PDF no lo contiene
+   */
+  async function extraerDatosDePdf(buffer) {
+    const texto = new TextDecoder('latin1').decode(buffer);
+    const cadena = ultimaCoincidencia(patronMarcaContenido(), texto)
+      || await buscarCadenaEnStreams(new Uint8Array(buffer), texto)
+      || buscarCadenaEnMetadatos(texto);
+    if (!cadena) return null;
+
+    let base64 = cadena[1];
+    if (base64 == null) {
+      const hex = cadena[2].replace(/\s+/g, '');
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+      const esUtf16 = bytes[0] === 0xFE && bytes[1] === 0xFF;
+      base64 = esUtf16
+        ? new TextDecoder('utf-16be').decode(bytes.subarray(2))
+        : new TextDecoder('latin1').decode(bytes);
+    }
+
+    const binario = atob(base64.replace(/\s+/g, ''));
+    const bytes = Uint8Array.from(binario, c => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder('utf-8').decode(bytes));
   }
 
   // =========================================================================
@@ -1175,7 +1313,8 @@
   }
 
   /**
-   * Importa datos desde un archivo .dta
+   * Importa datos desde un archivo .dta, o desde un PDF generado por la app
+   * (que lleva los mismos datos ocultos al final de la última página y en sus metadatos)
    * @param {File} archivo - Archivo seleccionado
    * @returns {Promise<{ok: boolean, cargaParcial: boolean, motivo?: string, cancelado?: boolean}>}
    */
@@ -1186,18 +1325,29 @@
         return;
       }
 
-      // Verificar extensión (.dta o .json para compatibilidad con Android)
+      // Verificar extensión (.dta o .json para compatibilidad con Android, o .pdf)
       const nombreLower = archivo.name.toLowerCase();
-      if (!nombreLower.endsWith('.dta') && !nombreLower.endsWith('.json')) {
-        reject(new Error('El archivo debe tener extensión .dta'));
+      const esPdf = nombreLower.endsWith('.pdf');
+      if (!esPdf && !nombreLower.endsWith('.dta') && !nombreLower.endsWith('.json')) {
+        reject(new Error('El archivo debe tener extensión .dta o .pdf'));
         return;
       }
 
       const lector = new FileReader();
-      
+
       lector.onload = async (e) => {
+        let datos;
         try {
-          const datos = JSON.parse(e.target.result);
+          datos = esPdf ? await extraerDatosDePdf(e.target.result) : JSON.parse(e.target.result);
+        } catch (error) {
+          reject(new Error(`Error al leer el archivo: ${error.message}`));
+          return;
+        }
+        if (esPdf && !datos) {
+          reject(new Error('Este PDF no contiene datos del formulario. Solo se pueden cargar los PDF generados por esta aplicación.'));
+          return;
+        }
+        try {
           const resultado = await restaurarTodo(datos);
           resolve(resultado);
         } catch (error) {
@@ -1209,7 +1359,11 @@
         reject(new Error('Error al leer el archivo'));
       };
 
-      lector.readAsText(archivo);
+      if (esPdf) {
+        lector.readAsArrayBuffer(archivo);
+      } else {
+        lector.readAsText(archivo);
+      }
     });
   }
 
@@ -1229,7 +1383,7 @@
   function abrirDialogoImportar() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.dta,.json';
+    input.accept = '.dta,.json,.pdf';
     
     input.onchange = async (e) => {
       const archivo = e.target.files[0];
@@ -1261,7 +1415,10 @@
     exportarArchivo,
     importarArchivo,
     abrirDialogoImportar,
-    generarNombreArchivo
+    generarNombreArchivo,
+    codificarDatosParaPdf,
+    extraerDatosDePdf,
+    CLAVE_PDF_DTA
   };
 
   global.serializacionDatos = serializacionDatos;

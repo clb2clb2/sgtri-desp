@@ -44,6 +44,19 @@
   // =========================================================================
 
   /**
+   * Indica si un tipo de descuento se ofrece en la liquidación actual:
+   * Honorarios solo si hay sección de honorarios, e Inscripción solo si hay de congresos.
+   * @param {string} tipo - Código del descuento (MNT, HON, INS...)
+   * @returns {boolean}
+   */
+  function tipoDescuentoDisponible(tipo) {
+    const cfg = global.tipoLiquidacion?.getConfig?.() || {};
+    if (tipo === 'HON') return !!cfg.mostrarHonorarios;
+    if (tipo === 'INS') return !!cfg.mostrarEventos;
+    return true;
+  }
+
+  /**
    * Crea una nueva línea de descuento
    * @returns {HTMLElement} El elemento de la línea creada
    */
@@ -69,13 +82,15 @@
     // Poblar select desde datos.json
     const descuentos = (global.utils?.getSgtriDatos()?.otrosDescuentos) ||
                        (global.__sgtriDatos?.otrosDescuentos) || [];
-    descuentos.forEach((item, index) => {
-      const opt = document.createElement('option');
-      opt.value = item[1] || item[0];
-      opt.textContent = item[0];
-      if (index === 0) opt.selected = true;
-      selectTipo.appendChild(opt);
-    });
+    descuentos
+      .filter(item => tipoDescuentoDisponible(item[1] || item[0]))
+      .forEach((item, index) => {
+        const opt = document.createElement('option');
+        opt.value = item[1] || item[0];
+        opt.textContent = item[0];
+        if (index === 0) opt.selected = true;
+        selectTipo.appendChild(opt);
+      });
 
     colTipo.appendChild(labelTipo);
     colTipo.appendChild(selectTipo);
@@ -189,12 +204,63 @@
   }
 
   /**
+   * Muestra la pregunta "Del descuento en manutención, ¿qué importe corresponde
+   * al día...?" solo si hay descuentos de manutención y días con retención. Al ocultarla,
+   * la vacía; si supera lo descontado, la limita.
+   * La llama resultadoLiquidacion.renderResultado con los datos calculados.
+   * @param {Array<{fecha: string}>} dias - Días con retención (yyyy-mm-dd)
+   * @param {number} maximo - Total de los descuentos de manutención (MNT)
+   */
+  function actualizarPreguntaManutencionRetencion(dias, maximo) {
+    const row = document.getElementById('manut-retencion-row');
+    const input = document.getElementById('descuento-manut-retencion');
+    const label = document.getElementById('descuento-manut-retencion-label');
+    if (!row || !input || !label) return;
+
+    const fechas = [...new Set((Array.isArray(dias) ? dias : []).map(d => d.fecha))];
+    if (fechas.length === 0 || !(maximo > 0)) {
+      row.style.display = 'none';
+      if (input.value !== '') {
+        input.value = '';
+        global.resultadoLiquidacion?.registrarManutencionDiasRetencion?.(0);
+      }
+      return;
+    }
+
+    const textos = fechas.map(fecha => {
+      const [y, m, d] = fecha.split('-');
+      return `${d}/${m}/${y.slice(-2)}`;
+    });
+    const textoDias = textos.length === 1
+      ? `al día ${textos[0]}`
+      : `a los días ${textos.slice(0, -1).join(', ')} o ${textos[textos.length - 1]}`;
+    label.textContent = `Del descuento en manutención, ¿qué importe corresponde ${textoDias}?`;
+
+    if (global.utils.parseNumber(input.value) > maximo) {
+      input.value = `${global.utils.fmt(maximo)} €`;
+      global.resultadoLiquidacion?.registrarManutencionDiasRetencion?.(maximo);
+    }
+    row.style.display = '';
+  }
+
+  /**
    * Inicializa el módulo
    */
   function init() {
     const btnAdd = document.getElementById('btn-add-descuento');
     if (btnAdd) {
       btnAdd.addEventListener('click', agregarDescuento);
+    }
+
+    const manutRetencion = document.getElementById('descuento-manut-retencion');
+    if (manutRetencion) {
+      // En el siguiente tick, para que formLogic ya haya formateado el importe
+      const onChange = () => setTimeout(() => {
+        global.resultadoLiquidacion?.actualizarManutencionDiasRetencion?.();
+        global.resultadoLiquidacion?.renderResultado?.();
+      }, 0);
+      manutRetencion.addEventListener('change', onChange);
+      manutRetencion.addEventListener('blur', onChange);
     }
 
     const tipoActual = global.tipoLiquidacion?.getTipoActual
@@ -221,6 +287,7 @@
     crearLineaDescuento,
     actualizarBotonAddDescuento,
     actualizarVisibilidadImporteAnticipado,
+    actualizarPreguntaManutencionRetencion,
     getDescuentoCounter: () => descuentoCounter,
     setDescuentoCounter: (val) => { descuentoCounter = val; },
     reset

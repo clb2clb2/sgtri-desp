@@ -1,5 +1,5 @@
 {
-  "versionEsquema": "26.10.2",
+  "versionEsquema": "26.11.1",
   "limites": {
     "maxDesplazamientos": 8,
     "maxOtrosGastosPorDesplazamiento": 10,
@@ -50,10 +50,11 @@
     ["Otros gastos", "OTR"]
   ],
   "otrosDescuentos": [
-    ["Total", "TOT"],
     ["Manutención", "MNT"],
     ["Alojamiento", "ALJ"],
     ["Kilometraje", "KLM"],
+    ["Honorarios", "HON"],
+    ["Inscripción en Congreso", "INS"],
     ["Otros gastos", "OTR"]
   ],
   "kmTarifas": {
